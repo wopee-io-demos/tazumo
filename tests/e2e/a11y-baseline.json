@@ -1,0 +1,61 @@
+{
+  "description": "Known serious/critical axe violations accepted until the linked issue is fixed. A scan fails on any rule not listed here or on more nodes than maxNodes. Remove entries when the fix lands.",
+  "entries": [
+    {
+      "scan": "catalogue-violet",
+      "rule": "color-contrast",
+      "impact": "serious",
+      "maxNodes": 1,
+      "issue": "https://github.com/wopee-io-demos/tazumo/issues/46",
+      "reason": "Hero disclaimer .hero small (#76727a) on the palette background is below 4.5:1 for 13.33px text."
+    },
+    {
+      "scan": "catalogue-coral",
+      "rule": "color-contrast",
+      "impact": "serious",
+      "maxNodes": 1,
+      "issue": "https://github.com/wopee-io-demos/tazumo/issues/46",
+      "reason": "Hero disclaimer .hero small (#76727a) on the palette background is below 4.5:1 for 13.33px text."
+    },
+    {
+      "scan": "catalogue-emerald",
+      "rule": "color-contrast",
+      "impact": "serious",
+      "maxNodes": 1,
+      "issue": "https://github.com/wopee-io-demos/tazumo/issues/46",
+      "reason": "Hero disclaimer .hero small (#76727a) on the palette background is below 4.5:1 for 13.33px text."
+    },
+    {
+      "scan": "catalogue-midnight",
+      "rule": "color-contrast",
+      "impact": "serious",
+      "maxNodes": 1,
+      "issue": "https://github.com/wopee-io-demos/tazumo/issues/46",
+      "reason": "Hero disclaimer .hero small (#76727a) on the palette background is below 4.5:1 for 13.33px text."
+    },
+    {
+      "scan": "search-results",
+      "rule": "color-contrast",
+      "impact": "serious",
+      "maxNodes": 1,
+      "issue": "https://github.com/wopee-io-demos/tazumo/issues/46",
+      "reason": "Hero disclaimer .hero small (#76727a) on the palette background is below 4.5:1 for 13.33px text."
+    },
+    {
+      "scan": "search-empty",
+      "rule": "color-contrast",
+      "impact": "serious",
+      "maxNodes": 1,
+      "issue": "https://github.com/wopee-io-demos/tazumo/issues/46",
+      "reason": "Hero disclaimer .hero small (#76727a) on the palette background is below 4.5:1 for 13.33px text."
+    },
+    {
+      "scan": "cart",
+      "rule": "color-contrast",
+      "impact": "serious",
+      "maxNodes": 2,
+      "issue": "https://github.com/wopee-io-demos/tazumo/issues/46",
+      "reason": "Cart line unit price .cartLine small (#777777 on #FFFFFF, 4.47:1) is below 4.5:1; one node per cart line, the scan uses two lines."
+    }
+  ]
+}
