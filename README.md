@@ -64,16 +64,23 @@ SUT reference imagery captured from the real app. These are not Wopee or Appium 
 
 | Provenance | iOS | Android |
 | --- | --- | --- |
-| Workflow run | [SUT screenshots #44811016593](https://github.com/wopee-io-demos/tazumo/actions/runs/44811016593) | same run |
+| Workflow run | [SUT screenshots #44817080915](https://github.com/wopee-io-demos/tazumo/actions/runs/44817080915) | same run |
 | SUT commit | [`3354ab6`](https://github.com/wopee-io-demos/tazumo/commit/3354ab63930c56ff8fb138e55c1682c54029a04c) (last change to `apps/mobile`, `packages`, workspace config) | same |
-| Capture commit | `e7c1390` (PR head of [#57](https://github.com/wopee-io-demos/tazumo/pull/57)) | same |
+| Capture commit | `b925225` on the [#57](https://github.com/wopee-io-demos/tazumo/pull/57) branch. Later commits in that PR only pinned the Maestro download and emulator action, forced Android light mode and added checksums and resolved versions to `provenance.json` | same |
 | Build | Release `iphonesimulator` build with the JS bundle embedded, unsigned | Release-variant APK with the JS bundle embedded, signed with the debug keystore, x86_64 |
-| Device | iPhone 16 Pro simulator, iOS 26.2, Xcode 16.4, hosted `macos-15` | `sdk_gphone64_x86_64` emulator, Android 14 (API 34), hosted `ubuntu-latest` with KVM |
+| Device | iPhone 16 Pro simulator on the iOS 26.2 runtime, built with Xcode 16.4 (iPhoneSimulator 18.5 SDK), hosted `macos-15` | `sdk_gphone64_x86_64` emulator, Android 14 (API 34), hosted `ubuntu-latest` with KVM |
 | Capture | `xcrun simctl io screenshot`; taps by Maestro 1.41.0 | `adb exec-out screencap -p`; taps by Maestro 1.41.0 |
 | Fixture data | Same synthetic catalogue and cart as the web gallery | same |
-| Captured | 2026-11-20 ([`provenance.json`](docs/screenshots/ios/provenance.json)) | 2026-11-20 ([`provenance.json`](docs/screenshots/android/provenance.json)) |
+| Captured | 2026-11-20 ([`provenance.json`](docs/screenshots/ios/provenance.json), [`SHA256SUMS`](docs/screenshots/ios/SHA256SUMS)) | 2026-11-20 ([`provenance.json`](docs/screenshots/android/provenance.json), [`SHA256SUMS`](docs/screenshots/android/SHA256SUMS)) |
 
-The PNGs are the exact files from the run's `tazumo-screenshots-ios` and `tazumo-screenshots-android` artifacts, optimised in CI with pngquant. Regenerate them by running the [SUT screenshots workflow](.github/workflows/screenshots.yml) (`workflow_dispatch`, or any PR touching `apps/mobile/**`, `packages/**` or the capture files), then `gh run download <run-id> -n tazumo-screenshots-ios -n tazumo-screenshots-android` into `docs/screenshots/`. Release builds are used because debug builds need a running Metro dev server.
+The PNGs and `provenance.json` are the exact files from the run's `tazumo-screenshots-ios` and `tazumo-screenshots-android` artifacts, optimised in CI with pngquant; `SHA256SUMS` was computed from the downloaded artifacts, so the match stays checkable after the artifacts expire (newer runs also write the checksums into `provenance.json`). To regenerate, run the [SUT screenshots workflow](.github/workflows/screenshots.yml) (`workflow_dispatch`, or any PR touching `apps/mobile/**`, `packages/**` or the capture files), then:
+
+```sh
+gh run download <run-id> -n tazumo-screenshots-ios -D docs/screenshots/ios
+gh run download <run-id> -n tazumo-screenshots-android -D docs/screenshots/android
+```
+
+Release builds are used because debug builds need a running Metro dev server.
 
 ## Delivery governance
 [GitHub Issues backlog](https://github.com/wopee-io-demos/tazumo/issues) is the operational tracker. Changes require issue, OpenSpec and, when relevant, ADR. Read [PR quality and merge policy](docs/PR-QUALITY.md).

@@ -1,14 +1,14 @@
 {
   "platform": "ios",
   "sutCommit": "3354ab63930c56ff8fb138e55c1682c54029a04c",
-  "captureCommit": "e7c13909967dddc144d190f1b952a9383d2abe23",
-  "workflowRun": "https://github.com/wopee-io-demos/tazumo/actions/runs/44811016593",
+  "captureCommit": "b9252256571d4cd2d1cac3b172f773c28ad1f64f",
+  "workflowRun": "https://github.com/wopee-io-demos/tazumo/actions/runs/44817080915",
   "runner": "macOS macos15 20261118.0550.1",
   "device": "iPhone 16 Pro (iOS-26-2) simulator",
   "os": "macOS 15.8.2, Xcode 16.4 Build version 16F6 ",
   "build": "Release iphonesimulator build (JS bundle embedded), unsigned",
   "fixtureData": "packages/core/src/index.ts products (synthetic, illustrative); cart = 2x Margherita pizza, 1x Sourdough loaf, 1x Fresh flowers",
-  "optimiser": "3.0.3",
+  "optimiser": "pngquant 3.0.3",
   "driver": "Maestro 1.41.0 for taps; screenshots taken by the platform tool",
-  "capturedAt": "2026-11-20T21:02:16Z"
+  "capturedAt": "2026-11-20T21:49:45Z"
 }

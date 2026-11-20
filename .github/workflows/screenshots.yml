@@ -15,6 +15,7 @@ concurrency:
   cancel-in-progress: true
 env:
   MAESTRO_VERSION: 1.41.0
+  MAESTRO_SHA256: 0b87a2eed8c1594fe572c5f29d6d64af389f4b7231ddde714179bbcb05f0fe0c
   MAESTRO_CLI_NO_ANALYTICS: '1'
   MAESTRO_CLI_ANALYSIS_NOTIFICATION_DISABLED: 'true'
 jobs:
@@ -66,7 +67,8 @@ jobs:
         run: |
           udid="$(xcrun simctl list devices available -j | node -e "
             const d=JSON.parse(require('fs').readFileSync(0)).devices;
-            const ios=Object.keys(d).filter(r=>r.includes('iOS')).sort().reverse();
+            const ver=r=>r.split('iOS-')[1].split('-').map(Number);
+            const ios=Object.keys(d).filter(r=>r.includes('iOS-')).sort((a,b)=>{const x=ver(a),y=ver(b);return (y[0]-x[0])||((y[1]||0)-(x[1]||0))});
             for(const r of ios){const x=d[r].find(x=>/^iPhone 16( |$)/.test(x.name))||d[r].find(x=>x.name.startsWith('iPhone'));if(x){console.log(x.udid);break}}")"
           test -n "$udid"
           xcrun simctl boot "$udid"
@@ -79,8 +81,7 @@ jobs:
         run: xcodebuild -workspace Tazumo.xcworkspace -scheme Tazumo -configuration Release -sdk iphonesimulator -destination "id=${{ steps.sim.outputs.udid }}" -derivedDataPath "$RUNNER_TEMP/tazumo-ios" ONLY_ACTIVE_ARCH=YES CODE_SIGNING_ALLOWED=NO build
       - name: Install Maestro and pngquant
         run: |
-          curl -fsSL https://get.maestro.mobile.dev | bash
-          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+          bash tests/screenshots/native/install-maestro.sh
           HOMEBREW_NO_AUTO_UPDATE=1 brew install pngquant
       - name: Capture
         run: bash tests/screenshots/native/ios.sh "$RUNNER_TEMP/tazumo-ios/Build/Products/Release-iphonesimulator/Tazumo.app" "${{ steps.sim.outputs.udid }}" screenshots/ios
@@ -127,11 +128,10 @@ jobs:
           sudo udevadm trigger --name-match=kvm
       - name: Install Maestro and pngquant
         run: |
-          curl -fsSL https://get.maestro.mobile.dev | bash
-          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+          bash tests/screenshots/native/install-maestro.sh
           sudo apt-get update -q && sudo apt-get install -yq pngquant
       - name: Capture
-        uses: reactivecircus/android-emulator-runner@v2
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
           api-level: 34
           arch: x86_64

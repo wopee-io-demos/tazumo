@@ -17,6 +17,7 @@ statusbar(){
   demo notifications -e visible false
   sleep 1
 }
+adb shell cmd uimode night no
 adb install -r "$apk"
 adb shell monkey -p io.wopee.demos.tazumo -c android.intent.category.LAUNCHER 1 >/dev/null
 maestro test "$here/wait-catalogue.yaml"

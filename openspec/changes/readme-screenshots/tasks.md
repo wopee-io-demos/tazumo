@@ -9,9 +9,10 @@
 - [x] Current-head CI green ([run 44809089544](https://github.com/wopee-io-demos/tazumo/actions/runs/44809089544)), independent review recorded, merged in #52 as `f047b5a`.
 
 ## Native gallery (PR 2)
-- [x] `.github/workflows/screenshots.yml`: web job, iOS simulator job (hosted macos-15, Release simulator build, iPhone 16 Pro / iOS 26.2) and Android emulator job (ubuntu-latest + KVM, API 34 x86_64, release-variant APK); Maestro 1.41.0 taps, platform-tool screenshots, pngquant, artifacts. Evidence: [run 44811016593](https://github.com/wopee-io-demos/tazumo/actions/runs/44811016593) on `e7c1390`, all three jobs success.
-- [x] CI PNGs copied into `docs/screenshots/ios/` and `docs/screenshots/android/` with their `provenance.json`; sha256 of committed files equals the downloaded artifacts. All four PNGs opened: real app, catalogue and cart with subtotal €46.20.
-- [x] Android status bar demo mode re-applied right before each screencap (run 44811016593 showed a real clock); validated by the current-head run, committed PNGs stay those of run 44811016593.
+- [x] `.github/workflows/screenshots.yml`: web job, iOS simulator job (hosted macos-15, Release simulator build, iPhone 16 Pro on iOS 26.2) and Android emulator job (ubuntu-latest + KVM, API 34 x86_64, release-variant APK); Maestro 1.41.0 taps, platform-tool screenshots, pngquant, artifacts. Evidence: [run 44811016593](https://github.com/wopee-io-demos/tazumo/actions/runs/44811016593) on `e7c1390` and [run 44817080915](https://github.com/wopee-io-demos/tazumo/actions/runs/44817080915) on `b925225`, all jobs success.
+- [x] Android status bar: run 44811016593 showed a real clock; re-applying demo mode before each screencap gives a clean 9:41 in run 44817080915 (PNGs opened).
+- [x] PNGs and `provenance.json` of run 44817080915 copied into `docs/screenshots/ios/` and `docs/screenshots/android/`; `SHA256SUMS` computed from the downloaded artifacts and verified with `shasum -a 256 -c`. All four PNGs opened: real app, catalogue and cart with subtotal €46.20.
+- [x] Independent review of `b925225`: no blockers. Addressed: PNGs from the current-head run, README regenerate command uses `-D` per platform, checksums (committed `SHA256SUMS`; new runs write `pngSha256` and resolved Expo/React Native versions into `provenance.json`), Maestro downloaded from a pinned release with sha256 check, emulator action pinned to a commit SHA, numeric iOS runtime sort, iOS SDK/runtime stated, udid passed as an argument, Android light mode forced.
 - [ ] Current-head CI green, independent review recorded, merged; merge SHA on #37.
 
 ## Downstream
