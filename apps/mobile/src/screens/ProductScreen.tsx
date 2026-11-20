@@ -1,5 +1,5 @@
 import React from 'react';
-import {View,Text,Pressable,ScrollView,StyleSheet} from 'react-native';
+import {View,Text,Pressable,ScrollView,StyleSheet,AccessibilityInfo,Platform} from 'react-native';
 import {t,categoryLabel,formatLocalizedPrice,type Language,type Product} from '@tazumo/core';
 import {m} from '../messages';
 import {ScreenHeader} from './ScreenHeader';
@@ -8,16 +8,17 @@ import type {Colors} from './types';
 type Props={product:Product;quantity:number;count:number;lang:Language;colors:Colors;onAdd:()=>void;onBack:()=>void;onCart:()=>void};
 
 export function ProductScreen({product,quantity,count,lang,colors,onAdd,onBack,onCart}:Props){
+ const add=()=>{onAdd();if(Platform.OS==='ios')AccessibilityInfo.announceForAccessibility(`${m(lang,'inCart')}: ${quantity+1}`)};
  return <View testID="sut-detail-screen" style={styles.screen}>
   <ScreenHeader title={product.name} lang={lang} colors={colors} count={count} onBack={onBack} onCart={onCart}/>
   <ScrollView contentContainerStyle={styles.body}>
    <View style={[styles.hero,{backgroundColor:colors.background}]}><Text style={styles.emoji} accessible={false}>{product.emoji}</Text></View>
    <Text style={styles.merchant}>{product.merchant} · {categoryLabel(lang,product.category)}</Text>
-   <Text testID="sut-detail-title" accessibilityRole="header" style={[styles.name,{color:colors.ink}]}>{product.name}</Text>
+   <Text testID="sut-detail-title" style={[styles.name,{color:colors.ink}]}>{product.name}</Text>
    <Text style={styles.description}>{product.description}</Text>
    <Text testID="sut-detail-price" style={styles.price}>{formatLocalizedPrice(product.priceCents,lang)}</Text>
    <Text style={styles.note}>{t(lang,'demo')}</Text>
-   <Pressable testID="sut-detail-add" accessibilityRole="button" accessibilityLabel={`${m(lang,'addToCart')}: ${product.name}`} onPress={onAdd} style={[styles.add,{backgroundColor:colors.primary}]}><Text style={styles.addText}>{m(lang,'addToCart')}</Text></Pressable>
+   <Pressable testID="sut-detail-add" accessibilityRole="button" accessibilityLabel={`${m(lang,'addToCart')}: ${product.name}`} onPress={add} style={[styles.add,{backgroundColor:colors.primary}]}><Text style={styles.addText}>{m(lang,'addToCart')}</Text></Pressable>
    <Text testID="sut-detail-quantity" accessibilityLiveRegion="polite" style={styles.inCart}>{m(lang,'inCart')}: {quantity}</Text>
   </ScrollView>
  </View>;

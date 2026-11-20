@@ -1,5 +1,5 @@
 import React from 'react';
-import {View,Text,Pressable,ScrollView,StyleSheet} from 'react-native';
+import {View,Text,Pressable,ScrollView,StyleSheet,AccessibilityInfo} from 'react-native';
 import {t,cartTotal,formatLocalizedPrice,type Cart,type Language} from '@tazumo/core';
 import {m} from '../messages';
 import {cartLines} from '../shopping';
@@ -10,6 +10,8 @@ type Props={cart:Cart;count:number;lang:Language;colors:Colors;onChange:(id:stri
 
 export function CartScreen({cart,count,lang,colors,onChange,onRemove,onBack}:Props){
  const lines=cartLines(cart);
+ const change=(id:string,name:string,next:number,delta:number)=>{onChange(id,delta);AccessibilityInfo.announceForAccessibility(next>0?`${name}, ${m(lang,'quantity')}: ${next}`:`${m(lang,'remove')} ${name}`)};
+ const remove=(id:string,name:string)=>{onRemove(id);AccessibilityInfo.announceForAccessibility(`${m(lang,'remove')} ${name}`)};
  return <View testID="sut-cart-screen" style={styles.screen}>
   <ScreenHeader title={t(lang,'basket')} lang={lang} colors={colors} count={count} onBack={onBack}/>
   <ScrollView contentContainerStyle={styles.body}>
@@ -19,12 +21,12 @@ export function CartScreen({cart,count,lang,colors,onChange,onRemove,onBack}:Pro
     <View style={styles.info}>
      <Text style={styles.name}>{p.name}</Text>
      <Text style={styles.price}>{formatLocalizedPrice(p.priceCents*quantity,lang)}</Text>
-     <Pressable testID={`sut-cart-remove-${p.id}`} accessibilityRole="button" accessibilityLabel={`${m(lang,'remove')} ${p.name}`} onPress={()=>onRemove(p.id)} style={styles.remove}><Text style={[styles.removeText,{color:colors.primary}]}>{m(lang,'remove')}</Text></Pressable>
+     <Pressable testID={`sut-cart-remove-${p.id}`} accessibilityRole="button" accessibilityLabel={`${m(lang,'remove')} ${p.name}`} onPress={()=>remove(p.id,p.name)} style={styles.remove}><Text style={[styles.removeText,{color:colors.primary}]}>{m(lang,'remove')}</Text></Pressable>
     </View>
     <View style={styles.stepper}>
-     <Pressable testID={`sut-cart-decrease-${p.id}`} accessibilityRole="button" accessibilityLabel={`${t(lang,'removeOne')} ${p.name}`} onPress={()=>onChange(p.id,-1)} style={styles.step}><Text style={styles.stepText}>−</Text></Pressable>
+     <Pressable testID={`sut-cart-decrease-${p.id}`} accessibilityRole="button" accessibilityLabel={`${t(lang,'removeOne')} ${p.name}`} onPress={()=>change(p.id,p.name,quantity-1,-1)} style={styles.step}><Text style={styles.stepText}>−</Text></Pressable>
      <Text testID={`sut-cart-quantity-${p.id}`} accessibilityLabel={`${m(lang,'quantity')}: ${quantity}`} style={styles.quantity}>{quantity}</Text>
-     <Pressable testID={`sut-cart-increase-${p.id}`} accessibilityRole="button" accessibilityLabel={`${t(lang,'addOne')} ${p.name}`} onPress={()=>onChange(p.id,1)} style={styles.step}><Text style={styles.stepText}>+</Text></Pressable>
+     <Pressable testID={`sut-cart-increase-${p.id}`} accessibilityRole="button" accessibilityLabel={`${t(lang,'addOne')} ${p.name}`} onPress={()=>change(p.id,p.name,quantity+1,1)} style={styles.step}><Text style={styles.stepText}>+</Text></Pressable>
     </View>
    </View>)}
    <Text testID="sut-cart-subtotal" style={styles.total}>{t(lang,'subtotal')} {formatLocalizedPrice(cartTotal(cart),lang)}</Text>

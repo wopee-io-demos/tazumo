@@ -10,7 +10,7 @@
 | testID | Element |
 | --- | --- |
 | `sut-open-product-<id>` | Catalogue row button that opens the detail screen |
-| `sut-cart-view` | Mini-cart button that opens the cart screen |
+| `sut-cart-screen-open` | Mini-cart button that opens the cart screen |
 | `sut-nav-back`, `sut-nav-cart` | Screen header back and cart buttons |
 | `sut-detail-screen`, `sut-detail-title`, `sut-detail-price`, `sut-detail-add`, `sut-detail-quantity` | Product detail screen |
 | `sut-cart-screen`, `sut-cart-empty`, `sut-cart-subtotal`, `sut-cart-prototype-note`, `sut-cart-checkout-disabled` | Cart screen |
