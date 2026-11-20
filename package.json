@@ -13,10 +13,10 @@
     "bundle:mobile": "pnpm --filter @tazumo/mobile exec expo export --platform ios && pnpm --filter @tazumo/mobile exec expo export --platform android"
   },
   "devDependencies": {
-    "@axe-core/playwright": "^4.14.0",
+    "@axe-core/playwright": "4.14.0",
     "@playwright/test": "^1.56.0",
-    "ajv": "^8.20.0",
-    "ajv-formats": "^3.0.1"
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
@@ -24,7 +24,8 @@
     ],
     "overrides": {
       "postcss": "^8.5.18",
-      "image-size": "^2.0.3"
+      "image-size": "^2.0.3",
+      "axe-core": "4.14.1"
     }
   }
 }

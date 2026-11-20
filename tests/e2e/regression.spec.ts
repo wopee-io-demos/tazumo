@@ -1,6 +1,8 @@
 import {test,expect,type Page} from '@playwright/test';
 import {search,productHeadings,cartButton} from './support/locators';
-import {products} from '../../packages/core/src/index.ts';
+import {products,formatPrice} from '../../packages/core/src/index.ts';
+
+const price=(id:string,quantity=1)=>formatPrice(products.find(p=>p.id===id)!.priceCents*quantity);
 
 const pageErrors=new WeakMap<Page,string[]>();
 test.beforeEach(({page})=>{
@@ -62,14 +64,14 @@ test.describe('cart edge cases',()=>{
     await page.getByRole('button',{name:'Add Sourdough loaf'}).click();
     await cartButton(page,4).click();
     const dialog=page.getByRole('dialog');
-    await expect(dialog).toContainText('€40.20');
+    await expect(dialog).toContainText(formatPrice(products.find(p=>p.id==='pizza')!.priceCents*3+products.find(p=>p.id==='bread')!.priceCents));
     await expect(dialog.getByRole('button',{name:'Checkout coming later'})).toBeDisabled();
 
     const removePizza=dialog.getByRole('button',{name:'Remove one Margherita pizza'});
     for(let i=0;i<3;i++)await removePizza.click();
     await expect(removePizza).toHaveCount(0);
     await expect(dialog.getByRole('button',{name:'Remove one Sourdough loaf'})).toBeVisible();
-    await expect(dialog).toContainText('€4.50');
+    await expect(dialog).toContainText(price('bread'));
     await expect(dialog).not.toContainText('Margherita pizza');
     await expect(dialog.getByRole('button',{name:'Checkout coming later'})).toBeDisabled();
 
@@ -87,6 +89,6 @@ test.describe('cart edge cases',()=>{
     await expect(productHeadings(page)).toHaveCount(0);
     await cartButton(page,1).click();
     await expect(page.getByRole('dialog')).toContainText('Wireless headphones');
-    await expect(page.getByRole('dialog')).toContainText('€39.90');
+    await expect(page.getByRole('dialog')).toContainText(price('headphones'));
   });
 });

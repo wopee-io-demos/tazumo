@@ -15,18 +15,20 @@ Tazumo is the canonical system under test for five demo repositories. Its own pu
 | Layer | Tool | Gate | Evidence class |
 | --- | --- | --- | --- |
 | Unit | `node --test` in `packages/core` | every PR (`pnpm test`) | fixture/unit |
-| Contract | Ajv (JSON Schema 2020-12) on `contracts/openapi.json`, `tests/contract` | every PR (`pnpm test`) | fixture/unit |
+| Contract (projection conformance) | Ajv (JSON Schema 2020-12) on `contracts/openapi.json`, `tests/contract` | every PR (`pnpm test`) | fixture/unit |
 | Browser E2E, accessibility, failure scenarios | Playwright Chromium + `@axe-core/playwright`, `tests/e2e` | every PR (`pnpm test:e2e`), report uploaded on every run by `test-evidence.yml` | browser |
 | Native smoke | Appium (see below) on the CI-built Android debug APK and iOS Simulator app | PRs that touch `apps/mobile` or `packages/*`, once implemented | native simulator/emulator |
 | Agentic and hosted runs | Wopee web and mobile agents in the downstream demo repos | downstream, not a Tazumo merge gate | hosted |
 
 Most checks live at the bottom. Browser E2E covers each user journey once, plus failure scenarios and accessibility. Native smoke stays a handful of paths (launch, search, add to cart, open cart, checkout disabled), because the shared domain logic is already covered below it.
 
-Accessibility gate: serious and critical axe violations fail. Known violations are allowed only through `tests/e2e/a11y-baseline.json`, where each entry names a scan, a rule, a node limit and a tracking issue. The baseline only shrinks.
+Accessibility gate: serious and critical axe violations fail. Known violations are allowed only through `tests/e2e/a11y-baseline.json`, where each entry names a scan, a rule, its impact, the exact node count and a tracking issue. Entries that stop reproducing fail the run, so the baseline only shrinks.
+
+Tool versions for the gates (`@axe-core/playwright`, `axe-core`, `ajv`, `ajv-formats`) are pinned exactly until the repository commits a lockfile (#14), so a new rule release cannot change a verdict unnoticed.
 
 ### Native smoke automation
 
-Use the organization's **backend-neutral case format from mobile-agent with Appium as the CI executor**. Cases address elements by the `sut-*` identifiers from the SUT contract (iOS `accessibility id`, Android `id`), never by localized labels. mobilecli may run the same cases locally once mobile-agent#11 has merged with real simulator evidence. Native smoke is not implemented in this ADR's change. The native app owner implements it in a later slice.
+Use the organization's **backend-neutral case format from mobile-agent with Appium as the CI executor**. Cases address elements by the `sut-*` identifiers from the SUT contract (iOS `accessibility id`, Android `id`), never by localized labels. Those identifiers arrive with #33, so native smoke depends on it merging first. mobilecli may run the same cases locally once mobile-agent#11 has merged with real simulator evidence. Native smoke is not implemented in this ADR's change. The native app owner implements it in a later slice.
 
 ## Alternatives
 

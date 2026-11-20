@@ -10,9 +10,10 @@ export const specId='https://tazumo.example.invalid/contracts/openapi.json';
 export const spec=JSON.parse(readFileSync(new URL('../../contracts/openapi.json',import.meta.url),'utf8'));
 
 export function createValidator(){
-  const ajv=new Ajv2020({allErrors:true,strict:false,validateFormats:true});
+  const ajv=new Ajv2020({allErrors:true,strict:true,validateFormats:true});
   addFormats(ajv);
-  ajv.addSchema({...spec,$id:specId});
+  for(const keyword of ['example','paths','components'])ajv.addKeyword(keyword);
+  ajv.addSchema({$id:specId,paths:spec.paths,components:spec.components});
   return {
     schema:(name:string)=>ajv.compile({$ref:`${specId}#/components/schemas/${name}`}),
     pointer:(pointer:string)=>ajv.compile({$ref:`${specId}#${pointer}`})

@@ -18,9 +18,13 @@ test('every synthetic product validates against the OpenAPI Product schema',()=>
   }
 });
 
-test('the full catalogue validates as a GET /v1/merchants/{merchantId}/products response',()=>{
-  const body=products.map(p=>toApiProduct(p));
-  assert.ok(validateProductsResponse(body),errors(validateProductsResponse));
+test('each merchant catalogue validates as its GET /v1/merchants/{merchantId}/products response',()=>{
+  const merchantIds=new Set(toApiMerchants(products).map(m=>m.id));
+  for(const merchant of new Set(products.map(p=>p.merchant))){
+    const body=products.filter(p=>p.merchant===merchant).map(p=>toApiProduct(p));
+    assert.ok(validateProductsResponse(body),`${merchant}: ${errors(validateProductsResponse)}`);
+    for(const product of body)assert.ok(merchantIds.has(product.merchantId),`${product.name} links to an unknown merchant`);
+  }
 });
 
 test('merchants derived from the fixtures validate and never claim live ordering or ETAs',()=>{
