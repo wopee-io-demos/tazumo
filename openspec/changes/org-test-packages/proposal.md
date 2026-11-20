@@ -6,7 +6,7 @@ Cross-repository QA and manual testing need reproducible, permissioned test arti
 ## Scope
 - Versioned organization-scoped synthetic fixture npm package.
 - GHCR web test-preview image, source-linked by OCI metadata.
-- Manual publish workflow with build gates and restricted token permissions.
+- Push-to-main and manual publish workflow with build gates and restricted token permissions.
 - Consumption instructions, version provenance and package visibility review.
 
 ## Tracking

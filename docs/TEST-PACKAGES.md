@@ -1,6 +1,6 @@
 # Organization testing packages
 
-The monorepo has **two opt-in, private-by-default test distribution paths** through GitHub Packages. Publishing requires the workflow on `main` to be manually started; a successful PR build alone **does not publish packages**.
+The monorepo has **two opt-in, private-by-default test distribution paths** through GitHub Packages. PRs run package and container smoke checks but never publish. A reviewed merge to `main` that changes packaging inputs automatically publishes both test package types; maintainers can also manually trigger the workflow from `main`.
 
 ## 1. Web preview image in GitHub Container Registry
 
@@ -48,9 +48,9 @@ console.log(fixture.products.length,fixture.brand.palettes);
 
 ## Publish procedure
 
-1. Merge the workflow and test kit PR to `main` after CI verification.
-2. Open **Actions → Publish organization test packages → Run workflow** on `main`.
-3. Select web image and/or npm kit. Each publishes separately after verification.
+1. Merge the workflow and test kit PR to `main` after CI verification. An eligible push to `main` automatically publishes both types after validation.
+2. Alternatively open **Actions → Publish organization test packages → Run workflow** on `main`.
+3. For a manual run, select web image and/or npm kit. Each publishes separately after verification.
 4. Inspect the run output and verify actual package versions in the organization **Packages** page.
 5. In package settings, confirm repository linkage, private visibility and team/repo read grants as appropriate. The default behavior may depend on organization settings.
 6. Record the successfully published tags/versions and run URLs in issue #29.

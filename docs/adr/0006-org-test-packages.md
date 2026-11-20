@@ -9,7 +9,7 @@ A single pnpm monorepo powers a static web prototype and Expo iOS/Android apps; 
 ## Decision
 - Publish a dedicated `@wopee-io-demos/tazumo-test-kit` npm package to `npm.pkg.github.com`, generated from local shared modules without altering internal `@tazumo/*` imports.
 - Publish the static web client as `ghcr.io/wopee-io-demos/tazumo-web` via a build-stage Dockerfile.
-- Use a **manual**, main-branch-only workflow, job-scoped `packages:write` `GITHUB_TOKEN`, version tags using workflow run and Git SHA, and pre-publish tests. No publish on untrusted PRs.
+- Use PR validation plus **automatic publication from main only** (also manually dispatchable), job-scoped `packages:write` `GITHUB_TOKEN`, version tags using workflow run and Git SHA, and pre-publish tests. No publish on untrusted PRs.
 - Retain the Android debug APK and iOS Simulator app as GitHub Actions build artifacts. Future physical-device signed binaries are separate release work.
 - Initially keep package visibility private and grant access to specific organization teams/repositories only after reviewing controls.
 
