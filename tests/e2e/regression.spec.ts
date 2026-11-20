@@ -2,7 +2,8 @@ import {test,expect,type Page} from '@playwright/test';
 import {search,productHeadings,cartButton} from './support/locators';
 import {products,formatPrice} from '../../packages/core/src/index.ts';
 
-const price=(id:string,quantity=1)=>formatPrice(products.find(p=>p.id===id)!.priceCents*quantity);
+const priceCents=(id:string)=>products.find(p=>p.id===id)!.priceCents;
+const price=(id:string)=>formatPrice(priceCents(id));
 
 const pageErrors=new WeakMap<Page,string[]>();
 test.beforeEach(({page})=>{
@@ -64,7 +65,7 @@ test.describe('cart edge cases',()=>{
     await page.getByRole('button',{name:'Add Sourdough loaf'}).click();
     await cartButton(page,4).click();
     const dialog=page.getByRole('dialog');
-    await expect(dialog).toContainText(formatPrice(products.find(p=>p.id==='pizza')!.priceCents*3+products.find(p=>p.id==='bread')!.priceCents));
+    await expect(dialog).toContainText(formatPrice(priceCents('pizza')*3+priceCents('bread')));
     await expect(dialog.getByRole('button',{name:'Checkout coming later'})).toBeDisabled();
 
     const removePizza=dialog.getByRole('button',{name:'Remove one Margherita pizza'});

@@ -9,11 +9,15 @@ import type {Product as FixtureProduct} from '../../packages/core/src/index.ts';
 export const specId='https://tazumo.example.invalid/contracts/openapi.json';
 export const spec=JSON.parse(readFileSync(new URL('../../contracts/openapi.json',import.meta.url),'utf8'));
 
+const withoutExtensions=(value:unknown):unknown=>Array.isArray(value)?value.map(withoutExtensions)
+  :value&&typeof value==='object'?Object.fromEntries(Object.entries(value).filter(([k])=>!k.startsWith('x-')).map(([k,v])=>[k,withoutExtensions(v)]))
+  :value;
+
 export function createValidator(){
   const ajv=new Ajv2020({allErrors:true,strict:true,validateFormats:true});
   addFormats(ajv);
-  for(const keyword of ['example','paths','components'])ajv.addKeyword(keyword);
-  ajv.addSchema({$id:specId,paths:spec.paths,components:spec.components});
+  for(const keyword of ['paths','components','example','discriminator','xml','externalDocs'])ajv.addKeyword(keyword);
+  ajv.addSchema({$id:specId,...(withoutExtensions({paths:spec.paths,components:spec.components}) as object)});
   return {
     schema:(name:string)=>ajv.compile({$ref:`${specId}#/components/schemas/${name}`}),
     pointer:(pointer:string)=>ajv.compile({$ref:`${specId}#${pointer}`})
