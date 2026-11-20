@@ -1,7 +1,15 @@
 name: Native development builds
 on:
+  pull_request:
+    paths:
+      - '.github/workflows/native-builds.yml'
+      - 'apps/mobile/**'
+      - 'packages/**'
+      - 'package.json'
+      - 'pnpm-workspace.yaml'
+      - 'pnpm-lock.yaml'
   push:
-    branches: [feat/marketplace-monorepo-foundation]
+    branches: [main]
   workflow_dispatch:
 permissions:
   contents: read
@@ -22,11 +30,6 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - name: Verify preinstalled Android SDK
-        run: |
-          echo "ANDROID_HOME=$ANDROID_HOME"
-          test -d "$ANDROID_HOME"
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --list_installed | head -40 || true
       - run: pnpm install --no-frozen-lockfile
       - run: pnpm --filter @tazumo/mobile exec expo prebuild --platform android --non-interactive --no-install
       - name: Assemble debug APK

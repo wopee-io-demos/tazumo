@@ -1,22 +1,18 @@
-# Progress and implementation evidence
+# Development progress
 
-Last updated: 2026-11-20.
+Updated 2026-11-20. The [GitHub Issues backlog](https://github.com/wopee-io-demos/tazumo/issues) is authoritative.
 
-GitHub Issues are the operational system of record: [#2](https://github.com/wopee-io-demos/tazumo/issues/2), [#3](https://github.com/wopee-io-demos/tazumo/issues/3), [#4](https://github.com/wopee-io-demos/tazumo/issues/4), [#5](https://github.com/wopee-io-demos/tazumo/issues/5), [#6](https://github.com/wopee-io-demos/tazumo/issues/6), [#7](https://github.com/wopee-io-demos/tazumo/issues/7).
+## Verified at commit 15c44a67
+- Typechecking, unit tests, production web build, 3 Chromium E2E tests, Expo iOS/Android JavaScript exports: [quality run](https://github.com/wopee-io-demos/tazumo/actions/runs/44767554583) (success).
+- Android debug APK and unsigned iOS simulator .app: [native run](https://github.com/wopee-io-demos/tazumo/actions/runs/44767543758) (success).
+- Native artifacts retained through 2026-11-27.
 
-### Implemented in repository source
-- Web browse, search, categories, cart and color theme switcher.
-- Native Expo browse, search, categories, cart and palette switcher.
-- Shared fixtures and cart calculations, a Node test file.
-- Initial OpenSpec change, ADRs and CI configuration.
+## Outstanding
+- Simulator/emulator launch and interaction tests (#9).
+- Published web preview, signed iOS/Android release (#10).
+- Lockfile/frozen installs and supported Expo upgrades (#14).
+- Required branch ruleset and independent reviewers (#15).
+- Backend, real payments, identity, merchants and courier tracking (#5, #12).
+- Brand clearance, original fox and accessibility audit (#6, #13).
 
-### Not verified
-- pnpm dependency installation, TypeScript compilation, web production build, unit tests.
-- Actual native iOS and Android builds, device testing or releases.
-- Accessibility audit and real merchant/operator experiences.
-
-### Not implemented
-- Real customer registration, store onboarding, merchant APIs, inventory, pricing, taxes, payments, courier integrations, order tracking and deployment.
-- Production logo and original fox mascot. Brand name/rights not yet cleared.
-
-Do not mark an issue complete without linking reproducible evidence. PR reviews and CI logs must be used for completion.
+App catalogue and prices are synthetic. Checkout remains intentionally disabled.
