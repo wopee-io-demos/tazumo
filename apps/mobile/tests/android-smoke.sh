@@ -9,6 +9,10 @@ mkdir -p "$out/smoke" "$out/negative"
 
 adb wait-for-device
 adb shell 'while [ "$(getprop sys.boot_completed)" != "1" ]; do sleep 2; done'
+# A slow hosted emulator often raises "Pixel Launcher isn't responding", and that dialog takes the UiAutomator focus.
+adb shell settings put global hide_error_dialogs 1
+sleep 30
+adb shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS >/dev/null || true
 adb install -r -g "$apk"
 adb shell getprop ro.build.version.release > "$out/android-version.txt"
 
