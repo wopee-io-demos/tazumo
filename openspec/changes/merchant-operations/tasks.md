@@ -12,6 +12,7 @@
 - [x] Proposed migration and route plan in `design.md`.
 - [x] Follow-up issue filed as `status:backlog`: #75 "Wire merchant-ops into apps/api (migration, routes, policy)".
 - [x] Independent review on be7401e: no blockers, eight should-fix items, all fixed: malformed hours fail closed; unknown decisions refused; string instants need an offset; actor is the API `Principal` with grants; `merchant_paused` for `accepting_orders`; design adds the `available` grant, a seed backfill, the profile source of truth and 404 for non-live delivery checks; corrupt deadlines count as expired; malformed input returns codes instead of throwing. Nits fixed: raw-length profile checks, `reason_too_long`, decline-reason CHECKs, integer radius, a non-EU DST zone, an independent radius boundary.
+- [x] Independent re-review on cf63b56: no blockers or should-fix items; all first-round findings resolved. Four nits then fixed: null availability, acceptance and grant entries return codes instead of throwing; impossible calendar dates (`2026-02-30`) are refused; the design notes that seed merchants stay `merchant_paused` while `accepting_orders` is false.
 - [ ] Current-head CI green on the PR.
 - [ ] Review findings resolved and merge SHA recorded on #12.
 

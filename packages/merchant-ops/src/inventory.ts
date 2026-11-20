@@ -5,7 +5,9 @@ import { acceptsOrders, type OnboardingState } from './onboarding.ts';
 export type Availability = { status: 'in_stock' } | { status: 'out_of_stock' } | { status: 'scheduled'; from: string; until?: string };
 
 export function validateAvailability(availability: Availability): string[] {
-  if (availability?.status !== 'scheduled') return availability.status === 'in_stock' || availability.status === 'out_of_stock' ? [] : ['status'];
+  const status = availability?.status;
+  if (status !== 'scheduled') return status === 'in_stock' || status === 'out_of_stock' ? [] : ['status'];
+  if (availability.status !== 'scheduled') return ['status'];
   const from = toInstant(availability.from);
   if (!from) return ['from'];
   if (availability.until === undefined) return [];
@@ -27,7 +29,7 @@ export function checkOrderable(
   input: { onboardingState: OnboardingState; acceptingOrders: boolean; hours: OpeningHours; availability: Availability },
   at: Date | string,
 ): OrderableCheck {
-  if (!acceptsOrders(input.onboardingState)) return { ok: false, reason: 'merchant_not_live' };
+  if (!acceptsOrders(input?.onboardingState)) return { ok: false, reason: 'merchant_not_live' };
   if (input.acceptingOrders !== true) return { ok: false, reason: 'merchant_paused' };
   if (!isOpenAt(input.hours, at)) return { ok: false, reason: 'merchant_closed' };
   if (!isAvailableAt(input.availability, at)) return { ok: false, reason: 'item_unavailable' };

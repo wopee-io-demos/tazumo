@@ -57,6 +57,9 @@ test('inventory availability: in stock, out of stock and scheduled windows', () 
   assert.deepEqual(validateAvailability({ status: 'scheduled', from: 'soon' }), ['from']);
   assert.equal(isAvailableAt({ status: 'scheduled', from: 'soon' }, '2026-11-20T10:00:00Z'), false);
   assert.deepEqual(validateAvailability({ status: 'scheduled', from: '2026-11-20T10:00:00' }), ['from']);
+  assert.deepEqual(validateAvailability({ status: 'scheduled', from: '2026-02-30T10:00Z' }), ['from']);
+  assert.deepEqual(validateAvailability(null as never), ['status']);
+  assert.equal(isAvailableAt(null as never, '2026-11-20T10:00:00Z'), false);
   assert.deepEqual(validateAvailability({ status: 'scheduled', from: '2026-11-20T11:00:00+01:00', until: '2026-11-20T10:30:00Z' }), []);
 });
 
@@ -109,6 +112,9 @@ test('acceptance window: refusals for wrong actor, missing reason, late or repea
   assert.deepEqual(respondToOrder(pending, 'accept', staff, '2026-11-20T10:01:00'), { ok: false, error: 'invalid_instant' });
   assert.deepEqual(respondToOrder(pending, 'yes' as never, staff, at), { ok: false, error: 'invalid_decision' });
   assert.deepEqual(respondToOrder({ ...pending, deadline: 'x' }, 'accept', staff, at), { ok: false, error: 'window_expired' });
+  assert.deepEqual(respondToOrder(null as never, 'accept', staff, at), { ok: false, error: 'forbidden' });
+  assert.deepEqual(respondToOrder(pending, 'accept', { userId: 'u-n', grants: [null] } as never, at), { ok: false, error: 'forbidden' });
+  assert.deepEqual(expireIfDue(null as never, at), { ok: false, error: 'already_decided' });
   const accepted = respondToOrder(pending, 'accept', staff, at);
   assert.ok(accepted.ok);
   assert.deepEqual(respondToOrder(accepted.value, 'decline', staff, at, 'other'), { ok: false, error: 'already_decided' });

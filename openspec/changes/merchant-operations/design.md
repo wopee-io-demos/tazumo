@@ -97,7 +97,7 @@ ALTER TABLE audit_events
   ALTER COLUMN actor_user_id DROP NOT NULL,
   ADD CHECK ((actor_kind = 'user') = (actor_user_id IS NOT NULL));
 ```
-- The backfill starts the existing synthetic seed merchants as `live` with an empty profile, so Discovery keeps showing them; `apps/api/src/seed.ts` must insert the same row for new seed merchants. Non-synthetic merchants do not exist yet and would start in `draft`.
+- The backfill starts the existing synthetic seed merchants as `live` with an empty profile, so Discovery keeps showing them. They stay `merchant_paused` in `checkOrderable` while the seed writes `accepting_orders = false`, which is intended until checkout exists; `apps/api/src/seed.ts` must insert the same row for new seed merchants. Non-synthetic merchants do not exist yet and would start in `draft`.
 - `order_id` gets a foreign key once an `orders` table exists.
 - Runtime grants for `tazumo_api`: SELECT, INSERT, UPDATE on the new tables; UPDATE on `products (available, availability_status, available_from, available_until)` only; no DELETE on `merchant_onboarding` or `merchant_order_acceptances`.
 - Concurrency: transitions use `UPDATE ... WHERE merchant_id = $1 AND version = $2`, and a lost race returns 409.

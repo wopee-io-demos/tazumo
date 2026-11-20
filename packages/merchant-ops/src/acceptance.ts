@@ -53,10 +53,10 @@ export function respondToOrder(
   at: Date | string,
   reason?: DeclineReason,
 ): Result<OrderAcceptance, RespondError> {
-  const role = matchingRole(principal, acceptance.merchantId, ['own_staff']);
+  const role = matchingRole(principal, acceptance?.merchantId, ['own_staff']);
   if (!role) return { ok: false, error: 'forbidden' };
   if (decision !== 'accept' && decision !== 'decline') return { ok: false, error: 'invalid_decision' };
-  if (acceptance.state !== 'pending') return { ok: false, error: 'already_decided' };
+  if (acceptance?.state !== 'pending') return { ok: false, error: 'already_decided' };
   const instant = toInstant(at);
   if (!instant) return { ok: false, error: 'invalid_instant' };
   if (deadlinePassed(acceptance, instant)) return { ok: false, error: 'window_expired' };
@@ -78,7 +78,7 @@ export function respondToOrder(
 }
 
 export function expireIfDue(acceptance: OrderAcceptance, now: Date | string): Result<OrderAcceptance, 'not_due' | 'already_decided' | 'invalid_instant'> {
-  if (acceptance.state !== 'pending') return { ok: false, error: 'already_decided' };
+  if (acceptance?.state !== 'pending') return { ok: false, error: 'already_decided' };
   const instant = toInstant(now);
   if (!instant) return { ok: false, error: 'invalid_instant' };
   if (!deadlinePassed(acceptance, instant)) return { ok: false, error: 'not_due' };

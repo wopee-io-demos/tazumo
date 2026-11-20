@@ -22,8 +22,8 @@ export function matchingRole(principal: Principal, merchantId: string, rules: re
   for (const rule of rules) {
     const match =
       rule === 'own_staff'
-        ? grants.some((g) => g.role === 'merchant_staff' && g.merchantId === merchantId)
-        : grants.some((g) => g.role === rule);
+        ? grants.some((g) => g?.role === 'merchant_staff' && typeof merchantId === 'string' && g.merchantId === merchantId)
+        : grants.some((g) => g?.role === rule);
     if (match) return rule === 'own_staff' ? 'merchant_staff' : rule;
   }
   return null;
@@ -31,8 +31,14 @@ export function matchingRole(principal: Principal, merchantId: string, rules: re
 
 const isoInstant = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})$/;
 
+function isCalendarDate(text: string) {
+  const [y, m, d] = text.slice(0, 10).split('-').map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d));
+  return date.getUTCFullYear() === y && date.getUTCMonth() === m - 1 && date.getUTCDate() === d;
+}
+
 export function toInstant(at: Date | string): Date | null {
-  if (typeof at === 'string' && !isoInstant.test(at)) return null;
+  if (typeof at === 'string' && !(isoInstant.test(at) && isCalendarDate(at))) return null;
   const date = typeof at === 'string' ? new Date(at) : at;
   return date instanceof Date && !Number.isNaN(date.getTime()) ? date : null;
 }
