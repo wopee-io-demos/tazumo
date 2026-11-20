@@ -22,7 +22,7 @@ test('options are named in their own language for screen readers',async({page})=
   await page.goto('/');
   const options=switcher(page).locator('option');
   await expect(options).toHaveText(['English','Čeština','Deutsch']);
-  await expect(options.nth(1)).toHaveAttribute('lang','cs');
+  for(const [i,code] of ['en','cs','de'].entries())await expect(options.nth(i)).toHaveAttribute('lang',code);
   await expect(page.getByLabel('Language')).toHaveCount(1);
 });
 
@@ -57,6 +57,7 @@ test('blocked storage still lets the visitor switch language',async({page})=>{
     Object.defineProperty(window,'localStorage',{get(){throw new DOMException('blocked','SecurityError');}});
   });
   await page.goto('/');
+  await expect(page.getByRole('heading',{name:'What are you craving?'})).toBeVisible();
   await switcher(page).selectOption('de');
   await expect(page.getByRole('heading',{name:'Worauf hast du Lust?'})).toBeVisible();
   expect(errors).toEqual([]);
@@ -70,6 +71,8 @@ test('switcher is reachable by keyboard from the header',async({page})=>{
   await page.keyboard.press('Tab');
   await expect(switcher(page)).toBeFocused();
   await expect(switcher(page)).toHaveCSS('outline-style','solid');
+  const ink=await page.locator('.app').evaluate(el=>{const probe=document.createElement('span');probe.style.color='var(--ink)';el.append(probe);const c=getComputedStyle(probe).color;probe.remove();return c;});
+  await expect(switcher(page)).toHaveCSS('outline-color',ink);
 });
 
 test('header fits a phone viewport with the switcher',async({page})=>{
@@ -78,7 +81,20 @@ test('header fits a phone viewport with the switcher',async({page})=>{
     await page.goto(path);
     await expect(switcher(page)).toBeVisible();
     await expect(page.getByRole('button',{name:/Cart, 0/})).toBeVisible();
+    const box=await switcher(page).boundingBox();
+    expect(box!.x+box!.width,path).toBeLessThanOrEqual(320);
     const overflow=await page.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth);
     expect(overflow,path).toBeLessThanOrEqual(0);
   }
+});
+
+test('a ?lang= link overrides and stores the language for demos and resets',async({page})=>{
+  await page.addInitScript(()=>{if(!sessionStorage.getItem('seeded')){localStorage.setItem('tazumo.language','de');sessionStorage.setItem('seeded','1');}});
+  await page.goto('/?lang=en#/merchant/piazza-local');
+  await expect(page.locator('html')).toHaveAttribute('lang','en');
+  await expect(page.getByRole('heading',{level:2,name:'Products'})).toBeVisible();
+  await page.goto('/');
+  await expect(switcher(page)).toHaveValue('en');
+  await page.goto('/?lang=xx');
+  await expect(switcher(page)).toHaveValue('en');
 });

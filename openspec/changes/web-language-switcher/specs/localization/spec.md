@@ -20,6 +20,10 @@ The selected language SHALL persist across reloads in the same browser. Missing,
 - **WHEN** a user selects Čeština and reloads the page
 - **THEN** the page renders in Czech
 
+#### Scenario: Query parameter reset
+- **WHEN** a page is opened with `?lang=en` while another language is stored
+- **THEN** the page renders in English and English is stored
+
 #### Scenario: Storage blocked
 - **WHEN** `localStorage` throws
 - **THEN** the page renders in English and the switcher still changes the language for the session
