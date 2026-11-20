@@ -7,7 +7,7 @@
     "dev:mobile": "pnpm --filter @tazumo/mobile start",
     "build": "pnpm --filter @tazumo/web build",
     "typecheck": "pnpm -r typecheck",
-    "test": "pnpm --filter @tazumo/core test && pnpm --filter @tazumo/commerce test && pnpm --filter @tazumo/address test && pnpm test:contract",
+    "test": "pnpm --filter @tazumo/core test && pnpm --filter @tazumo/commerce test && pnpm --filter @tazumo/address test && pnpm --filter @tazumo/product-options test && pnpm test:contract",
     "test:contract": "node --experimental-strip-types --test tests/contract/*.test.mts",
     "test:e2e": "playwright test",
     "bundle:mobile": "pnpm --filter @tazumo/mobile exec expo export --platform ios && pnpm --filter @tazumo/mobile exec expo export --platform android"

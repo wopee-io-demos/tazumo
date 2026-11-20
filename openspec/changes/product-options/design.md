@@ -1,0 +1,11 @@
+# Design
+
+- **Pure and dependency-free.** The runtime has no dependencies, so `apps/api`, `apps/web` and `apps/mobile` can all import it. `@tazumo/core` is a dev dependency, used only by the fixture test to check that product IDs and base prices exist.
+- **Money shape.** `priceSelection` takes the base price as `{ currency, minorUnits }` and returns `unitPrice` and `lineTotal` in the same shape. This matches `Money` in `@tazumo/commerce` (PR #80) and the OpenAPI `Money` schema, so commerce takes `unitPrice` as an order line's unit price without conversion. Taking a `Money` instead of a bare number is what makes a currency mismatch detectable.
+- **Integer arithmetic.** Deltas and base prices must be safe integers. Sums and the line total use `BigInt` and are checked against `Number.MAX_SAFE_INTEGER`, so an overflow is an error, never a rounded number.
+- **Availability.** `Option.available` is a boolean that the caller resolves at quote time, for example from `@tazumo/merchant-ops` `isAvailableAt` (PR #76). Scheduling is not duplicated here. An unavailable default is skipped; an unavailable explicit choice is rejected.
+- **Defaults.** A group left out of the selection takes its available defaults. A group listed with an empty array is an explicit "none", which a required group rejects as too few.
+- **Consistency rules.** `required` must equal `min >= 1`; `single` groups have `max` 1; `max` cannot exceed the option count; option IDs are unique across the whole product, so "an option from another group" is unambiguous.
+- **Errors.** Every error has a code and a path (array of segments, for example `['groups', 0, 'options', 1, 'priceDeltaMinor']` or `['selection', 'extras', 2]`). Validation collects all errors in one pass. A definition error stops selection checks; a selection error stops pricing.
+- **Line keys.** `lineKey` sorts group IDs and option IDs and serialises with JSON, so it is order-independent and cannot collide on delimiter characters. It is meant for the resolved selection that `validateSelection` and `priceSelection` return, which lists every group.
+- **No ADR.** No contract, storage or security trade-off arises in this slice. Option snapshot storage (slice 2) is the likely ADR; 0022 is reserved for it.
