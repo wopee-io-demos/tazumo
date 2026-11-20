@@ -4,7 +4,7 @@ const merchants=(page:Page)=>page.getByTestId('sut-merchant-list');
 
 test('merchant list follows category filter and searches merchants and products',async({page})=>{
   await page.goto('/');
-  await expect(merchants(page).getByRole('heading',{level:3})).toHaveCount(7);
+  await expect(merchants(page).getByRole('listitem')).toHaveCount(7);
   await page.getByTestId('sut-category-shops').click();
   await expect(page.getByTestId('sut-category-shops')).toHaveAttribute('aria-pressed','true');
   await expect(merchants(page).getByRole('link')).toHaveText(['City Tech','The Corner Bookshop']);
