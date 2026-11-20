@@ -36,7 +36,7 @@
   - UUID `pattern` added to the contract parameters.
   - In-transaction denials are logged.
   - ADR-0017 re-identification wording corrected.
-- [ ] Current-head CI green (record run URLs).
-- [ ] Merge and record the merge SHA on #56.
+- [x] Current-head CI green on PR #66 head c1c5f69: [API integration](https://github.com/wopee-io-demos/tazumo/actions/runs/44818849484) (81/81), [Quality checks](https://github.com/wopee-io-demos/tazumo/actions/runs/44818849402), [Dependency audit](https://github.com/wopee-io-demos/tazumo/actions/runs/44818849429), [Test evidence](https://github.com/wopee-io-demos/tazumo/actions/runs/44818849465).
+- [x] Merged as 3f95fbd02ad09e1526252e931dd8eb5b2104ac08; recorded on #56.
 
 Not implemented: provider wiring (pending ADR-0017), a shared rate-limit store, courier scopes, payments, orders.
