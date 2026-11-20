@@ -10,7 +10,7 @@ This is a proposed dependency remediation. CI audit, JS bundles and native build
 | Check | Workflow | When | Fails on |
 | --- | --- | --- | --- |
 | `dependency-audit` | `security.yml` | PRs, `main`, weekly | High or critical npm advisories |
-| `CodeQL PR analysis` | `codeql.yml` | PRs (read-only token) | Any CodeQL JavaScript/TypeScript result outside the exclusions in `.github/codeql/codeql-config.yml` (`js/missing-rate-limiting` until #98) |
+| `CodeQL PR analysis` | `codeql.yml` | PRs (read-only token) | Any CodeQL JavaScript/TypeScript result outside the exclusions in `.github/codeql/codeql-config.yml` (`js/missing-rate-limiting` until #98; the upload job still reports it). The config is read from the PR itself, so review every change to it |
 | `CodeQL analysis and upload` | `codeql.yml` | `main`, weekly, dispatch | Analysis errors. Results go to the Security tab |
 | `Secret scan` | `secret-scan.yml` | PRs, `main`, weekly, dispatch | Any gitleaks finding in the scanned commits |
 

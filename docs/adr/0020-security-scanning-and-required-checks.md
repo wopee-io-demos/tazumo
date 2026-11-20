@@ -12,7 +12,7 @@ Tazumo is a public repository. `security.yml` already fails a PR on high or crit
 
 ### CodeQL: a read-only PR gate and a separate upload job
 
-`.github/workflows/codeql.yml` analyses `javascript-typescript` with `build-mode: none`. It uses the default query suite through `.github/codeql/codeql-config.yml`, which excludes `js/missing-rate-limiting` until #98 rate-limits the public API routes. The first run reported 5 results: the public catalogue and health routes have no limit, and CodeQL does not model the custom bearer-route limiter.
+`.github/workflows/codeql.yml` analyses `javascript-typescript` with `build-mode: none`. Both jobs use the default query suite. The PR job loads `.github/codeql/codeql-config.yml`, which excludes `js/missing-rate-limiting` until #98 rate-limits the public API routes. The upload job keeps the query, so those alerts stay visible in the Security tab. The first run reported 5 results: the public catalogue and health routes have no limit, and CodeQL does not model the custom bearer-route limiter.
 
 - **`CodeQL PR analysis`** runs on `pull_request` only. It holds `contents: read` and nothing else, runs `analyze` with `upload: never`, and fails when the SARIF output contains any result. Each finding is printed as an `::error` annotation.
 - **`CodeQL analysis and upload`** runs on push to `main`, weekly (Monday 05:27 UTC) and on dispatch. It is the only job that holds `security-events: write`, and it uploads results to code scanning.
@@ -85,4 +85,4 @@ Agents must not change rulesets. The repository owner applies the command in `do
 - The planted-secret test closes its throwaway PR without merging. The fake value stays reachable through that PR's `refs/pull/<n>/head`, so it must never resemble a live provider credential.
 - Required checks become server-enforced only after the owner runs the command. Until then they remain a documented process.
 - Renaming a required job breaks the ruleset. Rename jobs and the ruleset together.
-- `pull_request` runs the PR's own copy of each workflow, so a PR can weaken a scan by editing the workflow itself. Review of `.github/**` changes remains the final control until CODEOWNERS exists.
+- `pull_request` runs the PR's own copy of each workflow, so a PR can weaken a scan by editing the workflow itself. The same holds for `.github/codeql/codeql-config.yml`, which, unlike the gitleaks allowlist, is read from the PR checkout. A PR can therefore exclude a query and pass at once. Review of `.github/**` changes remains the final control until CODEOWNERS exists.
