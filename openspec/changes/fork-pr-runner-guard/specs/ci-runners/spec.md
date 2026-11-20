@@ -16,7 +16,7 @@ Every workflow that can select the self-hosted runner pool SHALL select `ubuntu-
 - **THEN** the job selects the self-hosted pool exactly as before.
 
 ### Requirement: Pull request workflows hold no secrets or write tokens
-A workflow triggered by `pull_request` SHALL NOT reference secrets or grant write permissions, and no workflow SHALL use `pull_request_target`.
+A job that can run on `pull_request` SHALL NOT reference secrets other than `GITHUB_TOKEN` or hold write permissions, no workflow SHALL use `pull_request_target`, and every job SHALL use either a GitHub-hosted label or a guarded runner expression.
 
 #### Scenario: Guard detects a regression
 - **WHEN** a `runs-on` expression, secret reference or permission violates these rules
