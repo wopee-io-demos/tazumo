@@ -24,6 +24,9 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
       - uses: pnpm/action-setup@v4
         with:
           version: 10.11.0
@@ -48,6 +51,9 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
       - uses: pnpm/action-setup@v4
         with:
           version: 10.11.0
@@ -71,20 +77,24 @@ jobs:
       - name: Build Release simulator app
         working-directory: apps/mobile/ios
         run: xcodebuild -workspace Tazumo.xcworkspace -scheme Tazumo -configuration Release -sdk iphonesimulator -destination "id=${{ steps.sim.outputs.udid }}" -derivedDataPath "$RUNNER_TEMP/tazumo-ios" ONLY_ACTIVE_ARCH=YES CODE_SIGNING_ALLOWED=NO build
-      - name: Install Maestro
+      - name: Install Maestro and pngquant
         run: |
           curl -fsSL https://get.maestro.mobile.dev | bash
           echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+          HOMEBREW_NO_AUTO_UPDATE=1 brew install pngquant
       - name: Capture
         run: bash tests/screenshots/native/ios.sh "$RUNNER_TEMP/tazumo-ios/Build/Products/Release-iphonesimulator/Tazumo.app" "${{ steps.sim.outputs.udid }}" screenshots/ios
       - uses: actions/upload-artifact@v4
-        if: always()
         with:
           name: tazumo-screenshots-ios
-          path: |
-            screenshots/ios/
-            ~/.maestro/tests/
+          path: screenshots/ios/
           retention-days: 30
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: tazumo-maestro-logs-ios
+          path: ~/.maestro/tests/
+          retention-days: 7
 
   android:
     name: Android emulator
@@ -92,6 +102,9 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
       - uses: pnpm/action-setup@v4
         with:
           version: 10.11.0
@@ -112,10 +125,11 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
-      - name: Install Maestro
+      - name: Install Maestro and pngquant
         run: |
           curl -fsSL https://get.maestro.mobile.dev | bash
           echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+          sudo apt-get update -q && sudo apt-get install -yq pngquant
       - name: Capture
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -127,10 +141,13 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           script: bash tests/screenshots/native/android.sh apps/mobile/android/app/build/outputs/apk/release/app-release.apk screenshots/android
       - uses: actions/upload-artifact@v4
-        if: always()
         with:
           name: tazumo-screenshots-android
-          path: |
-            screenshots/android/
-            ~/.maestro/tests/
+          path: screenshots/android/
           retention-days: 30
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: tazumo-maestro-logs-android
+          path: ~/.maestro/tests/
+          retention-days: 7

@@ -11,7 +11,8 @@ demo(){ adb shell am broadcast -a com.android.systemui.demo -e command "$@" >/de
 demo enter
 demo clock -e hhmm 0941
 demo battery -e level 100 -e plugged false
-demo network -e wifi show -e level 4 -e mobile show -e level 4
+demo network -e wifi show -e level 4 -e fully true
+demo network -e mobile hide
 demo notifications -e visible false
 adb install -r "$apk"
 adb shell monkey -p io.wopee.demos.tazumo -c android.intent.category.LAUNCHER 1 >/dev/null
@@ -19,6 +20,7 @@ maestro test "$here/wait-catalogue.yaml"
 adb exec-out screencap -p > "$out/catalogue.png"
 maestro test "$here/fill-cart.yaml"
 adb exec-out screencap -p > "$out/cart.png"
+bash "$here/optimise.sh" "$out"
 device="$(adb shell getprop ro.product.model | tr -d '\r') emulator"
 os="Android $(adb shell getprop ro.build.version.release | tr -d '\r') (API $(adb shell getprop ro.build.version.sdk | tr -d '\r'))"
 bash "$here/provenance.sh" "$out/provenance.json" android "$device" "$os" "release-variant APK (JS bundle embedded) signed with the debug keystore, x86_64"
