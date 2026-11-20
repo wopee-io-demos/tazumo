@@ -29,7 +29,8 @@
       "addPizza": "sut-add-pizza",
       "languageEnglish": "sut-language-en",
       "languageCzech": "sut-language-cs",
-      "categoryGroceries": "sut-category-groceries"
+      "categoryGroceries": "sut-category-groceries",
+      "checkoutDisabled": "sut-checkout-disabled"
     }
   },
   "fixtures": {
@@ -65,7 +66,8 @@
         "add pizza",
         "open cart",
         "assert Margherita pizza and subtotal",
-        "assert checkout disabled"
+        "assert checkout disabled",
+        "assert native checkout control is disabled, not only warning text"
       ]
     },
     {

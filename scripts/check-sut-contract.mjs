@@ -35,3 +35,5 @@ for(const token of ['sut-cart-open','sut-search','sut-cart-summary','sut-languag
  assert.ok(mobile.includes(token),'Native UI missing selector: '+token);
 }
 console.log('Tazumo SUT v'+contract.version+' contract checked against native app IDs, fixture keys, web and mobile selectors.');
+
+assert.ok(mobile.includes('testID="sut-checkout-disabled"') && mobile.includes('disabled={true}'),'Native checkout must expose a genuinely disabled test control');

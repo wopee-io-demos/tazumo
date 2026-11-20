@@ -10,3 +10,6 @@ Issue #32, PR #33.
 - [ ] Verify new branch CI checks green on a working runner.
 - [ ] Verify Android emulator and iOS Simulator test ID exposure in the actual Appium XML.
 - [ ] Validate cross-repo consumers and merge integration PRs.
+
+- [x] Add a real disabled native checkout control and stable `sut-checkout-disabled` identifier, rather than relying on warning text alone.
+- [ ] Validate the disabled state with Appium WebDriver `GET /element/{id}/enabled` on actual iOS/Android devices.
