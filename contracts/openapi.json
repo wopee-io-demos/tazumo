@@ -281,6 +281,25 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limit exceeded (per client IP before authentication, per principal after)",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the current window resets",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
           }
         }
       }
@@ -340,6 +359,25 @@
           },
           "404": {
             "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded (per client IP before authentication, per principal after)",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the current window resets",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -409,6 +447,25 @@
           },
           "404": {
             "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded (per client IP before authentication, per principal after)",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the current window resets",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {

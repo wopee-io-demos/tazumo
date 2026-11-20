@@ -367,6 +367,12 @@ describe('JWKS rotation and availability', () => {
 test('auth configuration is all-or-nothing and requires https outside loopback', () => {
   const base = { DATABASE_URL: 'postgres://x@localhost/x' };
   assert.equal(loadConfig(base).auth, undefined);
+  assert.equal(loadConfig(base).trustProxy, false);
+  assert.deepEqual(loadConfig({ ...base, TRUST_PROXY: '10.0.0.0/8, 192.168.1.1' }).trustProxy, ['10.0.0.0/8', '192.168.1.1']);
+  const hops = loadConfig({ ...base, TRUST_PROXY: '1' }).trustProxy as (address: string, hop: number) => boolean;
+  assert.equal(hops('10.0.0.1', 0), true);
+  assert.equal(hops('10.0.0.1', 1), false);
+  assert.throws(() => loadConfig({ ...base, TRUST_PROXY: 'true' }), /TRUST_PROXY/);
   assert.throws(() => loadConfig({ ...base, AUTH_ISSUER: issuer }), /set together/);
   assert.throws(() => loadConfig({ ...base, AUTH_ISSUER: issuer, AUTH_AUDIENCE: audience, AUTH_JWKS_URL: 'https://idp.example.com/jwks' }), /AUTH_LOG_SALT/);
   const full = { ...base, AUTH_ISSUER: issuer, AUTH_AUDIENCE: audience, AUTH_LOG_SALT: 's'.repeat(32), AUTH_TOKEN_TYPE: 'at+jwt' };

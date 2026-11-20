@@ -1,7 +1,7 @@
 import { after, before, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildApp } from '../src/app.ts';
-import { FixedWindowLimiter } from '../src/rate-limit.ts';
+import { clientKey, FixedWindowLimiter } from '../src/rate-limit.ts';
 import { assertMatchesContract, createTestDb, type TestDb } from './helpers.ts';
 import { audience, issuer, mint, signingKey, startIdp, type SigningKey, type TestIdp } from './idp.ts';
 
@@ -17,12 +17,41 @@ test('fixed window limiter counts per key and resets on a simulated clock', () =
   assert.deepEqual(limiter.hit('a'), { allowed: true });
 });
 
-test('limiter memory is bounded', () => {
+test('limiter memory is bounded and a full table never frees a blocked key', () => {
   let now = 0;
   const limiter = new FixedWindowLimiter({ limit: 1, windowMs: 1_000 }, () => now, 3);
-  for (const key of ['a', 'b', 'c', 'd', 'e']) assert.deepEqual(limiter.hit(key), { allowed: true });
-  now = 5_000;
-  assert.deepEqual(limiter.hit('f'), { allowed: true });
+  assert.deepEqual(limiter.hit('x'), { allowed: true });
+  assert.equal(limiter.hit('x').allowed, false);
+  now = 100;
+  assert.deepEqual(limiter.hit('a'), { allowed: true });
+  assert.deepEqual(limiter.hit('b'), { allowed: true });
+  assert.deepEqual(limiter.hit('c'), { allowed: false, retryAfterSeconds: 1 }, 'new keys fail closed while the table is full');
+  assert.equal(limiter.size, 3);
+  assert.equal(limiter.hit('x').allowed, false, 'blocked key stays blocked');
+  now = 1_000;
+  assert.deepEqual(limiter.hit('c'), { allowed: true }, 'expired windows are swept');
+  assert.ok(limiter.size <= 3);
+});
+
+test('a reset window moves to the back of the eviction order', () => {
+  let now = 0;
+  const limiter = new FixedWindowLimiter({ limit: 1, windowMs: 1_000 }, () => now, 2);
+  limiter.hit('a');
+  now = 500;
+  limiter.hit('b');
+  now = 1_000;
+  limiter.hit('a');
+  now = 1_500;
+  assert.equal(limiter.hit('a').allowed, false, 'a was reset at 1000 and is still in its window');
+  assert.deepEqual(limiter.hit('c'), { allowed: true }, 'b expired and was swept');
+});
+
+test('client keys group IPv6 by /64 and unwrap IPv4-mapped addresses', () => {
+  assert.equal(clientKey('2001:db8:1:2:aaaa::1'), clientKey('2001:db8:1:2:ffff:ffff:ffff:ffff'));
+  assert.notEqual(clientKey('2001:db8:1:2::1'), clientKey('2001:db8:1:3::1'));
+  assert.equal(clientKey('2001:db8::1'), '2001:0db8:0000:0000::/64');
+  assert.equal(clientKey('::ffff:203.0.113.9'), '203.0.113.9');
+  assert.equal(clientKey('203.0.113.9'), '203.0.113.9');
 });
 
 describe('rate limits on authenticated routes', () => {
@@ -68,18 +97,32 @@ describe('rate limits on authenticated routes', () => {
   });
 
   test('per-IP limit stops token floods before verification', async () => {
-    const ip = '203.0.113.50';
-    for (let i = 0; i < 5; i++) {
-      const res = await app.inject({ method: 'GET', url: '/v1/me', remoteAddress: ip, headers: { authorization: 'Bearer a.b.c' } });
-      assert.equal(res.statusCode, 401);
+    const floodIdp = await startIdp([key]);
+    const flooded = buildApp({
+      pool: db.pool,
+      auth: { issuer, audience, jwksUrl: floodIdp.url },
+      rateLimits: { ip: { limit: 5, windowMs: 60_000 }, now: () => clock }
+    });
+    try {
+      for (let i = 0; i < 5; i++) {
+        const res = await flooded.inject({ method: 'GET', url: '/v1/me', remoteAddress: '2001:db8:9:9::' + (i + 1), headers: { authorization: 'Bearer a.b.c' } });
+        assert.equal(res.statusCode, 401);
+      }
+      const blocked = await flooded.inject({
+        method: 'GET',
+        url: '/v1/me',
+        remoteAddress: '2001:db8:9:9:ffff::7',
+        headers: { authorization: `Bearer ${await mint(key, { sub: 'flood-valid-token' })}` }
+      });
+      assert.equal(blocked.statusCode, 429, 'the whole /64 shares one bucket');
+      assert.ok(Number(blocked.headers['retry-after']) >= 1);
+      assert.equal(floodIdp.fetches, 0, 'no JWKS fetch for a rate-limited request');
+      const { rows } = await db.pool.query(`SELECT count(*)::int AS n FROM users WHERE subject = 'flood-valid-token'`);
+      assert.equal(rows[0].n, 0, 'rate-limited requests never reach authentication');
+    } finally {
+      await flooded.close();
+      await floodIdp.close();
     }
-    const fetches = idp.fetches;
-    const blocked = await me('flood-valid-token', ip);
-    assert.equal(blocked.statusCode, 429);
-    assert.ok(Number(blocked.headers['retry-after']) >= 1);
-    assert.equal(idp.fetches, fetches, 'no JWKS fetch for a rate-limited request');
-    const { rows } = await db.pool.query(`SELECT count(*)::int AS n FROM users WHERE subject = 'flood-valid-token'`);
-    assert.equal(rows[0].n, 0, 'rate-limited requests never reach authentication');
   });
 
   test('anonymous discovery routes are not rate limited by these layers', async () => {

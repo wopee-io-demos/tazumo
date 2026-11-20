@@ -29,7 +29,10 @@ export async function adminRoutes(app: FastifyInstance, { pool }: { pool: pg.Poo
     const principal = request.principal!;
     const { userId, role } = request.params;
     const decision = can(principal, 'role:manage', { type: 'user', id: userId });
-    if (!decision.allowed) return reply.code(403).send(apiError(request, 'forbidden', 'Not allowed to manage these roles'));
+    if (!decision.allowed) {
+      request.log.warn({ action: 'role:manage', role }, 'role change denied');
+      return reply.code(403).send(apiError(request, 'forbidden', 'Not allowed to manage these roles'));
+    }
     const merchantId = request.query.merchantId ?? null;
     if ((role === 'merchant_staff') !== (merchantId !== null)) {
       return reply
@@ -42,10 +45,13 @@ export async function adminRoutes(app: FastifyInstance, { pool }: { pool: pg.Poo
   async function change(request: FastifyRequest<GrantRequest>, action: 'role:grant' | 'role:revoke'): Promise<Outcome> {
     const { userId, role } = request.params;
     const merchantId = request.query.merchantId ?? null;
+    const actorId = request.principal!.userId;
     return inTransaction(pool, async (client) => {
-      if ((await client.query('SELECT 1 FROM users WHERE id = $1', [userId])).rowCount === 0) {
-        return { status: 404, code: 'user_not_found', message: 'User not found' };
-      }
+      const actorIsAdmin = await client.query(`SELECT 1 FROM user_roles WHERE user_id = $1 AND role = 'admin'`, [actorId]);
+      if (actorIsAdmin.rowCount === 0) return { status: 403, code: 'forbidden', message: 'Not allowed to manage these roles' };
+      const target = await client.query<{ id: string }>('SELECT id FROM users WHERE id = $1', [userId]);
+      if (target.rowCount === 0) return { status: 404, code: 'user_not_found', message: 'User not found' };
+      if (target.rows[0].id === actorId) return { status: 403, code: 'forbidden', message: 'Not allowed to manage these roles' };
       if (merchantId && (await client.query('SELECT 1 FROM merchants WHERE id = $1', [merchantId])).rowCount === 0) {
         return { status: 404, code: 'merchant_not_found', message: 'Merchant not found' };
       }
@@ -64,7 +70,7 @@ export async function adminRoutes(app: FastifyInstance, { pool }: { pool: pg.Poo
         await client.query(
           `INSERT INTO audit_events (actor_user_id, action, resource_type, resource_id, request_id, details)
            VALUES ($1, $2, 'user', $3, $4, $5)`,
-          [request.principal!.userId, action, userId, request.id, JSON.stringify({ role, merchantId })]
+          [actorId, action, userId, request.id, JSON.stringify({ role, merchantId })]
         );
       }
       return { status: action === 'role:revoke' ? 204 : changed ? 201 : 200, changed };

@@ -20,8 +20,15 @@
 - [x] Migration `0003`: `tazumo_api` least-privilege role and `audit_events.details`. Evidence: the admin suite runs the whole API as a login member of `tazumo_api`; UPDATE/DELETE/TRUNCATE/SELECT on the audit log, catalogue writes, DISABLE TRIGGER and DROP are refused.
 - [x] ADR-0017 (Proposed): OIDC provider comparison with a recommendation; the decision is left to the owner.
 - [x] Contract `0.4.0-draft`: admin operations and 429 responses.
+- [x] Independent review on 57cc9ff. Every item fixed:
+  - Blocker: upper-case UUIDs bypassed the admin self-change check. IDs are now canonicalised and the target is re-checked inside the transaction.
+  - `urn:uuid:` IDs caused a 500; they are now rejected with 400.
+  - Limiter eviction can no longer free a blocked key: windows are kept in start order and a full table fails closed.
+  - IPv6 addresses are keyed by /64, and `TRUST_PROXY` is configurable.
+  - An existing `tazumo_api` role with unsafe attributes is refused, and the CREATEROLE and per-cluster preconditions are documented.
+  - ADR-0017 corrected: hyperscaler exposure, `at+jwt` row, pseudonymisation wording.
+  - Nits: row-level security on admin grants, admin re-check in the transaction, deny logging, concurrency test, a meaningful flood/JWKS test, independent admin tests, guarded down migration, 429 on every BearerAuth operation.
 - [ ] Current-head CI green (record run URLs).
-- [ ] Independent review findings resolved and recorded in the PR.
 - [ ] Merge and record the merge SHA on #56.
 
 Not implemented: provider wiring (pending ADR-0017), a shared rate-limit store, courier scopes, payments, orders.

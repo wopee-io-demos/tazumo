@@ -15,9 +15,19 @@ export type AppOptions = {
   logger?: FastifyServerOptions['logger'];
   auth?: AuthOptions;
   rateLimits?: RateLimitOptions;
+  trustProxy?: FastifyServerOptions['trustProxy'];
 };
 
-export function buildApp({ pool, logger = false, auth, rateLimits }: AppOptions) {
+const canonicalUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function lowerCaseUuids(values: unknown) {
+  if (!values || typeof values !== 'object') return;
+  const record = values as Record<string, unknown>;
+  for (const [key, value] of Object.entries(record)) {
+    if (typeof value === 'string' && canonicalUuid.test(value)) record[key] = value.toLowerCase();
+  }
+}
+
+export function buildApp({ pool, logger = false, auth, rateLimits, trustProxy = false }: AppOptions) {
   const loggerOptions = logger === true ? {} : logger;
   const app = Fastify({
     logger:
@@ -31,6 +41,7 @@ export function buildApp({ pool, logger = false, auth, rateLimits }: AppOptions)
             }
           }
         : false,
+    trustProxy,
     genReqId: () => randomUUID(),
     requestIdHeader: false,
     bodyLimit: 16 * 1024,
@@ -46,6 +57,11 @@ export function buildApp({ pool, logger = false, auth, rateLimits }: AppOptions)
     if (requiresBearer(route.method, route.url)) {
       route.onRequest = [limits.byIp, authenticate, limits.byPrincipal, ...[route.onRequest ?? []].flat()];
     }
+  });
+
+  app.addHook('preHandler', async (request) => {
+    lowerCaseUuids(request.params);
+    lowerCaseUuids(request.query);
   });
 
   app.addHook('onSend', async (request, reply) => {

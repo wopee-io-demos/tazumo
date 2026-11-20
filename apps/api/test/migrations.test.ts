@@ -51,3 +51,16 @@ test('database rejects invalid money and identifiers', async () => {
     await db.drop();
   }
 });
+
+test('migration 0003 refuses an existing tazumo_api role with unsafe attributes', async () => {
+  const db = await createTestDb();
+  const fresh = await createTestDb({ migrated: false });
+  try {
+    await db.pool.query('ALTER ROLE tazumo_api LOGIN');
+    await assert.rejects(migrate({ databaseUrl: databaseUrl(), direction: 'up', schema: fresh.schema }), /unsafe attributes/);
+  } finally {
+    await db.pool.query('ALTER ROLE tazumo_api NOLOGIN');
+    await fresh.drop();
+    await db.drop();
+  }
+});

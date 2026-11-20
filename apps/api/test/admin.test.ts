@@ -46,11 +46,14 @@ describe('admin role grants, running as the least-privilege tazumo_api role', ()
     await db.pool.query(`INSERT INTO user_roles (user_id, role, merchant_id) VALUES ($1, 'merchant_staff', $2)`, [ids.staff, merchantA]);
   });
   after(async () => {
-    await app.close();
-    await idp.close();
-    await appPool.end();
-    await db.pool.query(`DROP ROLE ${appRole}`);
-    await db.drop();
+    try {
+      await app?.close();
+      await idp?.close();
+      await appPool?.end();
+    } finally {
+      await db.pool.query(`DROP ROLE IF EXISTS ${appRole}`);
+      await db.drop();
+    }
   });
 
   const call = (method: 'PUT' | 'DELETE', as: string, userId: string, role: string, merchantId?: string) =>
@@ -84,6 +87,10 @@ describe('admin role grants, running as the least-privilege tazumo_api role', ()
   });
 
   test('revokes are idempotent, audited once and effective on the next request', async () => {
+    await db.pool.query(`INSERT INTO user_roles (user_id, role, merchant_id) VALUES ($1, 'merchant_staff', $2) ON CONFLICT DO NOTHING`, [
+      ids.target2,
+      merchantA
+    ]);
     const staffList = () =>
       app.inject({ method: 'GET', url: `/v1/merchants/${merchantA}/staff`, headers: { authorization: `Bearer ${tokens.target2}` } });
     assert.equal((await staffList()).statusCode, 200);
@@ -107,6 +114,8 @@ describe('admin role grants, running as the least-privilege tazumo_api role', ()
     assert.equal((await call('PUT', 'customer', ids.customer, 'support')).statusCode, 403, 'self-escalation');
     assert.equal((await call('PUT', 'staff', ids.staff, 'merchant_staff', uuidV5('merchant:Morning Market'))).statusCode, 403);
     assert.equal((await call('PUT', 'admin', ids.admin, 'support')).statusCode, 403, 'admins cannot change their own grants');
+    assert.equal((await call('PUT', 'admin', ids.admin.toUpperCase(), 'support')).statusCode, 403, 'case variants are the same user');
+    assert.equal((await call('PUT', 'admin', ids.admin.toUpperCase(), 'merchant_staff', merchantA.toUpperCase())).statusCode, 403);
     assert.equal((await call('DELETE', 'admin', ids.admin, 'support')).statusCode, 403);
     assert.equal((await call('PUT', '', ids.target2, 'support')).statusCode, 401);
     assert.equal((await auditRows()).length, before, 'denied attempts change nothing');
@@ -127,12 +136,39 @@ describe('admin role grants, running as the least-privilege tazumo_api role', ()
       [ids.target2, 'merchant_staff'],
       [ids.target2, 'support', merchantA],
       ['not-a-uuid', 'support'],
+      [`urn:uuid:${ids.target2}`, 'support'],
       [ids.target2, 'merchant_staff', 'not-a-uuid']
     ] as Array<[string, string, string?]>) {
       const res = await call('PUT', 'admin', userId, role, merchantId);
       assert.equal(res.statusCode, 400, `${role} ${userId} ${merchantId ?? ''}`);
       assertMatchesContract('put', rolePath, 400, res.json());
     }
+  });
+
+  test('upper-case IDs are canonicalised in responses and audit rows', async () => {
+    const res = await call('PUT', 'admin', ids.target.toUpperCase(), 'merchant_staff', merchantA.toUpperCase());
+    assert.equal(res.statusCode, 201);
+    assert.deepEqual(res.json(), { role: 'merchant_staff', merchantId: merchantA });
+    const rows = (await auditRows()).filter((r) => r.resource_id === ids.target && r.details.role === 'merchant_staff');
+    assert.deepEqual(rows.map((r) => r.details.merchantId), [merchantA]);
+  });
+
+  test('concurrent identical grants create one grant and one audit row', async () => {
+    const results = await Promise.all(Array.from({ length: 8 }, () => call('PUT', 'admin', ids.customer, 'support')));
+    assert.deepEqual(results.map((r) => r.statusCode).sort(), [200, 200, 200, 200, 200, 200, 200, 201]);
+    const rows = (await auditRows()).filter((r) => r.resource_id === ids.customer && r.action === 'role:grant');
+    assert.equal(rows.length, 1);
+    await db.pool.query(`DELETE FROM user_roles WHERE user_id = $1 AND role = 'support'`, [ids.customer]);
+  });
+
+  test('row-level security stops the runtime role from granting or removing admin', async () => {
+    await assert.rejects(
+      appPool.query(`INSERT INTO user_roles (user_id, role) VALUES ($1, 'admin')`, [ids.customer]),
+      /row-level security/
+    );
+    const removed = await appPool.query(`DELETE FROM user_roles WHERE user_id = $1 AND role = 'admin'`, [ids.admin]);
+    assert.equal(removed.rowCount, 0);
+    assert.equal((await db.pool.query(`SELECT 1 FROM user_roles WHERE user_id = $1 AND role = 'admin'`, [ids.admin])).rowCount, 1);
   });
 
   test('the runtime role can only append to the audit log and only read the catalogue', async () => {

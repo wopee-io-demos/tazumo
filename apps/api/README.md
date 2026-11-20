@@ -13,9 +13,9 @@ Environment: `DATABASE_URL` (required), `HOST`, `PORT`, `LOG_LEVEL`.
 
 Auth (all three or none; without them `/v1/me` and other protected routes return 503): `AUTH_ISSUER`, `AUTH_AUDIENCE`, `AUTH_JWKS_URL` (https, or http on loopback only). `AUTH_LOG_SALT` (32+ characters) is required with them and keys the hashed principal tag in logs. Optional `AUTH_TOKEN_TYPE` (for example `at+jwt`) enforces the token `typ`, and `AUTH_MAX_TOKEN_LIFETIME` (seconds, default 3600) caps `exp - iat`. `AUTH_AUDIENCE` must be the API resource identifier, never an OIDC client ID. Admins grant and revoke `merchant_staff` and `support` with `PUT`/`DELETE /v1/admin/users/{userId}/roles/{role}`. The first admin is granted in the database.
 
-Authenticated routes are rate limited per IP (300 requests per 60 s, before token verification) and per principal (120 requests per 60 s). Over the limit, requests get 429 with `Retry-After`. Limits are per instance.
+Authenticated routes are rate limited per IP (300 requests per 60 s, before token verification) and per principal (120 requests per 60 s). Over the limit, requests get 429 with `Retry-After`. Limits are per instance. Set `TRUST_PROXY` (a hop count, or a comma-separated list of proxy addresses/CIDRs) behind a reverse proxy, otherwise all clients share the proxy's bucket.
 
-In production, run the server as a login role that is a member of `tazumo_api` (created by migration `0003`, with append-only access to `audit_events`), and run `db:migrate`/`db:seed` as the schema owner:
+In production, run the server as a login role that is a member of `tazumo_api` (created by migration `0003`, with append-only access to `audit_events`), and run `db:migrate`/`db:seed` as the schema owner. The owner needs CREATEROLE unless `tazumo_api` already exists. Use one PostgreSQL cluster per environment, because roles are cluster-wide.
 
 ```sql
 CREATE ROLE tazumo_api_app LOGIN PASSWORD '...' IN ROLE tazumo_api;

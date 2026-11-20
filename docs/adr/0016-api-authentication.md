@@ -37,13 +37,15 @@ Alternatives considered:
 ### Identity and roles in PostgreSQL
 
 - `users` stores only `(issuer, subject)` and a creation time: no names, e-mails or addresses. The first authenticated call creates the row and grants `customer` in the same transaction. Concurrent first calls converge on one row.
-- `user_roles` holds `customer`, `merchant_staff` (requires a `merchant_id`), `courier`, `support` and `admin`. Roles are never taken from token claims, so a grant can be revoked without waiting for token expiry. Until an admin API exists, grants other than `customer` are written in the database by operators.
+- `user_roles` holds `customer`, `merchant_staff` (requires a `merchant_id`), `courier`, `support` and `admin`. Roles are never taken from token claims, so a grant can be revoked without waiting for token expiry. The first admin is granted in the database by an operator. All other grants go through the admin API (slice 2), which audits every change.
 - `audit_events` is append-only: triggers reject UPDATE, DELETE and TRUNCATE. Support and admin reads write an audit row before data is returned. If the audit write fails, the read fails.
   - **Least-privilege runtime role:** migration `0003` creates the NOLOGIN group role `tazumo_api`. It has:
     - SELECT on catalogue tables;
     - SELECT and INSERT on `users`;
     - SELECT, INSERT and DELETE on `user_roles`;
     - INSERT only on `audit_events`.
+  - **Row-level security on `user_roles`:** `tazumo_api` cannot insert or delete `admin` grants, so even SQL injection in the runtime cannot create an admin.
+  - **Migration preconditions:** the migration needs a schema owner with CREATEROLE (or a pre-created `tazumo_api` role). It refuses an existing `tazumo_api` role that has LOGIN, SUPERUSER, BYPASSRLS, CREATEROLE or CREATEDB. Roles are cluster-wide, so use one cluster per environment, or `REVOKE CONNECT ON DATABASE ... FROM PUBLIC` and grant CONNECT per environment's login role. Revoking `TEMP` from PUBLIC is also recommended.
   - **Production deployment:** run the server as a login member of `tazumo_api`, and run migrations and seed as the schema owner. That role cannot update, delete, truncate or read the audit log, disable its triggers or drop it (all covered by tests). The owner still can, and the down migration drops the table, so owner credentials must stay out of the runtime.
 
 ### Authorization

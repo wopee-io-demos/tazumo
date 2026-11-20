@@ -1,3 +1,4 @@
+import { isIPv6 } from 'node:net';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { apiError } from './errors.ts';
 
@@ -8,6 +9,8 @@ export const defaultLimits = {
   ip: { limit: 300, windowMs: 60_000 },
   principal: { limit: 120, windowMs: 60_000 }
 } satisfies Record<'ip' | 'principal', LimitRule>;
+
+type Decision = { allowed: true } | { allowed: false; retryAfterSeconds: number };
 
 export class FixedWindowLimiter {
   readonly rule: LimitRule;
@@ -21,23 +24,53 @@ export class FixedWindowLimiter {
     this.#maxKeys = maxKeys;
   }
 
-  hit(key: string): { allowed: true } | { allowed: false; retryAfterSeconds: number } {
+  get size() {
+    return this.#windows.size;
+  }
+
+  hit(key: string): Decision {
     const now = this.#now();
+    this.#sweep(now);
     let window = this.#windows.get(key);
     if (!window || now - window.start >= this.rule.windowMs) {
-      if (!window && this.#windows.size >= this.#maxKeys) this.#evict(now);
+      this.#windows.delete(key);
+      if (this.#windows.size >= this.#maxKeys) return { allowed: false, retryAfterSeconds: this.#retryAfter(this.#oldestStart(), now) };
       window = { start: now, count: 0 };
       this.#windows.set(key, window);
     }
     window.count++;
     if (window.count <= this.rule.limit) return { allowed: true };
-    return { allowed: false, retryAfterSeconds: Math.max(1, Math.ceil((window.start + this.rule.windowMs - now) / 1000)) };
+    return { allowed: false, retryAfterSeconds: this.#retryAfter(window.start, now) };
   }
 
-  #evict(now: number) {
-    for (const [key, window] of this.#windows) if (now - window.start >= this.rule.windowMs) this.#windows.delete(key);
-    if (this.#windows.size >= this.#maxKeys) this.#windows.delete(this.#windows.keys().next().value as string);
+  #retryAfter(start: number, now: number) {
+    return Math.max(1, Math.ceil((start + this.rule.windowMs - now) / 1000));
   }
+
+  #oldestStart() {
+    return this.#windows.values().next().value?.start ?? this.#now();
+  }
+
+  #sweep(now: number) {
+    for (const [key, window] of this.#windows) {
+      if (now - window.start < this.rule.windowMs) break;
+      this.#windows.delete(key);
+    }
+  }
+}
+
+function expandIPv6(address: string): string[] {
+  const [head, tail = ''] = address.split('::');
+  const left = head ? head.split(':') : [];
+  const right = address.includes('::') ? (tail ? tail.split(':') : []) : [];
+  return [...left, ...Array(8 - left.length - right.length).fill('0'), ...right];
+}
+
+export function clientKey(ip: string): string {
+  const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/i.exec(ip);
+  if (mapped) return mapped[1];
+  if (!isIPv6(ip)) return ip;
+  return `${expandIPv6(ip.toLowerCase()).slice(0, 4).map((part) => part.padStart(4, '0')).join(':')}::/64`;
 }
 
 function hook(limiter: FixedWindowLimiter, key: (request: FastifyRequest) => string) {
@@ -54,7 +87,7 @@ export function createRateLimits(options: RateLimitOptions = {}) {
   const ip = new FixedWindowLimiter(options.ip ?? defaultLimits.ip, options.now, options.maxKeys);
   const principal = new FixedWindowLimiter(options.principal ?? defaultLimits.principal, options.now, options.maxKeys);
   return {
-    byIp: hook(ip, (request) => `ip:${request.ip}`),
+    byIp: hook(ip, (request) => `ip:${clientKey(request.ip)}`),
     byPrincipal: hook(principal, (request) => `principal:${request.principal?.userId ?? 'none'}`)
   };
 }

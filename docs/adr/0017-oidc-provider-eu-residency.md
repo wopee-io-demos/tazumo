@@ -25,10 +25,11 @@ Pricing and contract terms change often. The figures below are indicative and mu
 | | Keycloak, self-hosted in the EU | Zitadel, self-hosted in the EU (Zitadel Cloud as a managed variant) | Auth0, EU region | Microsoft Entra External ID | Ory Network, EU |
 | --- | --- | --- | --- | --- | --- |
 | **Who controls the data** | We do, on EU infrastructure we choose (for example an EU-owned host in Germany or Finland) | We do when self-hosted. The vendor is Swiss; Zitadel Cloud offers regional hosting | Okta, a US company. Tenant data is stored in the EU region | Microsoft, a US company. Tenant location is chosen at creation, and the EU Data Boundary applies | Ory (founded in Germany; verify the contracting entity). EU data location is selectable |
-| **Non-EU legal exposure** | None beyond our hosting provider | None when self-hosted. Switzerland has an EU adequacy decision | US parent: CLOUD Act / FISA exposure; transfers rely on the EU–US Data Privacy Framework or SCCs | Same US-parent exposure as Auth0, mitigated by the EU Data Boundary commitments | Low; verify the sub-processor list |
+| **Non-EU legal exposure** | Only what our hosting provider brings (none with an EU-owned host) | None when self-hosted; Switzerland has an EU adequacy decision. **Zitadel Cloud** reportedly runs on a US hyperscaler, which brings the same CLOUD Act / FISA sub-processor exposure as the US vendors; verify the sub-processor list | US parent: CLOUD Act / FISA exposure; transfers rely on the EU–US Data Privacy Framework or SCCs | Same US-parent exposure as Auth0, mitigated by the EU Data Boundary commitments (which have documented exceptions; confirm External ID coverage) | Reportedly hosted on a US hyperscaler, so there is sub-processor exposure similar to Zitadel Cloud; verify the sub-processor list |
 | **Licence** | Apache 2.0, CNCF project | AGPL-3.0 (since v3), commercial licence available | Proprietary SaaS | Proprietary SaaS | Proprietary SaaS on Apache-2.0 open-source components (Kratos, Hydra, Keto) |
 | **Cost at prototype scale** | Infrastructure only: one small VM plus managed or self-run PostgreSQL. The real cost is operations time | Infrastructure only, or Zitadel Cloud's usage-based plans | Free tier for low MAU (advertised at about 25k), then steep per-MAU tiers. Enterprise features cost extra | Free tier for low MAU (advertised at about 50k), then per-MAU pricing | Free developer tier; production plans are a monthly subscription |
 | **Ops burden** | **Highest:** upgrades (frequent majors), HA, backups, patching, theming, monitoring, our own incident response | **High:** a single Go binary on PostgreSQL is simpler than Keycloak, but HA, backups and upgrades are still ours | **Low** | **Low.** Configuration is Azure-centric | **Low** |
+| **RFC 9068 `at+jwt` access tokens** (needed for `AUTH_TOKEN_TYPE`) | Per-client option for the `at+jwt` header (verify in the spike) | Verify | RFC 9068 token profile selectable per API (verify) | Access tokens carry `typ: JWT`, not `at+jwt`, so leave `AUTH_TOKEN_TYPE` unset and rely on the audience | Verify (Hydra) |
 | **Standards fit** | OIDC-certified; audiences via client scopes and mappers; fine-grained token configuration | OIDC-certified; project and role model built in; JWT access tokens per application | OIDC-certified; API audiences built in; mature SDKs | OIDC; `sub` is pairwise per application, and `oid` is the stable object ID | OIDC-certified (Hydra); headless identity flows |
 | **Local and CI testing** | Official container: real-IdP integration tests in CI are easy | Official container | Needs a cloud tenant per environment | Needs a cloud tenant per environment | Open-source components run locally; the network product is cloud-only |
 | **Lock-in** | Low: standard OIDC, exportable realm | Low to medium | Medium: rules/actions and user export constraints | Medium to high: tied to Azure tenancy | Medium |
@@ -41,14 +42,16 @@ Every option uses the same erasure pattern on Tazumo's side:
 2. Replace `users.subject` with an irreversible tombstone (for example `erased:<random>`), and remove non-customer grants.
 3. Keep `users.id`, so that `audit_events.actor_user_id` (ON DELETE RESTRICT, ADR-0016) stays valid but no longer resolves to a person.
 
-The pseudonymised row holds no personal data, so audit integrity survives erasure.
+The row is then pseudonymous, not anonymous. It is still personal data under GDPR (Art. 4(5), Recital 26), because `users.id` links audit rows, request IDs and, later, orders. Keeping it with the audit trail relies on the Art. 17(3) exemptions (legal obligation, or establishing and defending legal claims), and that basis must be documented.
+
+Logs carry an HMAC of issuer and subject (ADR-0016). Once the provider account is deleted, that tag can no longer be linked back to a person. Rotating `AUTH_LOG_SALT` on a schedule, and expiring logs by retention, limits re-identification while backups still hold the account.
 
 What differs per provider:
 
 - **Self-hosted (Keycloak, Zitadel):**
   - We are controller and operator of the identity store, so its backups, logs and retention are ours to purge or expire.
   - Erasure must also reach database backups within the documented retention.
-  - We avoid third-party processors entirely.
+  - We use fewer processors, and none of them is identity-specific. The IaaS host, managed PostgreSQL and e-mail/SMS delivery remain processors.
 - **SaaS (Auth0, Entra, Ory, Zitadel Cloud):**
   - The provider is a processor under a DPA.
   - Erasure goes through its management API.
@@ -62,10 +65,10 @@ What differs per provider:
 ## Recommendation
 
 **Self-hosted Keycloak on EU infrastructure.**
-- It is the only option that combines full EU control, a permissive licence, OIDC certification, a container for real-IdP tests in CI, and no per-MAU cost.
-- Its operational burden is the main downside. It is acceptable because the project already operates EU-hosted infrastructure, and a single-instance deployment with managed PostgreSQL and tested backups is enough at prototype stage.
+- It is the only option that combines full EU control, OIDC certification, a container for real-IdP tests in CI, no per-MAU cost and a permissive licence. Zitadel's AGPL only binds a modified Zitadel offered over a network, so running it unmodified as a separate service is also fine; self-hosted Zitadel is a close second with lighter operations.
+- Its operational burden is the main downside. Nothing is deployed yet, and the only EU infrastructure the project runs today is its CI runners. A single-instance deployment with managed PostgreSQL and tested backups is enough at prototype stage, but someone has to own upgrades and on-call. If nobody can, the managed fallback below is the better choice.
 
-**If operations capacity is not available, use a managed EU vendor.** Zitadel Cloud (EU region) or Ory Network (EU) keeps residency and legal exposure low with minimal operations.
+**If operations capacity is not available, use a managed EU-region vendor.** Zitadel Cloud (EU region) or Ory Network (EU) keeps data in the EU with minimal operations. Their hyperscaler sub-processors carry legal exposure comparable to the US vendors, so the difference from Auth0 and Entra is smaller than residency alone suggests.
 
 **Auth0 EU and Entra External ID are technically strong but rank lower here.** Their US parents carry legal exposure. They remain viable if legal review accepts the Data Privacy Framework and SCC route.
 
