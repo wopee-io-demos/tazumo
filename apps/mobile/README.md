@@ -48,7 +48,7 @@ If the Hermes download stalls during `pod install`, download `react-native-artif
 
 ## Android emulator smoke (CI)
 
-The `Android emulator smoke` job in `native-builds.yml` builds a release-variant x86_64 APK (debug keystore, JavaScript embedded), boots an API 34 emulator and runs [`tests/android-smoke.case.json`](tests/android-smoke.case.json) with Appium UiAutomator2 ([ADR-0010](../../docs/adr/0010-test-pyramid-native-automation.md)). Steps address elements by `sut-` IDs. A negative case with a missing ID must fail. Screenshots, UiAutomator XML per step, `report.json`, the Appium log and the APK are uploaded as the `tazumo-android-smoke` artifact.
+The `Android emulator smoke` job in `native-builds.yml` builds a release-variant x86_64 APK (debug keystore, JavaScript embedded), boots an API 34 emulator and runs [`tests/android-smoke.case.json`](tests/android-smoke.case.json) with Appium UiAutomator2 ([ADR-0010](../../docs/adr/0010-test-pyramid-native-automation.md)). Steps address elements by `sut-` IDs with the Android `id` strategy, so the job also checks that React Native exposes `testID` as the resource-id the SUT contract promises. The text and enabled-state checks use XPath on `@resource-id`. `tests/run-case.mjs` mirrors the report shape and step semantics of mobile-agent's `native.py` (private repo, so it is not fetched in this public CI). A negative case with a missing ID must fail on its last step. Screenshots, UiAutomator XML per step, `report.json`, the Appium log and the APK are uploaded as the `tazumo-android-smoke` artifact.
 
 To run the same case against a local emulator with Appium running on port 4723:
 
