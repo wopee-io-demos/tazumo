@@ -1,0 +1,18 @@
+{
+  "expo": {
+    "name": "Tazumo",
+    "slug": "tazumo",
+    "scheme": "tazumo",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "io.wopee.demos.tazumo"
+    },
+    "android": {
+      "package": "io.wopee.demos.tazumo"
+    },
+    "plugins": []
+  }
+}
