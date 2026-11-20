@@ -37,9 +37,17 @@ Alternatives considered:
 ### Identity and roles in PostgreSQL
 
 - `users` stores only `(issuer, subject)` and a creation time: no names, e-mails or addresses. The first authenticated call creates the row and grants `customer` in the same transaction. Concurrent first calls converge on one row.
-- `user_roles` holds `customer`, `merchant_staff` (requires a `merchant_id`), `courier`, `support` and `admin`. Roles are never taken from token claims, so a grant can be revoked without waiting for token expiry. Until an admin API exists, grants other than `customer` are written in the database by operators.
+- `user_roles` holds `customer`, `merchant_staff` (requires a `merchant_id`), `courier`, `support` and `admin`. Roles are never taken from token claims, so a grant can be revoked without waiting for token expiry. The first admin is granted in the database by an operator. All other grants go through the admin API (slice 2), which audits every change.
 - `audit_events` is append-only: triggers reject UPDATE, DELETE and TRUNCATE. Support and admin reads write an audit row before data is returned. If the audit write fails, the read fails.
-  - **Limits:** the table owner can still disable the triggers or drop the table, and the down migration drops it. Real integrity needs a separate least-privilege runtime role without UPDATE, DELETE or TRUNCATE on the table, or ownership of it. That role is already a production gate in ADR-0009.
+  - **Least-privilege runtime role:** migration `0003` creates the NOLOGIN group role `tazumo_api`. It has:
+    - SELECT on catalogue tables;
+    - SELECT and INSERT on `users`;
+    - SELECT, INSERT and DELETE on `user_roles`;
+    - INSERT only on `audit_events`.
+  - **Row-level security on `user_roles`:** `tazumo_api` may insert only `customer`, `merchant_staff` and `support` grants, and delete only the latter two. Even SQL injection in the runtime therefore cannot create an admin or courier grant.
+  - **Side effect:** any future non-owner role with SELECT on `user_roles` (for example reporting) sees no rows unless it gets its own policy.
+  - **Migration preconditions:** the migration needs a schema owner with CREATEROLE (or a pre-created `tazumo_api` role). It refuses an existing `tazumo_api` role that has LOGIN, SUPERUSER, BYPASSRLS, CREATEROLE, CREATEDB or REPLICATION, or that is a member of any other role. Roles are cluster-wide, so use one cluster per environment, or `REVOKE CONNECT ON DATABASE ... FROM PUBLIC` and grant CONNECT per environment's login role. Revoking `TEMP` from PUBLIC is also recommended.
+  - **Production deployment:** run the server as a login member of `tazumo_api`, and run migrations and seed as the schema owner. That role cannot update, delete, truncate or read the audit log, disable its triggers or drop it (all covered by tests). The owner still can, and the down migration drops the table, so owner credentials must stay out of the runtime.
 
 ### Authorization
 
@@ -54,4 +62,9 @@ The `authorization` and `cookie` headers stay redacted (ADR-0009). A successful 
 - Any OIDC provider that publishes a JWKS and issues RS256 or ES256 access tokens with a configured audience works without code changes.
 - Tokens stay valid until `exp` even if the provider revokes the session. Lifetimes are capped by `AUTH_MAX_TOKEN_LIFETIME` (default one hour); 5 to 15 minutes is the provider configuration target. Revoking a role takes effect on the next request.
 - `audit_events` references `users` with `ON DELETE RESTRICT`. GDPR erasure must pseudonymize, not delete. A follow-up is needed before real users exist.
-- Not covered yet: rate limits, an admin API for grants, courier assignment scopes (which need orders), and the provider choice itself.
+- Slice 2 (#56) added:
+  - two-layer rate limits (per IP before verification, per principal after);
+  - an admin role-grants API;
+  - the `tazumo_api` runtime role.
+- The provider choice is proposed in ADR-0017.
+- Courier assignment scopes wait for orders.

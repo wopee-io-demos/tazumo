@@ -1,3 +1,4 @@
+import { isIP } from 'node:net';
 import type { AuthOptions } from './auth/plugin.ts';
 
 export type Config = {
@@ -6,6 +7,7 @@ export type Config = {
   host: string;
   port: number;
   logLevel: string;
+  trustProxy: false | string[];
 };
 
 const logLevels = ['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'];
@@ -17,7 +19,16 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('PORT must be an integer between 1 and 65535');
   const logLevel = env.LOG_LEVEL ?? 'info';
   if (!logLevels.includes(logLevel)) throw new Error(`LOG_LEVEL must be one of ${logLevels.join(', ')}`);
-  return { databaseUrl, host: env.HOST ?? '127.0.0.1', port, logLevel, auth: loadAuthConfig(env) };
+  return { databaseUrl, host: env.HOST ?? '127.0.0.1', port, logLevel, auth: loadAuthConfig(env), trustProxy: loadTrustProxy(env.TRUST_PROXY) };
+}
+
+function loadTrustProxy(value: string | undefined): Config['trustProxy'] {
+  if (!value) return false;
+  const entries = value.split(',').map((entry) => entry.trim()).filter(Boolean);
+  if (entries.length === 0 || entries.some((entry) => isIP(entry.split('/')[0]) === 0)) {
+    throw new Error('TRUST_PROXY must be a comma-separated list of proxy IP addresses or CIDRs');
+  }
+  return entries;
 }
 
 const loopbackHosts = ['127.0.0.1', 'localhost', '[::1]'];

@@ -46,3 +46,11 @@ test('a principal without grants gets nothing beyond itself', () => {
   assert.deepEqual(can(bare, 'merchant_staff:list', merchant(merchantA)), { allowed: false, status: 404 });
   assert.deepEqual(can(bare, 'user:read', { type: 'user', id: 'u-bare' }), { allowed: true, audit: false });
 });
+
+test('only admins manage roles, and never their own', () => {
+  const target = { type: 'user' as const, id: 'u-customer' };
+  assert.deepEqual(can(admin, 'role:manage', target), { allowed: true, audit: true });
+  for (const p of [customer, staffA, support]) assert.deepEqual(can(p, 'role:manage', target), { allowed: false, status: 403 });
+  assert.deepEqual(can(admin, 'role:manage', { type: 'user', id: 'u-admin' }), { allowed: false, status: 403 });
+  assert.deepEqual(can(support, 'role:manage', { type: 'user', id: 'u-support' }), { allowed: false, status: 403 });
+});

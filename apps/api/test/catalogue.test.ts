@@ -149,7 +149,7 @@ describe('catalogue API against PostgreSQL', () => {
     });
     await probe.ready();
     await probe.close();
-    assert.equal(routes.length, 5);
+    assert.equal(routes.length, 7);
     for (const route of routes) assert.ok(declared.includes(route), `${route} is not in contracts/openapi.json`);
   });
 });
