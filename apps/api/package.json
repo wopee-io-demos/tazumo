@@ -1,0 +1,30 @@
+{
+  "name": "@tazumo/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "scripts": {
+    "start": "node --experimental-strip-types src/server.ts",
+    "db:migrate": "node --experimental-strip-types src/migrate.ts up",
+    "db:rollback": "node --experimental-strip-types src/migrate.ts down",
+    "db:seed": "node --experimental-strip-types src/seed.ts",
+    "test": "node --experimental-strip-types --test --test-concurrency=1 test/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@tazumo/core": "workspace:*",
+    "fastify": "5.12.8",
+    "node-pg-migrate": "9.0.0",
+    "pg": "8.23.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "@types/pg": "8.23.1",
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1",
+    "typescript": "^5.8.3"
+  }
+}
