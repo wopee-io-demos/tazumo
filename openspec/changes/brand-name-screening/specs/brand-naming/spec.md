@@ -11,7 +11,7 @@ The name screening record SHALL state its date, sources, exact queries, search s
 
 #### Scenario: Near matches found
 - **WHEN** a fuzzy or phonetic search returns marks one or two letters away in Nice classes 9, 35, 39 or 43
-- **THEN** each one is listed with its office, owner, classes, status and a link for the attorney to assess
+- **THEN** each one is listed with its office, classes, status and a register number or search link for the attorney to assess, and private individuals are not named
 
 ### Requirement: Domain and handle observations are reproducible
 The record SHALL give the method (DNS resolver, WHOIS or RDAP server, HTTP check) and the observed status for every domain and handle. An observation that cannot tell "free" from "blocked" SHALL be marked inconclusive.

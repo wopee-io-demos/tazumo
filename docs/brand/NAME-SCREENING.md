@@ -9,12 +9,12 @@ Issue: [#6](https://github.com/wopee-io-demos/tazumo/issues/6). Name, palette an
 | | Tazumo | Zupomi | Zopiku |
 | --- | --- | --- | --- |
 | Identical mark found (EUIPO, WIPO) | none found | none found | none found |
-| Near marks to show an attorney | **Takumo** (DE, classes 9, 35, registered) | **MUPOMI** (DE, class 9, pending) | none in the EU; only Asian *KOPIKU* marks (classes 30, 35, 43) |
-| .com | **registered by a third party** (2025, has mail) | **registered by a third party** (2026, parked) | not registered |
-| .eu, .cz, .sk, .de | not registered | not registered | not registered |
-| Language flags | German reads "Tatsumo" | Czech "zapomni" (forget)? *needs native check* | Czech/Slovak "zopakuj" (repeat) *needs native check* |
+| Near marks to show an attorney | **Takumo** (DE, classes 9, 35, registered) | **MUPOMI** (DE, class 9, pending) | none among the top-ranked records reviewed; only Asian *KOPIKU* marks (classes 30, 32, 35, 43) |
+| .com | **registered by a third party** (2025, has mail) | **registered by a third party** (2026, parked) | no registration observed |
+| .eu, .cz, .sk, .de | no registration observed | no registration observed | no registration observed |
+| Language flags ⚑ | German reads "Tatsumo" | Czech *zapomeň* ("forget!"), Slovak *župa* (region) | Czech/Slovak *zopakuj* ("repeat!"), drug name *zopiclone* |
 
-"Not registered" means that the registry WHOIS or RDAP reported the domain as free or not found at that time. It is not a reservation.
+"No registration observed" means that the registry WHOIS or RDAP reported the domain as free or not found at the time of the check. It says nothing about availability now and is not a reservation. ⚑ = needs native-speaker confirmation.
 
 ## 1. Trademark databases
 
@@ -52,28 +52,28 @@ All queries ran on 2026-11-20 between 21:16 and 21:23 CET, across all offices an
 
 **Not obtained:** the class filter (Nice 9, 35, 39, 43) could not be applied through the form, because the field did not respond. Instead, the records rendered on the first results page of each fuzzy and phonetic search (8 per page, most relevant first) were reviewed by hand, and the class filter was applied to those. An attorney's search must apply the class filter across all results.
 
-Near marks among the reviewed results. Rows in **bold** are in classes 9, 35, 39 or 43 and are registered or pending in Europe:
+Near marks among the reviewed results. Rows in **bold** are in classes 9, 35, 39 or 43 and are registered or pending in a European office. Names of private individuals are left out on purpose. Use the register number or the WIPO link to look them up.
 
 | Query | Mark | Office | Owner | Classes | Status |
 | --- | --- | --- | --- | --- | --- |
-| tazumo | **Takumo** | Germany (DPMA) | Kahrmann, Tim Bastian | 9, 25, 35, 42 | Registered (2022-10-27) |
+| tazumo | **Takumo** | Germany (DPMA) `302022218163` | individual (see register) | 9, 25, 35, 42 | Registered (2022-10-27) |
 | tazumo | TAXUMO | Philippines | Taxumo Inc | 35, 42, 45 | Application ended (2019) |
-| tazumo | TAZAMO | France | Martin-Croust Patrick | 16, 41, 42 | Expired (2007) |
+| tazumo | TAZAMO | France | individual (see register) | 16, 41, 42 | Expired (2007) |
 | tazumo | TAZAMO | Malawi | The British Petroleum Company plc | 3 | Registered (1986) |
 | tazumo | NAZUMO | Japan | Kawashima Kogyo | 13 | Expired (2010) |
-| tazumo | TACUMO | USA | Tian Long Yu | 28 | Registered (2026) |
+| tazumo | TACUMO | USA | individual (see register) | 28 | Registered (2026) |
 | tazumo (stemming) | TAZUMARA | Cuba | Bayer Intellectual Property GmbH | 5, 10 | Expired (2013) |
-| zupomi | **MUPOMI** | Germany (DPMA) | Seedorf, Johannes Klaus | 9, 25, 41 | Pending (filed 2026-10-15) |
-| zupomi | **ZUHOMI** | Malaysia | Leong Kam Choong t/a Yummy Trading | 43 | Application ended (2011) |
-| zupomi | ZUHOMI | Malaysia | Leong Kam Choong t/a Yummy Trading | 30 | Registered (2010) |
+| zupomi | **MUPOMI** | Germany (DPMA) `3020262577997` as shown by WIPO | individual (see register) | 9, 25, 41 | Pending (filed 2026-10-15) |
+| zupomi | ZUHOMI | Malaysia | sole trader (see register) | 43 | Application ended (2011) |
+| zupomi | ZUHOMI | Malaysia | sole trader (see register) | 30 | Registered (2010) |
 | zupomi | ZUOMI | Zambia | L & A Logistics Limited | 30 | Registered (2026) |
-| zupomi | ZUYOMI | USA | Longfeng Lin | 25 | Registered (2026) |
+| zupomi | ZUYOMI | USA | individual (see register) | 25 | Registered (2026) |
 | zupomi | KUROMI | Brazil | Sanrio Company, Limited | 18, 35, 42 | Registered (2022) |
 | tazumo (phonetic) | TASUMO | Japan | not shown | 9, 35, 42 | Application ended |
-| tazumo (phonetic) | Tatsuma | Malaysia | Lee Wei Lun t/a Enonext Auto Supply | 7, 12, 35 | Pending (2025-12-30) |
+| tazumo (phonetic) | Tatsuma | Malaysia | sole trader (see register) | 7, 12, 35 | Pending (2025-12-30) |
 | zupomi (phonetic) | スポメ (Supome) | Japan | memory K.K. | 35, 38, 41, 45 | Registered (2026-06-23) |
-| zopiku | KOPIKU, KOPIMU KOPIKU MUKU, KOPIKU KOPIMU + LUKISAN | Indonesia (several), Malaysia | several owners | 30, 32, 35, 43 | Mostly ended; one KOPIKU registered (2023, class 30) |
-| zopiku (phonetic) | SAPIKU.ID | Indonesia | Eko Junirianto | 9 | Registered (2020) |
+| zopiku | KOPIKU, KOPIMU KOPIKU MUKU, KOPIKU KOPIMU + LUKISAN | Indonesia (several), Malaysia | several owners (see register) | 30, 32, 35, 43 | Mostly ended; one KOPIKU registered (2023, class 30) |
+| zopiku (phonetic) | SAPIKU.ID | Indonesia | individual (see register) | 9 | Registered (2020) |
 
 Saved result links (WIPO may need the form to be resubmitted if a link opens empty):
 
@@ -81,12 +81,12 @@ Saved result links (WIPO may need the form to be resubmitted if a link opens emp
 - Zupomi: [fuzzy](https://branddb.wipo.int/en/similarname/results?sort=score%20desc&start=0&rows=30&asStructure=%7B%22_id%22%3A%22e2ef%22%2C%22boolean%22%3A%22AND%22%2C%22bricks%22%3A%5B%7B%22_id%22%3A%22e2f0%22%2C%22key%22%3A%22brandName%22%2C%22value%22%3A%22zupomi%22%2C%22strategy%22%3A%22Fuzzy%22%7D%5D%7D&fg=_void_) · [phonetic](https://branddb.wipo.int/en/similarname/results?sort=score%20desc&start=0&rows=30&asStructure=%7B%22_id%22%3A%22d5a9%22%2C%22boolean%22%3A%22AND%22%2C%22bricks%22%3A%5B%7B%22_id%22%3A%22d5aa%22%2C%22key%22%3A%22brandName%22%2C%22value%22%3A%22zupomi%22%2C%22strategy%22%3A%22Phonetic%22%7D%5D%7D&fg=_void_)
 - Zopiku: [fuzzy](https://branddb.wipo.int/en/similarname/results?sort=score%20desc&start=0&rows=30&asStructure=%7B%22_id%22%3A%22ff95%22%2C%22boolean%22%3A%22AND%22%2C%22bricks%22%3A%5B%7B%22_id%22%3A%22ff96%22%2C%22key%22%3A%22brandName%22%2C%22value%22%3A%22zopiku%22%2C%22strategy%22%3A%22Fuzzy%22%7D%5D%7D&fg=_void_) · [phonetic](https://branddb.wipo.int/en/similarname/results?sort=score%20desc&start=0&rows=30&asStructure=%7B%22_id%22%3A%2287d9%22%2C%22boolean%22%3A%22AND%22%2C%22bricks%22%3A%5B%7B%22_id%22%3A%2287da%22%2C%22key%22%3A%22brandName%22%2C%22value%22%3A%22zopiku%22%2C%22strategy%22%3A%22Phonetic%22%7D%5D%7D&fg=_void_)
 
-Register numbers as WIPO showed them: Takumo DPMA `302022218163`; MUPOMI DPMA `3020262577997`. Look them up in [DPMAregister](https://register.dpma.de/DPMAregister/marke/einsteiger).
+Per-mark links: the two European near marks can be looked up by number in [DPMAregister](https://register.dpma.de/DPMAregister/marke/einsteiger) ("Aktenzeichen"). The two numbers are copied exactly as WIPO showed them, and their lengths differ (12 and 13 digits). Whether a check digit is included was not verified in DPMAregister. For the other marks, open the WIPO link for the query and select the mark.
 
 Reading the results (a non-lawyer's notes for the attorney, not conclusions):
-- **Takumo** differs from Tazumo by one consonant, is registered in Germany and covers classes 9 and 35. It is the closest live conflict risk found for Tazumo.
+- **Takumo** differs from Tazumo by one consonant, is registered in Germany and covers classes 9 and 35. It is the closest near mark observed for Tazumo.
 - **MUPOMI** differs from Zupomi by one letter, was filed in Germany in October 2026 and covers class 9. It is pending, so it may still change.
-- Zopiku's nearest marks are *kopiku* (Indonesian/Malay for "my coffee") marks in South-East Asia. None was found in the EU.
+- Zopiku's nearest marks among the reviewed records are *kopiku* (Indonesian/Malay for "my coffee") marks in South-East Asia. That is not evidence that no similar EU mark exists, because TMview and the class filter were not obtained.
 - The fuzzy and phonetic result counts are large because those strategies match loosely across all classes and offices. Only the top-ranked rendered records were reviewed, which is a small sample.
 
 ## 2. Domains
@@ -137,7 +137,7 @@ Czech and Slovak always stress the first syllable. German reads **z as /ts/**, w
 ### Tazumo
 | Lang | Likely reading | Notes |
 | --- | --- | --- |
-| EN | ta-ZOO-moh /təˈzuːmoʊ/ | Easy to spell from hearing. Sounds Japanese-like. Spanish *zumo* means juice (neutral, food-adjacent). |
+| EN | ta-ZOO-moh /təˈzuːmoʊ/ | Probably easy to spell from hearing. Sounds Japanese-like. Spanish *zumo* means juice (neutral, food-adjacent). ⚑ |
 | CS | TA-zu-mo | No common Czech word found. ⚑ |
 | SK | TA-zu-mo | Close to *ťažko* ("hard, heavy") only distantly; probably not noticed. ⚑ |
 | DE | TA-tsu-mo | Heard as "Tatsumo". Spelling it back from hearing may give "Tatsumo". No negative meaning found. ⚑ |
@@ -145,18 +145,18 @@ Czech and Slovak always stress the first syllable. German reads **z as /ts/**, w
 ### Zupomi
 | Lang | Likely reading | Notes |
 | --- | --- | --- |
-| EN | zoo-POH-mee | Neutral. Polish *zupa* means soup, a pleasant food association in Central Europe. |
-| CS | ZU-po-mi | May echo *zapomenout / zapomeň* ("to forget / forget!"), an unhelpful association for a shopping app. Also *župa* (historic region). ⚑ |
-| SK | ZU-po-mi | Slovak "forget" is *zabudnúť*, so the Czech echo is weaker. *Župa* is also a historic region. ⚑ |
+| EN | zoo-POH-mee | No association found. ⚑ |
+| CS | ZU-po-mi | May echo *zapomenout / zapomeň* ("to forget / forget!"), an unhelpful association for a shopping app. Also near *župan* ("bathrobe") and *župa* (historic region). Polish *zupa* ("soup") may be recognised: a pleasant food link. ⚑ |
+| SK | ZU-po-mi | Slovak "forget" is *zabudnúť*, so the Czech echo is weaker. *Župa* is the everyday word for today's self-governing regions, and *župan* is a region's elected head, so the name may sound administrative. ⚑ |
 | DE | TSU-po-mi | *zu* means "closed" or "to", read as a separate syllable. No negative meaning found. ⚑ |
 
 ### Zopiku
 | Lang | Likely reading | Notes |
 | --- | --- | --- |
-| EN | zoh-PEE-koo | Neutral. Easy to say, less easy to spell from hearing ("Zopicu", "Zopeeku"). |
+| EN | zoh-PEE-koo | Easy to say, less easy to spell from hearing ("Zopicu", "Zopeeku"). *Zopi-* may remind some readers of the sleeping drug *zopiclone*. ⚑ |
 | CS | ZO-pi-ku | Echoes *zopakuj* ("repeat!"), which could suit re-ordering. The syllable *pi-* is close to the vulgar Czech/Slovak root *píč-* only through a stretch; native speakers should judge whether anyone hears it. ⚑ |
 | SK | ZO-pi-ku | Same *zopakuj* echo ("repeat!") and the same check as Czech. ⚑ |
-| DE | TSO-pi-ku | Near *Zopf* (braid, also a bread). No negative meaning found. ⚑ |
+| DE | TSO-pi-ku | Near *Zopf* (braid, also a bread). *Zopiclon* (sleeping drug) may come to mind. ⚑ |
 
 ## 5. Status of the #6 acceptance criteria
 
@@ -165,14 +165,14 @@ Czech and Slovak always stress the first syllable. German reads **z as /ts/**, w
 | Formal name clearance | **Open** | Only this preliminary screening exists. See the next step. |
 | Domain/handles verified | Partly | Domains: section 2 (registry-confirmed snapshot). Handles: GitHub and Bluesky are reliable; the others need a logged-in human check. |
 | European pronunciation tests | Partly | Desk notes only (section 4). Native-speaker tests are not done. |
-| Accessible brand tokens | Done in PR [#44](https://github.com/wopee-io-demos/tazumo/pull/44) | Light and dark themes for every palette; the WCAG 2.2 contrast test in `pnpm test` covers 184 pairing checks; ADR-0011. |
-| Original icon and mascot assets | Done in PR [#44](https://github.com/wopee-io-demos/tazumo/pull/44) (not cleared) | Hand-written SVG fox mark and mascot, iOS and Android icon exports, and `docs/brand/ASSET-PROVENANCE.md`. Not searched as a figurative mark. |
+| Accessible brand tokens | Implemented in PR [#44](https://github.com/wopee-io-demos/tazumo/pull/44), pending merge at the time of writing | Light and dark themes for every palette; the WCAG 2.2 contrast test in `pnpm test` covers 184 pairing checks; ADR-0011. |
+| Original icon and mascot assets | Implemented in PR [#44](https://github.com/wopee-io-demos/tazumo/pull/44), pending merge at the time of writing (not cleared) | Hand-written SVG fox mark and mascot, iOS and Android icon exports, and `docs/brand/ASSET-PROVENANCE.md`. Not searched as a figurative mark. |
 
 ## Next step: formal clearance
 
 For a human (the repository owner) to arrange, since an agent cannot do this:
 
-1. Pick at most two candidates. Based on this page, Zopiku has the fewest observed conflicts (free .com, no identical marks) but has open language checks. Tazumo needs an assessment of **Takumo** (DE, classes 9 and 35), and its .com is held by a third party.
+1. Pick at most two candidates. Based on this page, Zopiku had the fewest near marks among the records reviewed (no .com registration observed, no identical marks found), but it has open language checks. Tazumo needs an assessment of **Takumo** (DE, classes 9 and 35), and its .com is held by a third party.
 2. Engage a **European trademark attorney** for a full clearance search: identical and similar word marks at EUIPO, DPMA, ÚPV CZ, ÚPV SK and WIPO Madrid designations for the EU, in Nice classes 9, 35, 39 and 43; company-name and common-law use in CZ, SK and DE; and a figurative search for the fox mark.
 3. Run the native-speaker tests in section 4.
 4. Only after a positive opinion: file the mark (EUTM), then register the .com (or a fallback such as .eu) and the handles.
