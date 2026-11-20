@@ -41,7 +41,8 @@ test('the shipped cases are valid mobile-agent cases',()=>{
 
 test('smoke case passes, clicks each tap target once and captures every step',async()=>{
  const {call,log}=fakeDevice(allPresent(smoke)),out=tmp();
- const report=await execute(smoke,call,out,{timeout:50});
+ const report=await execute(smoke,call,out,{timeout:50,settings:{disableIdLocatorAutocompletion:true}});
+ assert.ok(log.indexOf('POST /session/s1/appium/settings')>0&&log.indexOf('POST /session/s1/appium/settings')<log.findIndex(l=>l.endsWith('/elements')),'settings applied before the first lookup');
  assert.equal(report.outcome,'passed',report.error);
  assert.equal(report.steps.length,smoke.platforms.android.steps.length);
  assert.deepEqual(log.filter(l=>l.endsWith('/click')).map(l=>l.split('/element/')[1].split('%23')[0]),['id%3Dsut-open-product-pizza','id%3Dsut-detail-add','id%3Dsut-nav-cart']);

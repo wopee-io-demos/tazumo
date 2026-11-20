@@ -62,7 +62,7 @@ export async function perform(step,call,timeout){
  }
 }
 
-export async function execute(testCase,call,folder,{timeout=15000,firstTimeout=timeout,extra={}}={}){
+export async function execute(testCase,call,folder,{timeout=15000,firstTimeout=timeout,extra={},settings}={}){
  const spec=validate(testCase);
  const report={case:testCase.id,platform:'android',app:spec.app,wopee:testCase.wopee??null,steps:[],outcome:'infrastructure-failed'};
  mkdirSync(folder,{recursive:true});
@@ -78,6 +78,7 @@ export async function execute(testCase,call,folder,{timeout=15000,firstTimeout=t
   const caps={...extra,platformName:'android','appium:automationName':'UiAutomator2','appium:noReset':true,'appium:appPackage':spec.app};
   session='/session/'+(await call('POST','/session',{capabilities:{alwaysMatch:caps}})).sessionId;
   const device=(method,path,body)=>call(method,session+path,body);
+  if(settings)await device('POST','/appium/settings',{settings});
   for(const [i,step] of spec.steps.entries()){
    report.currentStep=i+1;
    await perform(step,device,i===0?firstTimeout:timeout);
@@ -106,6 +107,8 @@ if(import.meta.url===`file://${process.argv[1]}`){
  const report=await execute(testCase,client(process.env.APPIUM_URL??'http://127.0.0.1:4723'),outDir,{
   timeout:Number(process.env.STEP_TIMEOUT_MS??15000),
   firstTimeout:Number(process.env.FIRST_STEP_TIMEOUT_MS??90000),
+  // React Native emits testID as a bare resource-id; stop UiAutomator2 rewriting `id` locators to `<package>:id/<value>`.
+  settings:{disableIdLocatorAutocompletion:true},
   extra:{'appium:appActivity':'.MainActivity','appium:forceAppLaunch':true,'appium:autoGrantPermissions':true,'appium:newCommandTimeout':300,'appium:uiautomator2ServerLaunchTimeout':120000,'appium:uiautomator2ServerInstallTimeout':120000,'appium:adbExecTimeout':120000}
  });
  console.log(`${report.outcome} ${join(outDir,'report.json')}${report.error?` :: ${report.error}`:''}`);
