@@ -31,6 +31,7 @@ jobs:
           distribution: temurin
           java-version: '17'
       - run: pnpm install --no-frozen-lockfile
+      - run: pnpm --filter @tazumo/mobile test
       - run: pnpm --filter @tazumo/mobile exec expo prebuild --platform android --non-interactive --no-install
       - name: Assemble debug APK
         working-directory: apps/mobile/android
