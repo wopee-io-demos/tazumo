@@ -3,6 +3,7 @@ import { assertValidMarket, vatCategories, type MarketConfig, type VatCategory }
 import { divideRoundHalfUp, formatMinor, formatPercent, roundToIncrement, toSafeNumber, type Money } from './money.ts';
 
 export const MAX_LINE_QUANTITY = 999;
+export const MAX_LINES = 100;
 
 export type OrderLineInput = {
   id: string;
@@ -65,6 +66,7 @@ export type PriceBreakdown = {
 const NOTICE = 'Demo pricing: delivery fee and small-order surcharge are synthetic, and VAT rates are research data to re-verify. Not a real quote or tax advice.';
 
 function validateLine(market: MarketConfig, line: OrderLineInput, seen: Set<string>): { rateId: string } {
+  if (typeof line !== 'object' || line === null) throw new CommerceRuleError('invalid_line', 'Every line must be an object');
   if (typeof line.id !== 'string' || line.id.length === 0) {
     throw new CommerceRuleError('invalid_line', 'Every line needs a non-empty id');
   }
@@ -76,8 +78,8 @@ function validateLine(market: MarketConfig, line: OrderLineInput, seen: Set<stri
       quantity: line.quantity
     });
   }
-  const minor = line.unitPrice?.minorUnits;
-  if (!Number.isSafeInteger(minor) || minor < 0) {
+  const minor = typeof line.unitPrice === 'object' && line.unitPrice !== null ? line.unitPrice.minorUnits : undefined;
+  if (!Number.isSafeInteger(minor) || (minor as number) < 0) {
     throw new CommerceRuleError('invalid_amount', `Line "${line.id}" unit price must be non-negative integer minor units`, {
       lineId: line.id,
       minorUnits: minor
@@ -96,11 +98,17 @@ function validateLine(market: MarketConfig, line: OrderLineInput, seen: Set<stri
       vatCategory: line.vatCategory
     });
   }
-  const rateId = line.vatRateId ?? market.vat.categoryDefaults[line.vatCategory];
-  if (!Object.hasOwn(market.vat.rates, rateId)) {
-    throw new CommerceRuleError('unknown_vat_rate', `Line "${line.id}" uses VAT rate "${rateId}", which market ${market.code} does not define`, {
+  if (line.vatRateId !== undefined && typeof line.vatRateId !== 'string') {
+    throw new CommerceRuleError('invalid_line', `Line "${line.id}" vatRateId must be a string when present`, { lineId: line.id });
+  }
+  const defaultRateId = market.vat.categoryDefaults[line.vatCategory];
+  const rateId = line.vatRateId ?? defaultRateId;
+  const allowed = rateId === defaultRateId || market.vat.categoryOverrides[line.vatCategory].includes(rateId);
+  if (!allowed || !Object.hasOwn(market.vat.rates, rateId)) {
+    throw new CommerceRuleError('unknown_vat_rate', `Line "${line.id}" uses VAT rate "${rateId}", which market ${market.code} does not allow for ${line.vatCategory}`, {
       lineId: line.id,
-      vatRateId: rateId
+      vatRateId: rateId,
+      allowed: [defaultRateId, ...market.vat.categoryOverrides[line.vatCategory]]
     });
   }
   return { rateId };
@@ -112,8 +120,8 @@ function vatGroup(market: MarketConfig, rateId: string, amount: bigint): VatGrou
   let net: bigint;
   let vat: bigint;
   if (market.pricesIncludeVat) {
-    net = divideRoundHalfUp(amount * 10000n, 10000n + bp);
-    vat = amount - net;
+    vat = divideRoundHalfUp(amount * bp, 10000n + bp);
+    net = amount - vat;
   } else {
     net = amount;
     vat = divideRoundHalfUp(amount * bp, 10000n);
@@ -122,7 +130,7 @@ function vatGroup(market: MarketConfig, rateId: string, amount: bigint): VatGrou
   const vatMinor = toSafeNumber(vat, 'VAT amount');
   const grossMinor = toSafeNumber(net + vat, 'gross amount');
   const how = market.pricesIncludeVat
-    ? `contained in ${formatMinor(market, grossMinor)} (gross ÷ ${1 + r.basisPoints / 10000}, rounded half up)`
+    ? `contained in ${formatMinor(market, grossMinor)} (gross × ${r.basisPoints} ÷ ${10000 + r.basisPoints}, rounded half up)`
     : `added to ${formatMinor(market, netMinor)} (net × ${r.basisPoints / 10000}, rounded half up)`;
   return {
     rateId,
@@ -141,8 +149,11 @@ function vatGroup(market: MarketConfig, rateId: string, amount: bigint): VatGrou
  */
 export function priceBreakdown(market: MarketConfig, order: OrderInput): PriceBreakdown {
   assertValidMarket(market);
-  if (!Array.isArray(order.lines) || order.lines.length === 0) {
+  if (typeof order !== 'object' || order === null || !Array.isArray(order.lines) || order.lines.length === 0) {
     throw new CommerceRuleError('empty_order', 'An order needs at least one line');
+  }
+  if (order.lines.length > MAX_LINES) {
+    throw new CommerceRuleError('invalid_line', `An order may have at most ${MAX_LINES} lines`, { lines: order.lines.length });
   }
   const fmt = (minor: number) => formatMinor(market, minor);
   const seen = new Set<string>();
@@ -182,7 +193,7 @@ export function priceBreakdown(market: MarketConfig, order: OrderInput): PriceBr
       maxMeters: bands[bands.length - 1].upToMeters
     });
   }
-  const deliveryMinor = baseMinor + band.feeMinor;
+  const deliveryMinor = toSafeNumber(BigInt(baseMinor) + BigInt(band.feeMinor), 'delivery fee');
 
   const { thresholdMinor, capMinor } = market.smallOrderSurcharge;
   const surchargeMinor = subtotalMinor < thresholdMinor ? Math.min(thresholdMinor - subtotalMinor, capMinor) : 0;
@@ -224,23 +235,21 @@ export function priceBreakdown(market: MarketConfig, order: OrderInput): PriceBr
       explanation:
         surchargeMinor > 0
           ? `Synthetic small-order surcharge: subtotal is ${fmt(thresholdMinor - subtotalMinor)} below ${fmt(thresholdMinor)}, charged up to ${fmt(capMinor)}, ${feeVat}.`
-          : `No small-order surcharge: subtotal reaches ${fmt(thresholdMinor)}.`
+          : `No synthetic small-order surcharge: subtotal reaches the synthetic threshold of ${fmt(thresholdMinor)}.`
     },
     ...vat.map((g): BreakdownComponent => ({ kind: 'vat', amountMinor: g.vatMinor, addsToPayable: !market.pricesIncludeVat, synthetic: false, explanation: g.explanation })),
     { kind: 'total', amountMinor: totalMinor, addsToPayable: false, synthetic: false, explanation: `Total ${fmt(totalMinor)}` }
   ];
   if (roundingMinor !== 0) {
-    components.push(
-      {
-        kind: 'rounding',
-        amountMinor: roundingMinor,
-        addsToPayable: true,
-        synthetic: false,
-        explanation: `Rounded to the nearest ${fmt(market.rounding.payableIncrementMinor)}: ${roundingMinor > 0 ? '+' : ''}${(roundingMinor / 100).toFixed(2)} ${market.currency}, not subject to VAT`
-      },
-      { kind: 'payable', amountMinor: payableMinor, addsToPayable: false, synthetic: false, explanation: `Amount to pay ${fmt(payableMinor)}` }
-    );
+    components.push({
+      kind: 'rounding',
+      amountMinor: roundingMinor,
+      addsToPayable: true,
+      synthetic: false,
+      explanation: `Rounded to the nearest ${fmt(market.rounding.payableIncrementMinor)}: ${roundingMinor > 0 ? '+' : ''}${fmt(roundingMinor)}, not subject to VAT`
+    });
   }
+  components.push({ kind: 'payable', amountMinor: payableMinor, addsToPayable: false, synthetic: false, explanation: `Amount to pay ${fmt(payableMinor)}` });
 
   return {
     market: market.code,

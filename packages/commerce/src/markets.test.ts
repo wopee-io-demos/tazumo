@@ -37,13 +37,17 @@ test('every VAT rate cites official sources with a retrieval date and is flagged
     const { vat } = markets[code];
     assert.equal(vat.status, 'reverify');
     for (const rate of Object.values(vat.rates)) {
-      assert.ok(rate.sourceIds.length >= 2, `${code}.${rate.id} needs an EU and a national source`);
+      assert.ok(
+        rate.sourceIds.some((id) => !vatSources[id]?.url.includes('europa.eu')),
+        `${code}.${rate.id} needs a national official source`
+      );
       for (const id of rate.sourceIds) {
         const source = vatSources[id];
         assert.ok(source, `${code}.${rate.id} cites unknown source ${id}`);
         assert.match(source.url, /^https:\/\/([a-z0-9-]+\.)*(europa\.eu|financnasprava\.sk|financnisprava\.gov\.cz|gesetze-im-internet\.de|bka\.gv\.at|usp\.gv\.at)\//);
         assert.match(source.retrievedOn, /^\d{4}-\d{2}-\d{2}$/);
       }
+      if (code === 'AT' && rate.id === 'basicFood') assert.ok(!rate.sourceIds.includes('eu-your-europe'), 'the EU overview does not list 4.9 %');
     }
   }
 });

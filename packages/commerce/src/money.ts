@@ -4,7 +4,7 @@ import type { MarketConfig } from './markets.ts';
 /** Same shape as the OpenAPI `Money` schema: ISO 4217 code plus integer minor units. */
 export type Money = { currency: string; minorUnits: number };
 
-/** Rounds num / den half away from zero, using exact integer arithmetic. */
+/** Rounds num / den half away from zero (half up for the non-negative amounts used here), using exact integer arithmetic. */
 export function divideRoundHalfUp(num: bigint, den: bigint): bigint {
   if (den <= 0n) throw new RangeError('denominator must be positive');
   const sign = num < 0n ? -1n : 1n;
@@ -27,14 +27,22 @@ export function roundToIncrement(minor: number, increment: number): number {
  * Formats minor units for the market locale. With `wholeUnitDisplay` (CZK), whole-crown amounts are shown
  * without a fraction; amounts that are not whole crowns (such as VAT) keep two decimals so nothing is hidden.
  */
+const formatters = new Map<string, Intl.NumberFormat>();
+
 export function formatMinor(market: MarketConfig, minor: number): string {
   const digits = market.rounding.wholeUnitDisplay && minor % 100 === 0 ? 0 : 2;
-  return new Intl.NumberFormat(market.locale, {
-    style: 'currency',
-    currency: market.currency,
-    minimumFractionDigits: digits,
-    maximumFractionDigits: digits
-  }).format(minor / 100);
+  const key = `${market.locale}|${market.currency}|${digits}`;
+  let formatter = formatters.get(key);
+  if (!formatter) {
+    formatter = new Intl.NumberFormat(market.locale, {
+      style: 'currency',
+      currency: market.currency,
+      minimumFractionDigits: digits,
+      maximumFractionDigits: digits
+    });
+    formatters.set(key, formatter);
+  }
+  return formatter.format(minor / 100);
 }
 
 export const formatPercent = (basisPoints: number): string => `${(basisPoints / 100).toString()} %`;

@@ -36,7 +36,7 @@ test('SK basket with three VAT rates explains every component', () => {
     lines: [
       line('pizza', eur(1190), { quantity: 2, vatCategory: 'food' }),
       line('headphones', eur(3990)),
-      line('apples', eur(390), { quantity: 3, vatCategory: 'groceries', vatRateId: 'superReduced' })
+      line('apples', eur(390), { quantity: 3, vatCategory: 'groceries', vatRateId: 'reduced5' })
     ]
   });
   assert.equal(b.subtotalMinor, 7540);
@@ -47,7 +47,7 @@ test('SK basket with three VAT rates explains every component', () => {
     [
       ['standard', 2300, 3365, 774, 4139],
       ['reduced', 1900, 2000, 380, 2380],
-      ['superReduced', 500, 1114, 56, 1170]
+      ['reduced5', 500, 1114, 56, 1170]
     ]
   );
   assert.equal(b.totalMinor, 7689);
@@ -56,7 +56,7 @@ test('SK basket with three VAT rates explains every component', () => {
   assert.equal(payableFromComponents(b), b.payableMinor);
   assert.deepEqual(
     b.components.map((c) => c.kind),
-    ['line', 'line', 'line', 'subtotal', 'delivery_fee', 'small_order_surcharge', 'vat', 'vat', 'vat', 'total']
+    ['line', 'line', 'line', 'subtotal', 'delivery_fee', 'small_order_surcharge', 'vat', 'vat', 'vat', 'total', 'payable']
   );
   assert.ok(b.components.every((c) => c.explanation.length > 0));
   assert.match(b.lines[0].explanation, /^2 × 11,90\s€ = 23,80\s€, VAT 19 %/);
@@ -96,7 +96,7 @@ test('CZK: half-haler VAT rounds half up and the payable total is whole crowns',
     b.vat.map((g) => [g.rateId, g.netMinor, g.vatMinor]),
     [
       ['standard', 11405, 2395],
-      ['reduced', 11563, 1387]
+      ['reduced', 11562, 1388]
     ]
   );
   assert.equal(b.totalMinor, 26750);
@@ -105,8 +105,15 @@ test('CZK: half-haler VAT rounds half up and the payable total is whole crowns',
   assert.equal(b.payableMinor % 100, 0);
   assert.equal(payableFromComponents(b), b.payableMinor);
   const rounding = b.components.find((c) => c.kind === 'rounding');
-  assert.match(rounding?.explanation ?? '', /nearest 1\sKč: \+0\.50 CZK/);
+  assert.match(rounding?.explanation ?? '', /nearest 1\sKč: \+0,50\sKč, not subject to VAT/);
   assert.match(b.components.at(-1)?.explanation ?? '', /^Amount to pay 268\sKč$/);
+});
+
+test('VAT contained in inclusive prices rounds half up on exact ties', () => {
+  const at = priceBreakdown(noFees(markets.AT), { deliveryDistanceMeters: 0, lines: [line('a', eur(3))] });
+  assert.deepEqual([at.vat[0].netMinor, at.vat[0].vatMinor], [2, 1]);
+  const cz = priceBreakdown(noFees(markets.CZ), { deliveryDistanceMeters: 0, lines: [line('a', czk(350), { vatCategory: 'food' })] });
+  assert.deepEqual([cz.vat[0].netMinor, cz.vat[0].vatMinor], [312, 38]);
 });
 
 test('CZK rounds down below half a crown', () => {
@@ -161,16 +168,29 @@ test('small-order surcharge fills the gap to the threshold up to the cap', () =>
 });
 
 test('fees are always labelled synthetic and the data status asks for re-verification', () => {
-  for (const code of marketCodes) {
-    const sample = getMarket(code).currency === 'CZK' ? czk(10000) : eur(500);
-    const b = priceBreakdown(markets[code], { deliveryDistanceMeters: 2500, lines: [line('x', sample)] });
+  for (const [code, minor] of marketCodes.flatMap((c) => (getMarket(c).currency === 'CZK' ? [[c, 10000], [c, 50000]] : [[c, 500], [c, 5000]]) as [string, number][])) {
+    const market = getMarket(code);
+    const b = priceBreakdown(market, { deliveryDistanceMeters: 2500, lines: [line('x', { currency: market.currency, minorUnits: minor })] });
     const fees = b.components.filter((c) => c.kind === 'delivery_fee' || c.kind === 'small_order_surcharge');
     assert.ok(fees.every((c) => c.synthetic && /synthetic/i.test(c.explanation)));
     assert.equal(b.deliveryFee.synthetic, true);
     assert.equal(b.dataStatus.vatRates, 'reverify');
     assert.match(b.dataStatus.notice, /synthetic/);
     assert.equal(payableFromComponents(b), b.payableMinor);
+    assert.equal(b.components.at(-1)?.kind, 'payable');
   }
+});
+
+test('a line may only opt into the rates its category allows', () => {
+  const at = (extra: Partial<OrderLineInput>) => () => priceBreakdown(markets.AT, { deliveryDistanceMeters: 0, lines: [line('x', eur(100000), extra)] });
+  rejects('unknown_vat_rate', at({ vatRateId: 'basicFood' }));
+  rejects('unknown_vat_rate', at({ vatCategory: 'food', vatRateId: 'basicFood' }));
+  rejects('unknown_vat_rate', at({ vatCategory: 'flowers', vatRateId: 'reduced' }));
+  assert.equal(at({ vatCategory: 'groceries', vatRateId: 'basicFood' })().lines[0].vatBasisPoints, 490);
+  assert.equal(at({ vatCategory: 'flowers', vatRateId: 'reduced13' })().lines[0].vatBasisPoints, 1300);
+  const sk = priceBreakdown(markets.SK, { deliveryDistanceMeters: 0, lines: [line('chips', eur(199), { vatCategory: 'groceries', vatRateId: 'standard' })] });
+  assert.equal(sk.lines[0].vatBasisPoints, 2300);
+  rejects('unknown_vat_rate', () => priceBreakdown(markets.DE, { deliveryDistanceMeters: 0, lines: [line('x', eur(100), { vatCategory: 'food', vatRateId: 'standard' })] }));
 });
 
 const rejects = (code: string, fn: () => unknown) =>
@@ -206,6 +226,18 @@ test('unknown categories, rates, markets and malformed orders are rejected', () 
   rejects('invalid_distance', order([line('x', eur(100))], Number.NaN));
   rejects('outside_delivery_area', order([line('x', eur(100))], 7000.1));
   for (const code of ['PL', 'sk', '__proto__', 'toString', '']) rejects('unknown_market', () => getMarket(code));
+  const tooMany = Array.from({ length: 101 }, (_, i) => line(`l${i}`, eur(100)));
+  rejects('invalid_line', order(tooMany));
+  assert.equal(priceBreakdown(markets.DE, { deliveryDistanceMeters: 0, lines: tooMany.slice(0, 100) }).lines.length, 100);
+});
+
+test('non-object input is rejected with typed errors', () => {
+  const de = (order: unknown) => () => priceBreakdown(markets.DE, order as never);
+  rejects('empty_order', de(null));
+  rejects('empty_order', de({ deliveryDistanceMeters: 0 }));
+  rejects('invalid_line', de({ deliveryDistanceMeters: 0, lines: [null] }));
+  rejects('invalid_line', de({ deliveryDistanceMeters: 0, lines: [line('x', eur(100), { vatRateId: null as never })] }));
+  rejects('invalid_amount', de({ deliveryDistanceMeters: 0, lines: [line('x', null as never)] }));
 });
 
 test('amounts beyond the safe integer range are rejected instead of losing precision', () => {
@@ -229,4 +261,9 @@ test('an inconsistent market configuration is rejected', () => {
   rejects('invalid_market_config', () => priceBreakdown(broken, { deliveryDistanceMeters: 0, lines: [line('x', eur(100))] }));
   const missingRate: MarketConfig = { ...markets.DE, vat: { ...markets.DE.vat, feeRateId: 'zero' } };
   rejects('invalid_market_config', () => priceBreakdown(missingRate, { deliveryDistanceMeters: 0, lines: [line('x', eur(100))] }));
+  for (const bad of [{ locale: 'not a locale!' }, { currency: 'JPY' }, { pricesIncludeVat: 'yes' as never }]) {
+    rejects('invalid_market_config', () => priceBreakdown({ ...markets.DE, ...bad }, { deliveryDistanceMeters: 0, lines: [line('x', eur(100))] }));
+  }
+  const badOverride: MarketConfig = { ...markets.DE, vat: { ...markets.DE.vat, categoryOverrides: { ...markets.DE.vat.categoryOverrides, food: ['zero'] } } };
+  rejects('invalid_market_config', () => priceBreakdown(badOverride, { deliveryDistanceMeters: 0, lines: [line('x', eur(100))] }));
 });

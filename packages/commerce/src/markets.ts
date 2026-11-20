@@ -29,6 +29,8 @@ export type MarketConfig = {
     retrievedOn: string;
     rates: Readonly<Record<string, VatRate>>;
     categoryDefaults: Readonly<Record<VatCategory, string>>;
+    /** Other rates a line of the category may opt into with `vatRateId`; anything else is rejected. */
+    categoryOverrides: Readonly<Record<VatCategory, readonly string[]>>;
     feeRateId: string;
   };
   rounding: { payableIncrementMinor: number; wholeUnitDisplay: boolean };
@@ -87,12 +89,9 @@ export const vatSources: Readonly<Record<string, VatSource>> = {
   }
 };
 
-const rate = (id: string, basisPoints: number, label: string, ...sourceIds: string[]): VatRate => ({
-  id,
-  basisPoints,
-  label,
-  sourceIds: ['eu-your-europe', ...sourceIds]
-});
+const rate = (id: string, basisPoints: number, label: string, sourceIds: string[]): VatRate => ({ id, basisPoints, label, sourceIds });
+const EU = 'eu-your-europe';
+const noOverrides = { food: [], groceries: [], flowers: [], gifts: [], electronics: [] } as const;
 
 const euroFees = {
   deliveryFee: {
@@ -119,11 +118,12 @@ export const markets: Readonly<Record<MarketCode, MarketConfig>> = {
       status: 'reverify',
       retrievedOn: VAT_DATA_RETRIEVED_ON,
       rates: {
-        standard: rate('standard', 2300, 'Standard rate', 'sk-fs-rates'),
-        reduced: rate('reduced', 1900, 'Reduced rate: listed foods', 'sk-fs-rates'),
-        superReduced: rate('superReduced', 500, 'Reduced rate: listed basic foods, meals served in catering', 'sk-fs-rates')
+        standard: rate('standard', 2300, 'Standard rate', [EU, 'sk-fs-rates']),
+        reduced: rate('reduced', 1900, 'Reduced rate: listed foods', [EU, 'sk-fs-rates']),
+        reduced5: rate('reduced5', 500, 'Reduced rate: listed basic foods, meals served in catering', [EU, 'sk-fs-rates'])
       },
       categoryDefaults: { food: 'reduced', groceries: 'reduced', flowers: 'standard', gifts: 'standard', electronics: 'standard' },
+      categoryOverrides: { ...noOverrides, food: ['standard'], groceries: ['reduced5', 'standard'] },
       feeRateId: 'standard'
     },
     rounding: euroRounding,
@@ -138,10 +138,11 @@ export const markets: Readonly<Record<MarketCode, MarketConfig>> = {
       status: 'reverify',
       retrievedOn: VAT_DATA_RETRIEVED_ON,
       rates: {
-        standard: rate('standard', 2100, 'Standard rate (includes cut flowers since 2024)', 'cz-gfr-2024'),
-        reduced: rate('reduced', 1200, 'Reduced rate: food and catering services', 'cz-gfr-2024')
+        standard: rate('standard', 2100, 'Standard rate (includes cut flowers since 2024)', [EU, 'cz-gfr-2024']),
+        reduced: rate('reduced', 1200, 'Reduced rate: food and catering services', [EU, 'cz-gfr-2024'])
       },
       categoryDefaults: { food: 'reduced', groceries: 'reduced', flowers: 'standard', gifts: 'standard', electronics: 'standard' },
+      categoryOverrides: noOverrides,
       feeRateId: 'standard'
     },
     rounding: { payableIncrementMinor: 100, wholeUnitDisplay: true },
@@ -165,10 +166,11 @@ export const markets: Readonly<Record<MarketCode, MarketConfig>> = {
       status: 'reverify',
       retrievedOn: VAT_DATA_RETRIEVED_ON,
       rates: {
-        standard: rate('standard', 1900, 'Regelsteuersatz', 'de-ustg-12'),
-        reduced: rate('reduced', 700, 'Ermäßigter Satz: Anlage 2 goods (food, cut flowers), restaurant food', 'de-ustg-12', 'de-ustg-anlage-2')
+        standard: rate('standard', 1900, 'Regelsteuersatz', [EU, 'de-ustg-12']),
+        reduced: rate('reduced', 700, 'Ermäßigter Satz: Anlage 2 goods (food, cut flowers), restaurant food', [EU, 'de-ustg-12', 'de-ustg-anlage-2'])
       },
       categoryDefaults: { food: 'reduced', groceries: 'reduced', flowers: 'reduced', gifts: 'standard', electronics: 'standard' },
+      categoryOverrides: noOverrides,
       feeRateId: 'standard'
     },
     rounding: euroRounding,
@@ -183,12 +185,13 @@ export const markets: Readonly<Record<MarketCode, MarketConfig>> = {
       status: 'reverify',
       retrievedOn: VAT_DATA_RETRIEVED_ON,
       rates: {
-        standard: rate('standard', 2000, 'Normalsteuersatz', 'at-ustg-10'),
-        reduced: rate('reduced', 1000, 'Ermäßigter Satz: Anlage 1 food, restaurant sales', 'at-ustg-10'),
-        reduced13: rate('reduced13', 1300, 'Ermäßigter Satz: Anlage 2 goods (live plants, cut flowers)', 'at-ustg-10', 'at-ustg-anlage-2'),
-        basicFood: rate('basicFood', 490, 'Ermäßigter Satz: Anlage 3 basic foods (since 1 July 2026)', 'at-ustg-10', 'at-usp-4-9')
+        standard: rate('standard', 2000, 'Normalsteuersatz', [EU, 'at-ustg-10']),
+        reduced: rate('reduced', 1000, 'Ermäßigter Satz: Anlage 1 food, restaurant sales', [EU, 'at-ustg-10']),
+        reduced13: rate('reduced13', 1300, 'Ermäßigter Satz: Anlage 2 goods (live plants, cut flowers)', [EU, 'at-ustg-10', 'at-ustg-anlage-2']),
+        basicFood: rate('basicFood', 490, 'Ermäßigter Satz: Anlage 3 basic foods (since 1 July 2026)', ['at-ustg-10', 'at-usp-4-9'])
       },
       categoryDefaults: { food: 'reduced', groceries: 'reduced', flowers: 'reduced13', gifts: 'standard', electronics: 'standard' },
+      categoryOverrides: { ...noOverrides, groceries: ['basicFood'] },
       feeRateId: 'standard'
     },
     rounding: euroRounding,
@@ -215,6 +218,16 @@ export function assertValidMarket(market: MarketConfig): void {
   }
   for (const category of vatCategories) {
     if (!Object.hasOwn(market.vat.rates, market.vat.categoryDefaults[category])) problems.push(`category ${category} has no rate`);
+    for (const id of market.vat.categoryOverrides[category] ?? []) {
+      if (!Object.hasOwn(market.vat.rates, id)) problems.push(`category ${category} override ${id} is not defined`);
+    }
+  }
+  if (typeof market.pricesIncludeVat !== 'boolean') problems.push('pricesIncludeVat must be a boolean');
+  try {
+    const digits = new Intl.NumberFormat(market.locale, { style: 'currency', currency: market.currency }).resolvedOptions().maximumFractionDigits;
+    if (digits !== 2) problems.push('only currencies with two minor digits are supported');
+  } catch {
+    problems.push('locale or currency is not supported by Intl');
   }
   if (!Object.hasOwn(market.vat.rates, market.vat.feeRateId)) problems.push('fee rate is not defined');
   const increment = market.rounding.payableIncrementMinor;

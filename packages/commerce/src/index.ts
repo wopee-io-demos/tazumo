@@ -17,6 +17,7 @@ export {
 export { divideRoundHalfUp, formatMinor, roundToIncrement, type Money } from './money.ts';
 export {
   MAX_LINE_QUANTITY,
+  MAX_LINES,
   priceBreakdown,
   type BreakdownComponent,
   type BreakdownLine,
