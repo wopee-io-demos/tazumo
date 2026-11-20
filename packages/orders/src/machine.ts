@@ -1,7 +1,7 @@
 import {
   declineReasons,
+  systemSources,
   terminalStatuses,
-  type AcceptanceDecision,
   type Actor,
   type ActorRef,
   type Command,
@@ -23,11 +23,14 @@ const reference = /^[A-Za-z0-9_-]{1,128}$/;
 const idempotencyKey = /^[A-Za-z0-9_-]{8,128}$/;
 const isoInstant = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/;
 
-const fail = (error: OrderError, detail?: string): { ok: false; error: OrderError; detail?: string } => ({ ok: false, error, detail });
+type Failure = { ok: false; error: OrderError; detail?: string };
+const fail = (error: OrderError, detail?: string): Failure => ({ ok: false, error, detail });
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 const isNonTerminal = (s: OrderState) => !terminalStatuses.includes(s.status);
+const sameId = (a: unknown, b: unknown) => typeof a === 'string' && typeof b === 'string' && a.toLowerCase() === b.toLowerCase();
+const hasOnly = (value: Record<string, unknown>, keys: readonly string[]) => Object.keys(value).every((k) => keys.includes(k));
 
-export function toInstant(at: string): string | null {
+export function toInstant(at: unknown): string | null {
   if (typeof at !== 'string' || !isoInstant.test(at)) return null;
   const date = new Date(at);
   if (Number.isNaN(date.getTime())) return null;
@@ -40,6 +43,7 @@ export function toInstant(at: string): string | null {
 export function validateMoney(money: unknown): money is Money {
   return (
     isObject(money) &&
+    hasOnly(money, ['currency', 'minorUnits']) &&
     typeof money.currency === 'string' &&
     /^[A-Z]{3}$/.test(money.currency) &&
     Number.isSafeInteger(money.minorUnits) &&
@@ -59,133 +63,186 @@ function canonical(value: unknown): string {
   return JSON.stringify(value);
 }
 
-type Effect = { to: (s: OrderState) => OrderStatus; allowed: (s: OrderState) => boolean };
-const move = (from: OrderStatus[], to: OrderStatus): Effect => ({ allowed: (s) => from.includes(s.status), to: () => to });
+type Effect = { readonly to: OrderStatus; readonly allowed: (s: OrderState) => boolean };
+const move = (from: OrderStatus[], to: OrderStatus): Effect => Object.freeze({ allowed: (s: OrderState) => from.includes(s.status), to });
+const beforeAcceptance = (s: OrderState) => s.status === 'confirmed' && !s.merchantAccepted;
 
-export const transitions: Record<Exclude<EventType, 'order_created'>, Effect> = {
+const transitions: Readonly<Record<Exclude<EventType, 'order_created'>, Effect>> = Object.freeze({
   payment_requested: move(['created'], 'payment_pending'),
   payment_authorized: move(['payment_pending'], 'confirmed'),
   payment_failed: move(['payment_pending'], 'failed'),
-  merchant_accepted: { allowed: (s) => s.status === 'confirmed' && !s.merchantAccepted, to: () => 'confirmed' },
-  merchant_declined: { allowed: (s) => s.status === 'confirmed' && !s.merchantAccepted, to: () => 'cancelled' },
-  merchant_auto_declined: { allowed: (s) => s.status === 'confirmed' && !s.merchantAccepted, to: () => 'cancelled' },
-  preparation_started: { allowed: (s) => s.status === 'confirmed' && s.merchantAccepted, to: () => 'preparing' },
+  merchant_accepted: Object.freeze({ allowed: beforeAcceptance, to: 'confirmed' as const }),
+  merchant_declined: Object.freeze({ allowed: beforeAcceptance, to: 'cancelled' as const }),
+  merchant_auto_declined: Object.freeze({ allowed: beforeAcceptance, to: 'cancelled' as const }),
+  preparation_started: Object.freeze({ allowed: (s: OrderState) => s.status === 'confirmed' && s.merchantAccepted, to: 'preparing' as const }),
   marked_ready: move(['preparing'], 'ready_for_pickup'),
   courier_assigned: move(['ready_for_pickup'], 'courier_assigned'),
   picked_up: move(['courier_assigned'], 'picked_up'),
   delivered: move(['picked_up'], 'delivered'),
-  cancelled: { allowed: isNonTerminal, to: () => 'cancelled' },
-  failed: { allowed: isNonTerminal, to: () => 'failed' },
-};
+  cancelled: Object.freeze({ allowed: isNonTerminal, to: 'cancelled' as const }),
+  failed: Object.freeze({ allowed: isNonTerminal, to: 'failed' as const }),
+});
 
 type Who = 'customer' | 'own_staff' | 'assigned_courier' | 'support';
 type Rule = {
   event: Exclude<EventType, 'order_created'>;
-  system?: SystemSource[];
-  users?: { who: Who; from?: OrderStatus[] }[];
+  fields: readonly string[];
+  system?: readonly SystemSource[];
+  users?: readonly { who: Who; from?: readonly OrderStatus[] }[];
 };
 
-const rules: Record<CommandType, Rule> = {
-  request_payment: { event: 'payment_requested', system: ['payment'] },
-  payment_authorized: { event: 'payment_authorized', system: ['payment'] },
-  payment_failed: { event: 'payment_failed', system: ['payment'] },
-  merchant_accept: { event: 'merchant_accepted', users: [{ who: 'own_staff' }] },
-  merchant_decline: { event: 'merchant_declined', users: [{ who: 'own_staff' }] },
-  auto_decline: { event: 'merchant_auto_declined', system: ['acceptance'] },
-  start_preparing: { event: 'preparation_started', users: [{ who: 'own_staff' }] },
-  mark_ready: { event: 'marked_ready', users: [{ who: 'own_staff' }] },
-  assign_courier: { event: 'courier_assigned', system: ['dispatch'], users: [{ who: 'support' }] },
-  pick_up: { event: 'picked_up', users: [{ who: 'assigned_courier' }] },
-  deliver: { event: 'delivered', users: [{ who: 'assigned_courier' }] },
-  cancel: { event: 'cancelled', users: [{ who: 'customer', from: ['created', 'payment_pending'] }, { who: 'support' }] },
-  fail: { event: 'failed', system: ['operations'] },
-};
+const rules: Readonly<Record<CommandType, Rule>> = Object.freeze({
+  request_payment: { event: 'payment_requested', fields: [], system: ['payment'] },
+  payment_authorized: { event: 'payment_authorized', fields: ['paymentReference'], system: ['payment'] },
+  payment_failed: { event: 'payment_failed', fields: ['reason'], system: ['payment'] },
+  merchant_accept: { event: 'merchant_accepted', fields: ['acceptance'], users: [{ who: 'own_staff' }] },
+  merchant_decline: { event: 'merchant_declined', fields: ['acceptance'], users: [{ who: 'own_staff' }] },
+  auto_decline: { event: 'merchant_auto_declined', fields: ['acceptance'], system: ['acceptance'] },
+  start_preparing: { event: 'preparation_started', fields: [], users: [{ who: 'own_staff' }] },
+  mark_ready: { event: 'marked_ready', fields: [], users: [{ who: 'own_staff' }] },
+  assign_courier: { event: 'courier_assigned', fields: ['courierUserId'], system: ['dispatch'], users: [{ who: 'support' }] },
+  pick_up: { event: 'picked_up', fields: [], users: [{ who: 'assigned_courier' }] },
+  deliver: { event: 'delivered', fields: [], users: [{ who: 'assigned_courier' }] },
+  cancel: { event: 'cancelled', fields: ['reason'], users: [{ who: 'customer', from: ['created', 'payment_pending'] }, { who: 'support' }] },
+  fail: { event: 'failed', fields: ['reason'], system: ['operations'] },
+});
 
-function validPrincipal(actor: Actor): boolean {
-  if (actor.kind !== 'user') return false;
-  const p = actor.principal;
-  return isObject(p) && typeof p.userId === 'string' && p.userId.length > 0 && Array.isArray(p.grants);
+const roleOf: Record<Who, readonly Role[]> = { customer: ['customer'], own_staff: ['merchant_staff'], assigned_courier: ['courier'], support: ['support', 'admin'] };
+const reasonRequired: ReadonlySet<EventType> = new Set(['payment_failed', 'merchant_declined', 'merchant_auto_declined', 'cancelled', 'failed']);
+
+function principalOf(actor: unknown): { userId: string; grants: unknown[] } | null {
+  if (!isObject(actor) || actor.kind !== 'user' || !isObject(actor.principal)) return null;
+  const { userId, grants } = actor.principal;
+  return typeof userId === 'string' && userId.length > 0 && userId.length <= 255 && Array.isArray(grants) ? { userId, grants } : null;
 }
 
-function matchWho(actor: Actor, who: Who, state: OrderState): Role | null {
-  if (!validPrincipal(actor) || actor.kind !== 'user') return null;
-  const { userId, grants } = actor.principal;
+function matchWho(actor: Actor, who: Who, state: OrderState): ActorRef | null {
+  const principal = principalOf(actor);
+  if (!principal) return null;
+  const { userId, grants } = principal;
   const has = (role: Role, merchantId?: string) =>
-    grants.some((g) => isObject(g) && g.role === role && (merchantId === undefined || g.merchantId === merchantId));
+    grants.some((g) => isObject(g) && g.role === role && (merchantId === undefined || sameId(g.merchantId, merchantId)));
   switch (who) {
     case 'customer':
-      return userId === state.customerUserId && has('customer') ? 'customer' : null;
+      return sameId(userId, state.customerUserId) && has('customer') ? { kind: 'user', userId, role: 'customer' } : null;
     case 'own_staff':
-      return has('merchant_staff', state.merchantId) ? 'merchant_staff' : null;
+      return has('merchant_staff', state.merchantId) ? { kind: 'user', userId, role: 'merchant_staff', merchantId: state.merchantId } : null;
     case 'assigned_courier':
-      return state.courierUserId !== null && userId === state.courierUserId && has('courier') ? 'courier' : null;
+      return sameId(userId, state.courierUserId) && has('courier') ? { kind: 'user', userId, role: 'courier' } : null;
     case 'support':
-      return has('admin') ? 'admin' : has('support') ? 'support' : null;
+      return has('admin') ? { kind: 'user', userId, role: 'admin' } : has('support') ? { kind: 'user', userId, role: 'support' } : null;
   }
 }
 
-function authorize(rule: Rule, actor: Actor, state: OrderState): Result<ActorRef> {
-  if (!isObject(actor)) return fail('forbidden');
-  if (actor.kind === 'system') {
-    return rule.system?.includes(actor.source) ? { ok: true, value: { kind: 'system', source: actor.source } } : fail('forbidden');
-  }
-  let permittedElsewhere = false;
-  for (const { who, from } of rule.users ?? []) {
-    const role = matchWho(actor, who, state);
-    if (!role) continue;
-    if (from && !from.includes(state.status)) {
-      permittedElsewhere = true;
-      continue;
+type Identity = { ref: ActorRef; from?: readonly OrderStatus[] }[];
+
+function identify(rule: Rule, actor: Actor): (state: OrderState) => Identity {
+  return (state) => {
+    if (isObject(actor) && actor.kind === 'system') {
+      return rule.system?.includes(actor.source) ? [{ ref: { kind: 'system', source: actor.source } }] : [];
     }
-    return { ok: true, value: { kind: 'user', userId: actor.principal.userId, role } };
-  }
-  return permittedElsewhere ? fail('illegal_transition', `cancel is not allowed from ${state.status} by this actor`) : fail('forbidden');
+    return (rule.users ?? []).flatMap(({ who, from }) => {
+      const ref = matchWho(actor, who, state);
+      return ref ? [{ ref, from }] : [];
+    });
+  };
 }
 
-function checkAcceptance(acceptance: unknown, state: OrderState, expected: AcceptanceDecision['state']): Result<AcceptanceDecision> {
-  if (!isObject(acceptance)) return fail('invalid_input', 'acceptance is required');
-  const a = acceptance as AcceptanceDecision;
-  if (a.orderId !== state.id || a.merchantId !== state.merchantId || a.state !== expected) {
+type Normalized = Record<string, string>;
+
+function normalizeAcceptance(value: unknown): Result<Normalized> {
+  const keys = ['orderId', 'merchantId', 'state', 'receivedAt', 'deadline', 'decidedAt', 'declineReason'];
+  if (!isObject(value) || !hasOnly(value, keys)) return fail('invalid_input', 'acceptance has missing or unknown fields');
+  const receivedAt = toInstant(value.receivedAt);
+  const deadline = toInstant(value.deadline);
+  const decidedAt = toInstant(value.decidedAt);
+  const known = [...declineReasons, 'window_expired'] as readonly unknown[];
+  if (typeof value.orderId !== 'string' || !uuid.test(value.orderId) || typeof value.merchantId !== 'string' || !uuid.test(value.merchantId)) {
+    return fail('acceptance_mismatch', 'acceptance IDs must be UUIDs');
+  }
+  if (!receivedAt || !deadline || !decidedAt) return fail('acceptance_mismatch', 'acceptance is not decided or has invalid times');
+  if (value.declineReason !== undefined && !known.includes(value.declineReason)) return fail('reason_required');
+  return {
+    ok: true,
+    value: {
+      orderId: value.orderId.toLowerCase(),
+      merchantId: value.merchantId.toLowerCase(),
+      state: String(value.state),
+      receivedAt,
+      deadline,
+      decidedAt,
+      ...(value.declineReason !== undefined ? { declineReason: String(value.declineReason) } : {}),
+    },
+  };
+}
+
+function normalizeCommand(command: Command): Result<Normalized & { type: CommandType }> {
+  if (!isObject(command) || typeof command.type !== 'string' || !Object.hasOwn(rules, command.type)) return fail('invalid_input', 'unknown command');
+  const type = command.type as CommandType;
+  const raw = command as Record<string, unknown>;
+  const rule = rules[type];
+  if (!hasOnly(raw, ['type', ...rule.fields])) return fail('invalid_input', `unknown fields for ${type}`);
+  const out: Normalized & { type: CommandType } = { type };
+  if (rule.fields.includes('reason') && raw.reason !== undefined) {
+    if (typeof raw.reason !== 'string' || !reasonCode.test(raw.reason)) return fail('reason_required', 'reason must be a code');
+    out.reason = raw.reason;
+  }
+  if (rule.fields.includes('paymentReference')) {
+    if (typeof raw.paymentReference !== 'string' || !reference.test(raw.paymentReference)) return fail('invalid_input', 'paymentReference must be an opaque provider reference');
+    out.paymentReference = raw.paymentReference;
+  }
+  if (rule.fields.includes('courierUserId')) {
+    if (typeof raw.courierUserId !== 'string' || !uuid.test(raw.courierUserId)) return fail('invalid_input', 'courierUserId must be a UUID');
+    out.courierUserId = raw.courierUserId.toLowerCase();
+  }
+  if (rule.fields.includes('acceptance')) {
+    const acceptance = normalizeAcceptance(raw.acceptance);
+    if (!acceptance.ok) return acceptance;
+    for (const [k, v] of Object.entries(acceptance.value)) out[`acceptance.${k}`] = v;
+  }
+  return { ok: true, value: out };
+}
+
+const expectedAcceptance: Partial<Record<CommandType, string>> = { merchant_accept: 'accepted', merchant_decline: 'declined', auto_decline: 'auto_declined' };
+
+function checkAcceptance(type: CommandType, c: Normalized, state: OrderState, at: string): Result<Normalized> {
+  const expected = expectedAcceptance[type];
+  if (!expected) return { ok: true, value: {} };
+  const { orderId, merchantId, state: decision, receivedAt, deadline, decidedAt, declineReason } = Object.fromEntries(
+    Object.entries(c)
+      .filter(([k]) => k.startsWith('acceptance.'))
+      .map(([k, v]) => [k.slice('acceptance.'.length), v]),
+  );
+  if (orderId !== state.id || merchantId !== state.merchantId || decision !== expected) {
     return fail('acceptance_mismatch', `acceptance must be ${expected} for this order and merchant`);
   }
-  if (typeof a.decidedAt !== 'string' || !toInstant(a.decidedAt)) return fail('acceptance_mismatch', 'acceptance has no decision time');
-  return { ok: true, value: a };
+  if (receivedAt < state.createdAt || decidedAt < receivedAt || decidedAt > at) return fail('acceptance_mismatch', 'acceptance times are inconsistent with the order');
+  if (expected === 'auto_declined' ? decidedAt < deadline || declineReason !== 'window_expired' : decidedAt >= deadline) {
+    return fail('acceptance_mismatch', 'acceptance decision is inconsistent with its deadline');
+  }
+  if (expected === 'declined' && !(declineReasons as readonly string[]).includes(declineReason ?? '')) return fail('reason_required');
+  return { ok: true, value: { decidedAt, ...(declineReason ? { reason: declineReason } : {}) } };
 }
 
 type Draft = { reason?: string; data?: Record<string, string | number> };
 
-function payload(command: Command, state: OrderState, actor: ActorRef): Result<Draft> {
-  switch (command.type) {
+function draftFor(type: CommandType, c: Normalized, actor: ActorRef, acceptance: Normalized): Result<Draft> {
+  switch (type) {
     case 'payment_authorized':
-      return typeof command.paymentReference === 'string' && reference.test(command.paymentReference)
-        ? { ok: true, value: { data: { paymentReference: command.paymentReference } } }
-        : fail('invalid_input', 'paymentReference must be an opaque provider reference');
-    case 'merchant_accept': {
-      const a = checkAcceptance(command.acceptance, state, 'accepted');
-      return a.ok ? { ok: true, value: { data: { acceptanceDecidedAt: a.value.decidedAt! } } } : a;
-    }
-    case 'merchant_decline': {
-      const a = checkAcceptance(command.acceptance, state, 'declined');
-      if (!a.ok) return a;
-      const reason = a.value.declineReason ?? '';
-      return (declineReasons as readonly string[]).includes(reason) ? { ok: true, value: { reason } } : fail('reason_required');
-    }
-    case 'auto_decline': {
-      const a = checkAcceptance(command.acceptance, state, 'auto_declined');
-      return a.ok ? { ok: true, value: { reason: 'window_expired' } } : a;
-    }
+      return { ok: true, value: { data: { paymentReference: c.paymentReference } } };
+    case 'merchant_accept':
+      return { ok: true, value: { data: { acceptanceDecidedAt: acceptance.decidedAt } } };
+    case 'merchant_decline':
+    case 'auto_decline':
+      return { ok: true, value: { reason: acceptance.reason, data: { acceptanceDecidedAt: acceptance.decidedAt } } };
     case 'assign_courier':
-      return typeof command.courierUserId === 'string' && uuid.test(command.courierUserId)
-        ? { ok: true, value: { data: { courierUserId: command.courierUserId.toLowerCase() } } }
-        : fail('invalid_input', 'courierUserId must be a UUID');
+      return { ok: true, value: { data: { courierUserId: c.courierUserId } } };
     case 'cancel':
-      if (command.reason === undefined && actor.kind === 'user' && actor.role === 'customer') {
-        return { ok: true, value: { reason: 'customer_request' } };
-      }
-      return typeof command.reason === 'string' && reasonCode.test(command.reason) ? { ok: true, value: { reason: command.reason } } : fail('reason_required');
+      if (c.reason) return { ok: true, value: { reason: c.reason } };
+      return actor.kind === 'user' && actor.role === 'customer' ? { ok: true, value: { reason: 'customer_request' } } : fail('reason_required');
     case 'payment_failed':
     case 'fail':
-      return typeof command.reason === 'string' && reasonCode.test(command.reason) ? { ok: true, value: { reason: command.reason } } : fail('reason_required');
+      return c.reason ? { ok: true, value: { reason: c.reason } } : fail('reason_required');
     default:
       return { ok: true, value: {} };
   }
@@ -207,46 +264,82 @@ export type Applied = { state: OrderState; event: OrderEvent; replayed: boolean 
 const newEventId = (options?: Options) => (options?.newId ?? (() => globalThis.crypto.randomUUID()))();
 
 export function createOrder(input: CreateOrderInput, actor: Actor, at: string, key: string, options?: Options): Result<Applied> {
-  if (!isObject(input) || typeof input.orderId !== 'string' || !uuid.test(input.orderId) || typeof input.merchantId !== 'string' || !uuid.test(input.merchantId)) {
+  if (!isObject(input) || !hasOnly(input, ['orderId', 'merchantId', 'total'])) return fail('invalid_input', 'unknown fields');
+  if (typeof input.orderId !== 'string' || !uuid.test(input.orderId) || typeof input.merchantId !== 'string' || !uuid.test(input.merchantId)) {
     return fail('invalid_input', 'orderId and merchantId must be UUIDs');
   }
   if (!validateMoney(input.total)) return fail('invalid_input', 'total must be non-negative integer minor units with an ISO 4217 code');
   if (typeof key !== 'string' || !idempotencyKey.test(key)) return fail('invalid_idempotency_key');
   const occurredAt = toInstant(at);
   if (!occurredAt) return fail('invalid_instant');
-  if (!isObject(actor) || actor.kind !== 'user' || !validPrincipal(actor)) return fail('forbidden');
-  const { userId, grants } = actor.principal;
-  if (!grants.some((g) => isObject(g) && g.role === 'customer')) return fail('forbidden');
+  const principal = principalOf(actor);
+  if (!principal || !principal.grants.some((g) => isObject(g) && g.role === 'customer')) return fail('forbidden');
+  const data = {
+    customerUserId: principal.userId,
+    merchantId: input.merchantId.toLowerCase(),
+    currency: input.total.currency,
+    minorUnits: input.total.minorUnits,
+  };
+  const actorRef: ActorRef = { kind: 'user', userId: principal.userId, role: 'customer' };
+  const orderId = input.orderId.toLowerCase();
   const event: OrderEvent = {
     id: newEventId(options),
-    orderId: input.orderId.toLowerCase(),
+    orderId,
     sequence: 1,
     type: 'order_created',
     occurredAt,
     status: 'created',
-    actor: { kind: 'user', userId, role: 'customer' },
+    actor: actorRef,
     idempotencyKey: key,
-    fingerprint: canonical({ command: 'create', input, actor: userId }),
-    data: {
-      customerUserId: userId,
-      merchantId: input.merchantId.toLowerCase(),
-      currency: input.total.currency,
-      minorUnits: input.total.minorUnits,
-    },
+    fingerprint: canonical({ type: 'create', orderId, data, actor: actorRef }),
+    data,
   };
   const state = replay([event]);
   return state.ok ? { ok: true, value: { state: state.value, event, replayed: false } } : state;
 }
 
+const eventActors = new Map<EventType, { system: readonly string[]; users: readonly Who[] }>(
+  Object.values(rules).map((r) => [r.event, { system: r.system ?? [], users: (r.users ?? []).map((u) => u.who) }]),
+);
+
+function validEventActor(event: OrderEvent, state: OrderState): boolean {
+  const allowed = eventActors.get(event.type);
+  const a = event.actor as unknown;
+  if (!allowed || !isObject(a)) return false;
+  if (a.kind === 'system') return (systemSources as readonly unknown[]).includes(a.source) && allowed.system.includes(a.source as string);
+  if (a.kind !== 'user' || typeof a.userId !== 'string' || a.userId.length === 0) return false;
+  return allowed.users.some((who) => {
+    if (!roleOf[who].includes(a.role as Role)) return false;
+    if (who === 'customer') return sameId(a.userId, state.customerUserId);
+    if (who === 'own_staff') return sameId(a.merchantId, state.merchantId);
+    if (who === 'assigned_courier') return sameId(a.userId, state.courierUserId);
+    return true;
+  });
+}
+
+function validEventPayload(event: OrderEvent): boolean {
+  const d = event.data ?? {};
+  if (event.reason !== undefined && (typeof event.reason !== 'string' || !reasonCode.test(event.reason))) return false;
+  if (reasonRequired.has(event.type) && event.reason === undefined) return false;
+  if (event.type === 'merchant_declined' && !(declineReasons as readonly string[]).includes(event.reason ?? '')) return false;
+  if (event.type === 'merchant_auto_declined' && event.reason !== 'window_expired') return false;
+  if (event.type === 'payment_authorized') return typeof d.paymentReference === 'string' && reference.test(d.paymentReference);
+  if (event.type === 'courier_assigned') return typeof d.courierUserId === 'string' && uuid.test(d.courierUserId);
+  if (event.type.startsWith('merchant_')) return toInstant(d.acceptanceDecidedAt) === d.acceptanceDecidedAt;
+  return true;
+}
+
 function initial(event: OrderEvent): Result<OrderState> {
   const d = event.data ?? {};
   const total = { currency: d.currency, minorUnits: d.minorUnits };
-  if (event.type !== 'order_created' || event.sequence !== 1 || event.status !== 'created' || !uuid.test(event.orderId)) {
+  if (event.type !== 'order_created' || event.sequence !== 1 || event.status !== 'created' || typeof event.orderId !== 'string' || !uuid.test(event.orderId)) {
     return fail('invalid_history', 'the first event must be order_created with sequence 1');
   }
-  if (typeof d.customerUserId !== 'string' || typeof d.merchantId !== 'string' || !validateMoney(total)) {
+  if (typeof d.customerUserId !== 'string' || d.customerUserId.length === 0 || typeof d.merchantId !== 'string' || !uuid.test(d.merchantId) || !validateMoney(total)) {
     return fail('invalid_history', 'order_created lacks customer, merchant or total');
   }
+  const a = event.actor as unknown;
+  if (!isObject(a) || a.kind !== 'user' || a.role !== 'customer' || a.userId !== d.customerUserId) return fail('invalid_history', 'order_created must be made by its customer');
   return {
     ok: true,
     value: {
@@ -272,7 +365,10 @@ export function replay(events: readonly OrderEvent[]): Result<OrderState> {
   let state: OrderState | null = null;
   for (const event of events) {
     if (typeof event !== 'object' || event === null || toInstant(event.occurredAt) !== event.occurredAt) return fail('invalid_history', 'event time is not a normalised instant');
-    if (keys.has(event.idempotencyKey)) return fail('invalid_history', `duplicate idempotency key at sequence ${event.sequence}`);
+    if (typeof event.idempotencyKey !== 'string' || !idempotencyKey.test(event.idempotencyKey) || keys.has(event.idempotencyKey)) {
+      return fail('invalid_history', `missing or duplicate idempotency key at sequence ${event.sequence}`);
+    }
+    if (typeof event.id !== 'string' || typeof event.fingerprint !== 'string') return fail('invalid_history', 'event lacks id or fingerprint');
     keys.add(event.idempotencyKey);
     if (!state) {
       const first = initial(event);
@@ -284,10 +380,9 @@ export function replay(events: readonly OrderEvent[]): Result<OrderState> {
     if (event.sequence !== state.sequence + 1) return fail('invalid_history', `expected sequence ${state.sequence + 1}, got ${event.sequence}`);
     if (event.occurredAt < state.updatedAt) return fail('invalid_history', `time goes backwards at sequence ${event.sequence}`);
     const effect = event.type !== 'order_created' && Object.hasOwn(transitions, event.type) ? transitions[event.type as keyof typeof transitions] : undefined;
-    if (!effect || !effect.allowed(state) || effect.to(state) !== event.status) {
-      return fail('invalid_history', `${event.type} is not allowed from ${state.status}`);
-    }
-    if (event.type === 'courier_assigned' && !uuid.test(String(event.data?.courierUserId))) return fail('invalid_history', 'courier_assigned lacks courierUserId');
+    if (!effect || !effect.allowed(state) || effect.to !== event.status) return fail('invalid_history', `${event.type} is not allowed from ${state.status}`);
+    if (!validEventActor(event, state)) return fail('invalid_history', `${event.type} has an actor that may not produce it`);
+    if (!validEventPayload(event)) return fail('invalid_history', `${event.type} has an invalid reason or data`);
     state = reduce(state, event);
   }
   return { ok: true, value: state! };
@@ -297,24 +392,31 @@ export function applyCommand(events: readonly OrderEvent[], command: Command, ac
   const history = replay(events);
   if (!history.ok) return history;
   const state = history.value;
-  if (!isObject(command) || !Object.hasOwn(rules, command.type as string)) return fail('invalid_input', 'unknown command');
+  const normalized = normalizeCommand(command);
+  if (!normalized.ok) return normalized;
+  const c = normalized.value;
   if (typeof key !== 'string' || !idempotencyKey.test(key)) return fail('invalid_idempotency_key');
-  const actorId = isObject(actor) ? (actor.kind === 'system' ? `system:${actor.source}` : actor.principal?.userId) : undefined;
-  const fingerprint = canonical({ command, actor: actorId });
+
+  const rule = rules[c.type];
+  const identities = identify(rule, actor)(state);
+  if (identities.length === 0) return fail('forbidden');
+  const actorKey = identities[0].ref.kind === 'system' ? `system:${identities[0].ref.source}` : `user:${identities[0].ref.userId}`;
+  const fingerprint = canonical({ command: c, actor: actorKey });
   const previous = events.find((e) => e.idempotencyKey === key);
   if (previous) {
     return previous.fingerprint === fingerprint ? { ok: true, value: { state, event: previous, replayed: true } } : fail('idempotency_conflict');
   }
+
   const occurredAt = toInstant(at);
   if (!occurredAt) return fail('invalid_instant');
   if (occurredAt < state.updatedAt) return fail('invalid_instant', 'earlier than the last event');
-
-  const rule = rules[command.type];
-  const who = authorize(rule, actor, state);
-  if (!who.ok) return who;
+  const identity = identities.find((i) => !i.from || i.from.includes(state.status));
+  if (!identity) return fail('illegal_transition', `${c.type} is not allowed from ${state.status} for this actor`);
   const effect = transitions[rule.event];
-  if (!effect.allowed(state)) return fail('illegal_transition', `${command.type} is not allowed from ${state.status}`);
-  const draft = payload(command, state, who.value);
+  if (!effect.allowed(state)) return fail('illegal_transition', `${c.type} is not allowed from ${state.status}`);
+  const acceptance = checkAcceptance(c.type, c, state, occurredAt);
+  if (!acceptance.ok) return acceptance;
+  const draft = draftFor(c.type, c, identity.ref, acceptance.value);
   if (!draft.ok) return draft;
 
   const event: OrderEvent = {
@@ -323,8 +425,8 @@ export function applyCommand(events: readonly OrderEvent[], command: Command, ac
     sequence: state.sequence + 1,
     type: rule.event,
     occurredAt,
-    status: effect.to(state),
-    actor: who.value,
+    status: effect.to,
+    actor: identity.ref,
     idempotencyKey: key,
     fingerprint,
     ...draft.value,

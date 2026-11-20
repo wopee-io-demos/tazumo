@@ -23,6 +23,8 @@ describe('drift against the contract and sibling modules', () => {
     assert.deepEqual([...money.required].sort(), ['currency', 'minorUnits']);
     assert.equal(money.properties.minorUnits.type, 'integer');
     assert.equal(money.properties.minorUnits.minimum, 0);
+    assert.equal(money.properties.currency.pattern, '^[A-Z]{3}$');
+    assert.equal(money.additionalProperties, false);
   });
 
   it('uses the roles of the API policy and migration 0002 (ADR-0016)', () => {

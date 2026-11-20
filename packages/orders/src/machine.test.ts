@@ -13,6 +13,7 @@ import {
   type OrderEvent,
   type OrderStatus,
   type Principal,
+  terminalStatuses,
 } from './index.ts';
 
 const ORDER = '0b6f1d5e-3a7c-4c51-9d0e-2f6a8b1c4d01';
@@ -89,7 +90,7 @@ describe('order lifecycle', () => {
     assert.deepEqual(log.map((e) => e.sequence), [1, 2, 3, 4, 5, 6, 7, 8, 9]);
     assert.deepEqual(log.map((e) => e.status), ['created', 'payment_pending', 'confirmed', 'confirmed', 'preparing', 'ready_for_pickup', 'courier_assigned', 'picked_up', 'delivered']);
     assert.ok(log.every((e, i) => i === 0 || e.occurredAt >= log[i - 1].occurredAt));
-    assert.deepEqual(log[3].actor, { kind: 'user', userId: 'u-staff', role: 'merchant_staff' });
+    assert.deepEqual(log[3].actor, { kind: 'user', userId: 'u-staff', role: 'merchant_staff', merchantId: MERCHANT });
     assert.deepEqual(log[2].actor, { kind: 'system', source: 'payment' });
     const state = replay(log);
     assert.ok(state.ok);
@@ -117,12 +118,36 @@ describe('order lifecycle', () => {
     const key = log.at(-1)!.idempotencyKey;
     for (const [command, actor] of [
       [{ type: 'payment_authorized', paymentReference: 'pi_b' }, system('payment')],
-      [{ type: 'payment_authorized', paymentReference: 'pi_a' }, system('operations')],
       [{ type: 'fail', reason: 'internal_error' }, system('operations')],
     ] as [Command, Actor][]) {
       const r = applyCommand(log, command, actor, minute(30), key, options);
       assert.equal(r.ok ? 'ok' : r.error, 'idempotency_conflict');
     }
+  });
+
+  it('authorizes before the idempotency lookup, so revoked or unrelated actors learn nothing', () => {
+    const log = run(reach('preparing'), [[{ type: 'cancel', reason: 'merchant_unreachable' }, support]]);
+    const key = log.at(-1)!.idempotencyKey;
+    const revoked = applyCommand(log, { type: 'cancel', reason: 'merchant_unreachable' }, user('u-support'), minute(50), key, options);
+    assert.equal(revoked.ok ? 'ok' : revoked.error, 'forbidden');
+    const stranger = applyCommand(log, { type: 'cancel' }, otherCustomer, minute(50), key, options);
+    assert.equal(stranger.ok ? 'ok' : stranger.error, 'forbidden');
+    const wrongSource = applyCommand(log, { type: 'cancel', reason: 'merchant_unreachable' }, system('operations'), minute(50), key, options);
+    assert.equal(wrongSource.ok ? 'ok' : wrongSource.error, 'forbidden');
+  });
+
+  it('keeps free text and unknown fields out of events', () => {
+    const total = { currency: 'EUR', minorUnits: 100 };
+    const note = createOrder({ orderId: ORDER, merchantId: MERCHANT, total, note: 'John Smith, 5 Main St' } as never, customer, minute(0), 'create-key-9', options);
+    assert.equal(note.ok ? 'ok' : note.error, 'invalid_input');
+    const extraMoney = createOrder({ orderId: ORDER, merchantId: MERCHANT, total: { ...total, memo: 'x' } as never }, customer, minute(0), 'create-key-9', options);
+    assert.equal(extraMoney.ok ? 'ok' : extraMoney.error, 'invalid_input');
+    const comment = applyCommand(reach('confirmed'), { type: 'merchant_accept', acceptance: { ...acceptance('accepted'), comment: 'Jane Doe +421900111222' } as never }, staff, minute(40), 'comment-key', options);
+    assert.equal(comment.ok ? 'ok' : comment.error, 'invalid_input');
+    const extra = applyCommand(reach('created'), { type: 'request_payment', note: 'call Jane' } as never, system('payment'), minute(40), 'extra-key-1', options);
+    assert.equal(extra.ok ? 'ok' : extra.error, 'invalid_input');
+    const log = run(reach('picked_up'), [[{ type: 'deliver' }, courier]]);
+    assert.doesNotMatch(JSON.stringify(log), /John|Jane|Main St|\+421/);
   });
 
   const allowedFrom: Record<CommandType, Situation[]> = {
@@ -199,6 +224,10 @@ describe('order lifecycle', () => {
 
   it('lets the customer cancel only before confirmation, and admins act like support', () => {
     assert.ok(applyCommand(reach('payment_pending'), { type: 'cancel' }, customer, minute(40), 'cancel-own-1', options).ok);
+    for (const situation of ['confirmed', 'confirmed_accepted'] as Situation[]) {
+      const r = applyCommand(reach(situation), { type: 'cancel' }, customer, minute(40), 'cancel-own-3', options);
+      assert.equal(r.ok ? 'ok' : r.error, 'illegal_transition', situation);
+    }
     const late = applyCommand(reach('preparing'), { type: 'cancel' }, customer, minute(40), 'cancel-own-2', options);
     assert.equal(late.ok ? 'ok' : late.error, 'illegal_transition');
     const byAdmin = applyCommand(reach('preparing'), { type: 'cancel', reason: 'merchant_unreachable' }, admin, minute(40), 'cancel-admin', options);
@@ -238,6 +267,21 @@ describe('order lifecycle', () => {
       const r = applyCommand(reach('confirmed'), { type: 'merchant_accept', acceptance: bad }, staff, minute(40), 'acceptance-case', options);
       assert.equal(r.ok ? 'ok' : r.error, 'acceptance_mismatch', JSON.stringify(bad));
     }
+    for (const bad of [
+      acceptance('accepted', { decidedAt: minute(12) }),
+      acceptance('accepted', { decidedAt: '2020-01-01T00:00:00+05:00', receivedAt: '2020-01-01T00:00:00+05:00' }),
+      acceptance('accepted', { decidedAt: '2099-01-01T00:00:00Z', deadline: '2099-01-02T00:00:00Z' }),
+      acceptance('accepted', { decidedAt: minute(1) }),
+      acceptance('auto_declined', { decidedAt: minute(11) }),
+      acceptance('auto_declined', { declineReason: 'too_busy' }),
+    ]) {
+      const command: Command = bad.state === 'accepted' ? { type: 'merchant_accept', acceptance: bad } : { type: 'auto_decline', acceptance: bad };
+      const r = applyCommand(reach('confirmed'), command, bad.state === 'accepted' ? staff : system('acceptance'), minute(40), 'timing-case', options);
+      assert.equal(r.ok ? 'ok' : r.error, 'acceptance_mismatch', JSON.stringify(bad));
+    }
+    const offset = applyCommand(reach('confirmed'), { type: 'merchant_accept', acceptance: acceptance('accepted', { decidedAt: '2026-11-20T13:03:00+01:00' }) }, staff, minute(40), 'offset-key', options);
+    assert.ok(offset.ok);
+    assert.equal(offset.value.event.data?.acceptanceDecidedAt, minute(3));
     const declined = applyCommand(reach('confirmed'), valid.merchant_decline[0], staff, minute(40), 'decline-ok', options);
     assert.ok(declined.ok);
     assert.equal(declined.value.event.reason, 'too_busy');
@@ -289,6 +333,13 @@ describe('order lifecycle', () => {
       tamper(2, { orderId: OTHER_ORDER }),
       tamper(2, { idempotencyKey: log[1].idempotencyKey }),
       tamper(0, { data: { customerUserId: 'u-customer' } }),
+      tamper(0, { data: { ...log[0].data, merchantId: 'x' } }),
+      tamper(0, { actor: { kind: 'user', userId: 'u-other', role: 'customer' } }),
+      tamper(2, { data: undefined }),
+      tamper(2, { actor: { kind: 'user', userId: 'u-customer', role: 'customer' } }),
+      tamper(2, { idempotencyKey: undefined as unknown as string }),
+      tamper(3, { actor: { kind: 'user', userId: 'u-staff-b', role: 'merchant_staff', merchantId: OTHER_MERCHANT } }),
+      tamper(4, { reason: 'Jane Doe called from +421900111222' }),
     ];
     for (const events of cases) {
       const r = replay(events);
@@ -317,6 +368,19 @@ describe('order lifecycle', () => {
       const source = readFileSync(new URL(file, dir), 'utf8');
       assert.doesNotMatch(source, /Date\.now|new Date\(\)|setTimeout|setInterval|performance\.now|\beta\b|duration/i, file);
     }
+  });
+
+  it('rejects a courier event from someone other than the assigned courier in replay', () => {
+    const log = reach('picked_up');
+    const forged = log.map((e, i) => (i === log.length - 1 ? { ...e, actor: { kind: 'user' as const, userId: 'c0c0c0c0-1111-4222-8333-444455557777', role: 'courier' as const } } : e));
+    assert.equal(replay(forged).ok ? 'ok' : 'invalid', 'invalid');
+  });
+
+  it('matches user IDs case-insensitively and keeps exported tables frozen', () => {
+    const log = reach('courier_assigned');
+    const upper = user(COURIER_ID.toUpperCase(), { role: 'courier', merchantId: null });
+    assert.ok(applyCommand(log, { type: 'pick_up' }, upper, minute(40), 'upper-key-1', options).ok);
+    assert.throws(() => (terminalStatuses as OrderStatus[]).push('created'), TypeError);
   });
 
   it('exposes only genuine events to the customer', () => {

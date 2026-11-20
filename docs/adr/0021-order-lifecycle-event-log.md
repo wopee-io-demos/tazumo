@@ -20,6 +20,33 @@ ADR-0003 forbids simulated order progress and asks for an API-owned state machin
 5. **Idempotency keys are scoped to one order.** A key seen before with the same canonical command and actor returns the original event. With anything else it is a conflict. Order creation keys are scoped by the API to the caller (slice 2).
 6. **Reasons are codes, not text.** Events never carry free text, names or addresses. The customer projection drops actor identities, courier IDs, payment references and idempotency data.
 7. **Time never advances an order.** No function reads the clock or accepts a duration. A test enforces this.
+8. **Authorization comes before idempotency.** The actor's identity for the command (ignoring the current status) is checked first, then the idempotency key, then the transition. A revoked or unrelated actor gets `forbidden` even with a known key, so it learns nothing about the order. A replayed command returns the current state, not the state at that event.
+9. **Inputs are strict JSON values.** Unknown fields in commands, acceptances, money and creation input are rejected. The fingerprint is built from the normalised, validated command, so no free text reaches an event.
+10. **Replay checks more than transitions.** For each event type it checks:
+    - which actor kind, role or source may produce it, and that it is the order's customer, the order's merchant or the assigned courier where relevant (identity does not change over time, unlike grants);
+    - reason codes;
+    - the payload: payment reference, courier ID and acceptance time.
+    Replay cannot detect events cut off the end of a log, so slice 2 compares the replayed sequence with the cached `orders.sequence`.
+11. **An acceptance must be consistent.**
+    - `receivedAt` must not precede the order, and `decidedAt` must fall between `receivedAt` and the command time.
+    - Accepts and declines must come before the deadline; auto-declines at or after it, with reason `window_expired`.
+    - Slice 2 must load the acceptance from the merchant-operations store, never from a request body.
+
+## Trust boundaries and deviations
+
+- **Signed events:** ADR-0003 asks for signed events. This slice does not sign or hash-chain events. Integrity in slice 2 comes from an append-only `order_events` table (triggers rejecting UPDATE, DELETE and TRUNCATE, as for `audit_events`), a unique `(order_id, sequence)` and a runtime role without UPDATE. A per-event `prevHash` chain was considered and deferred until events leave the database (outbox consumers, exports). This is a recorded deviation from ADR-0003.
+- **Price:** `createOrder` takes the total from its caller. The checkout (#85) must pass the total of a server-side quote (#83), never a client value.
+- **System actors:** only server code that has verified its trigger may construct a `system` actor, for example a payment webhook with a checked signature or the acceptance sweeper. No HTTP request body may choose a system source.
+- **Mapping to ADR-0016:**
+  - `forbidden` maps to 404 for customers and couriers and to 403 for staff.
+  - `can()` keeps deciding reads; this module authorizes mutations.
+  - The three role checks (`can()`, merchant-ops `matchingRole`, this module) share the role list through drift tests and should converge on one shared policy package when slice 2 lands.
+- **Payment race:**
+  - A customer can cancel in `payment_pending`; a later `payment_authorized` is then illegal.
+  - The webhook handler must void the authorization and must not retry the command.
+  - Courier reassignment does not exist yet; a courier dropping out needs a dispatch design.
+- **Contract:** `OrderEvent` in the contract has no `status` or `reason`. Slice 2 needs an additive contract change to serve the customer timeline.
+- **Event IDs:** the default ID generator is `crypto.randomUUID()`. A React Native caller must pass `newId`.
 
 ## Alternatives
 

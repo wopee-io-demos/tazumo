@@ -1,4 +1,4 @@
-export const orderStatuses = [
+export const orderStatuses = Object.freeze([
   'created',
   'payment_pending',
   'confirmed',
@@ -9,24 +9,24 @@ export const orderStatuses = [
   'delivered',
   'cancelled',
   'failed',
-] as const;
+] as const);
 export type OrderStatus = (typeof orderStatuses)[number];
-export const terminalStatuses: readonly OrderStatus[] = ['delivered', 'cancelled', 'failed'];
+export const terminalStatuses: readonly OrderStatus[] = Object.freeze(['delivered', 'cancelled', 'failed'] as const);
 
-export const roles = ['customer', 'merchant_staff', 'courier', 'support', 'admin'] as const;
+export const roles = Object.freeze(['customer', 'merchant_staff', 'courier', 'support', 'admin'] as const);
 export type Role = (typeof roles)[number];
 export type Grant = { role: Role; merchantId: string | null };
 export type Principal = { userId: string; grants: Grant[] };
 
-export const systemSources = ['payment', 'acceptance', 'dispatch', 'operations'] as const;
+export const systemSources = Object.freeze(['payment', 'acceptance', 'dispatch', 'operations'] as const);
 export type SystemSource = (typeof systemSources)[number];
 export type Actor = { kind: 'user'; principal: Principal } | { kind: 'system'; source: SystemSource };
-export type ActorRef = { kind: 'user'; userId: string; role: Role } | { kind: 'system'; source: SystemSource };
+export type ActorRef = { kind: 'user'; userId: string; role: Role; merchantId?: string } | { kind: 'system'; source: SystemSource };
 
 export type Money = { currency: string; minorUnits: number };
 
-export const declineReasons = ['out_of_stock', 'too_busy', 'closing_soon', 'other'] as const;
-export const acceptanceStates = ['pending', 'accepted', 'declined', 'auto_declined'] as const;
+export const declineReasons = Object.freeze(['out_of_stock', 'too_busy', 'closing_soon', 'other'] as const);
+export const acceptanceStates = Object.freeze(['pending', 'accepted', 'declined', 'auto_declined'] as const);
 export type AcceptanceDecision = {
   orderId: string;
   merchantId: string;
@@ -53,7 +53,7 @@ export type Command =
   | { type: 'fail'; reason: string };
 export type CommandType = Command['type'];
 
-export const eventTypes = [
+export const eventTypes = Object.freeze([
   'order_created',
   'payment_requested',
   'payment_authorized',
@@ -68,7 +68,7 @@ export const eventTypes = [
   'delivered',
   'cancelled',
   'failed',
-] as const;
+] as const);
 export type EventType = (typeof eventTypes)[number];
 
 export type OrderEvent = {
