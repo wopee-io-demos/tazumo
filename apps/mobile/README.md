@@ -46,7 +46,16 @@ end
 
 If the Hermes download stalls during `pod install`, download `react-native-artifacts-0.79.2-hermes-ios-release.tar.gz` from Maven Central and set `HERMES_ENGINE_TARBALL_PATH` to the local file. Drive the simulator with [mobilecli](https://github.com/mobile-next/mobilecli) (`npx --yes mobilecli@1.0.24 agent install --device "$UDID"` once, then `dump ui`, `io tap x,y`, `screenshot`). Smoke path: open a product -> Add to cart -> cart icon -> increase/decrease/remove -> checkout stays disabled. Delete the simulator (`xcrun simctl delete "$UDID"`) and the DerivedData folder afterwards.
 
-Android has no committed local recipe; the `Native development builds` workflow builds the debug APK on every PR touching `apps/mobile/**`.
+## Android emulator smoke (CI)
+
+The `Android emulator smoke` job in `native-builds.yml` builds a release-variant x86_64 APK (debug keystore, JavaScript embedded), boots an API 34 emulator and runs [`tests/android-smoke.case.json`](tests/android-smoke.case.json) with Appium UiAutomator2 ([ADR-0010](../../docs/adr/0010-test-pyramid-native-automation.md)). Steps address elements by `sut-` IDs. A negative case with a missing ID must fail. Screenshots, UiAutomator XML per step, `report.json`, the Appium log and the APK are uploaded as the `tazumo-android-smoke` artifact.
+
+To run the same case against a local emulator with Appium running on port 4723:
+
+```sh
+adb install -r app-release.apk
+node apps/mobile/tests/run-case.mjs apps/mobile/tests/android-smoke.case.json /tmp/tazumo-smoke
+```
 
 ## CI builds
 
