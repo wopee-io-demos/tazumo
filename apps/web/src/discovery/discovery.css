@@ -4,14 +4,14 @@
 .merchantList,.detailProducts,.cartLines{list-style:none;padding:0;margin:0}
 .merchantList{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px}
 .merchantCard{display:flex;gap:14px;align-items:flex-start;padding:18px;border-radius:20px;border:1px solid color-mix(in srgb,var(--ink) 14%,transparent);background:var(--tint)}
-.merchantCard:has(a:focus-visible){outline:3px solid var(--accent);outline-offset:3px}
+.merchantCard:has(a:focus-visible){outline:3px solid var(--ink);outline-offset:3px}
 .merchantCard h3{font-size:18px;margin:0 0 6px}
 .merchantCard p{margin:4px 0;font-size:14px;line-height:1.4}
 .merchantEmoji{font-size:38px;line-height:1}
 .merchantMeta{font-weight:700}
 .app .merchantSection a,.app .detail a{color:var(--ink);text-decoration-color:var(--primary);text-decoration-thickness:2px;text-underline-offset:3px}
-.app .merchantSection a:focus-visible,.app .detail a:focus-visible{outline:3px solid var(--accent);outline-offset:3px;border-radius:4px}
-.detail h1[tabindex="-1"]:focus,.cartDialog h2[tabindex="-1"]:focus{outline:none}
+.app .merchantSection a:focus-visible,.app .detail a:focus-visible{outline:3px solid var(--ink);outline-offset:3px;border-radius:4px}
+.detail h1[tabindex="-1"]:focus,.cartDialog h2[tabindex="-1"]:focus,.merchantSection h2[tabindex="-1"]:focus{outline:none}
 .detailHero .stepper button{background:transparent;border:1px solid color-mix(in srgb,var(--ink) 35%,transparent);min-width:40px}
 .discoveryEmpty{padding:28px;text-align:center;background:var(--tint);border-radius:16px}
 .discoveryEmpty button,.primaryAction{background:var(--primary);color:var(--tint);border:0;border-radius:11px;padding:10px 16px;font-weight:700;cursor:pointer}
@@ -27,16 +27,16 @@
 .detailProducts h3{font-size:17px;margin:0 0 4px}
 .detailProducts p{margin:2px 0;font-size:14px}
 .inBasket{font-weight:700;color:var(--primary)}
-.detailPrice{font-size:26px!important;font-weight:800}
+.detailHero .detailPrice{font-size:26px;font-weight:800}
 .detailActions{margin:16px 0}
 .inBasketRow{display:flex;flex-wrap:wrap;gap:12px;align-items:center;font-weight:700}
 .detailBack{display:inline-block;margin-top:28px;font-weight:700}
 .notFound h1{font-size:28px}
 .removeLine{font-weight:700}
-.cartLine{display:grid!important;grid-template-columns:1fr auto;gap:10px}
+.cartLines .cartLine{display:grid;grid-template-columns:1fr auto;gap:10px}
 .cartLine .stepper{grid-column:1}
 .lineTotal{grid-column:2;grid-row:1 / span 2;align-self:center}
-.app .stepper button:focus-visible,.app .primaryAction:focus-visible,.app .discoveryEmpty button:focus-visible,.cartDialog button:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+.app .stepper button:focus-visible,.app .primaryAction:focus-visible,.app .discoveryEmpty button:focus-visible,.cartDialog button:focus-visible{outline:3px solid var(--ink);outline-offset:3px}
 @media(max-width:600px){
   .detail{padding:24px 16px 64px}
   .detailHero{flex-direction:column;gap:12px;padding:20px}

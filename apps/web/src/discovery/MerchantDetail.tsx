@@ -7,7 +7,7 @@ type Props={lang:Language;id:string;cart:Record<string,number>;onAdd:(productId:
 export function MerchantDetail({lang,id,cart,onAdd}:Props){
   const merchant=findMerchant(id);
   const heading=useRouteFocus(id);
-  if(!merchant)return <NotFound lang={lang} message={t(lang,'merchantNotFound')} testId="sut-merchant-not-found"/>;
+  if(!merchant)return <NotFound lang={lang} routeKey={id} message={t(lang,'merchantNotFound')} testId="sut-merchant-not-found"/>;
   return <article className="detail" data-testid="sut-merchant-detail">
     <Breadcrumbs lang={lang} trail={[{label:merchant.name}]}/>
     <header className="detailHero">
@@ -19,7 +19,7 @@ export function MerchantDetail({lang,id,cart,onAdd}:Props){
       <span className="detailEmoji small" aria-hidden="true">{p.emoji}</span>
       <div><h3><a href={productHref(p.id)} data-testid={`sut-product-link-${p.id}`}>{p.name}</a></h3><p>{p.description}</p>{(cart[p.id]??0)>0&&<p className="inBasket">{t(lang,'inBasket')}: {cart[p.id]}</p>}</div>
       <strong>{formatLocalizedPrice(p.priceCents,lang)}</strong>
-      <button type="button" className="primaryAction" data-testid={`sut-merchant-add-${p.id}`} aria-label={`${t(lang,'add')} ${p.name}`} onClick={()=>onAdd(p.id)}>{t(lang,'add')}</button>
+      <button type="button" className="primaryAction" data-testid={`sut-add-${p.id}`} aria-label={`${t(lang,'add')} ${p.name}`} onClick={()=>onAdd(p.id)}>{t(lang,'add')}</button>
     </li>)}</ul>
     <a className="detailBack" href={homeHref} data-testid="sut-back-to-merchants">← {t(lang,'backToMerchants')}</a>
   </article>;

@@ -15,8 +15,8 @@ export function Breadcrumbs({lang,trail}:{lang:Language;trail:{label:string;href
   </ol></nav>;
 }
 
-export function NotFound({lang,message,testId}:{lang:Language;message:string;testId:string}){
-  const heading=useRouteFocus(message);
+export function NotFound({lang,routeKey,message,testId}:{lang:Language;routeKey:string;message:string;testId:string}){
+  const heading=useRouteFocus(routeKey);
   return <section className="detail notFound" data-testid={testId}>
     <h1 ref={heading} tabIndex={-1}>{message}</h1>
     <a className="detailBack" href={homeHref} data-testid="sut-back-to-merchants">← {t(lang,'backToMerchants')}</a>

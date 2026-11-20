@@ -28,7 +28,7 @@ export function filterMerchants(query:string,category:Category|'All'='All',list:
 
 export function setQuantity(cart:Cart,id:string,quantity:number):Cart {
   const next={...cart};
-  const qty=Math.max(0,Math.trunc(quantity));
+  const qty=Number.isFinite(quantity)?Math.max(0,Math.trunc(quantity)):0;
   if(qty===0)delete next[id];else next[id]=qty;
   return next;
 }

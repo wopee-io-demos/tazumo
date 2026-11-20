@@ -44,4 +44,6 @@ test('setQuantity clamps to non-negative whole numbers',()=>{
   assert.deepEqual(setQuantity({},'pizza',2.7),{pizza:2});
   assert.deepEqual(setQuantity({pizza:2},'pizza',-1),{});
   assert.deepEqual(removeFromCart({},'pizza'),{});
+  assert.deepEqual(setQuantity({pizza:1},'pizza',Number.NaN),{});
+  assert.deepEqual(setQuantity({},'pizza',Number.POSITIVE_INFINITY),{});
 });
