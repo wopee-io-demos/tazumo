@@ -28,3 +28,5 @@ test('palette independent from catalogue',async({page})=>{
   await expect(page.getByRole('heading',{name:'Margherita pizza'})).toBeVisible();
   await expect(page.locator('.app')).toHaveCSS('--primary','#087F62');
 });
+
+test('language independent from product catalogue and cart',async({page})=>{await page.goto('/');await page.getByLabel('Language').selectOption('cs');await expect(page.getByRole('heading',{name:'Na co máte chuť?'})).toBeVisible();await expect(page.getByRole('heading',{name:'Margherita pizza'})).toBeVisible();await page.getByLabel('Jazyk').selectOption('de');await expect(page.getByRole('heading',{name:'Worauf hast du Lust?'})).toBeVisible();});
