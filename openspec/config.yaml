@@ -1,0 +1,12 @@
+schema: spec-driven
+context: |
+  Tazumo: Europe-first multi-category delivery marketplace.
+  pnpm TypeScript monorepo; Next.js web; Expo iOS/Android.
+  Brand is provisional and palette-independent. No fake live checkout/tracking.
+rules:
+  proposal:
+    - Explain customer impact and explicit non-goals.
+  design:
+    - Link relevant ADRs and document tradeoffs.
+  tasks:
+    - Keep checkbox states aligned with verified implementation.

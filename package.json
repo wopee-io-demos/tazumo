@@ -1,0 +1,16 @@
+{
+  "name": "tazumo",
+  "private": true,
+  "packageManager": "pnpm@10.20.0",
+  "scripts": {
+    "dev:web": "pnpm --filter @tazumo/web dev",
+    "dev:mobile": "pnpm --filter @tazumo/mobile start",
+    "build": "pnpm -r --if-present build",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "test": "pnpm -r --if-present test",
+    "lint": "pnpm -r --if-present lint"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}
