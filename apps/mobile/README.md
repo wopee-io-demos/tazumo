@@ -35,7 +35,16 @@ xcrun simctl install "$UDID" /tmp/tazumo-dd/Build/Products/Release-iphonesimulat
 xcrun simctl launch "$UDID" io.wopee.demos.tazumo
 ```
 
-The Release configuration embeds the JS bundle, so no Metro server is needed. Drive the simulator with [mobilecli](https://github.com/mobile-next/mobilecli) (`npx --yes mobilecli@1.0.24 agent install --device "$UDID"` once, then `dump ui`, `io tap x,y`, `screenshot`). Smoke path: open a product -> Add to cart -> cart icon -> increase/decrease/remove -> checkout stays disabled. Delete the simulator (`xcrun simctl delete "$UDID"`) and the DerivedData folder afterwards.
+The Release configuration embeds the JS bundle, so no Metro server is needed. With Xcode 27 the `fmt` pod (11.0.2, pulled in by React Native 0.79) fails with `call to consteval function ... is not a constant expression`. Locally, add this at the top of the generated Podfile's `post_install` block and rerun `pod install`, until the Expo SDK upgrade in [#14](https://github.com/wopee-io-demos/tazumo/issues/14):
+
+```ruby
+installer.pods_project.targets.each do |t|
+  next unless t.name == 'fmt'
+  t.build_configurations.each { |c| c.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'c++17' }
+end
+```
+
+If the Hermes download stalls during `pod install`, download `react-native-artifacts-0.79.2-hermes-ios-release.tar.gz` from Maven Central and set `HERMES_ENGINE_TARBALL_PATH` to the local file. Drive the simulator with [mobilecli](https://github.com/mobile-next/mobilecli) (`npx --yes mobilecli@1.0.24 agent install --device "$UDID"` once, then `dump ui`, `io tap x,y`, `screenshot`). Smoke path: open a product -> Add to cart -> cart icon -> increase/decrease/remove -> checkout stays disabled. Delete the simulator (`xcrun simctl delete "$UDID"`) and the DerivedData folder afterwards.
 
 Android has no committed local recipe; the `Native development builds` workflow builds the debug APK on every PR touching `apps/mobile/**`.
 
@@ -48,16 +57,19 @@ Android has no committed local recipe; the `Native development builds` workflow 
 Not configured yet: there is no Expo project ID and no `eas.json`. Store publication waits for name and trademark clearance ([#6](https://github.com/wopee-io-demos/tazumo/issues/6), [#10](https://github.com/wopee-io-demos/tazumo/issues/10)).
 
 ### Accounts (owned by the organization, not by an individual)
+
 - Expo organization for `wopee-io-demos`, with a robot user whose access token is stored as the GitHub Actions secret `EXPO_TOKEN`.
 - Apple Developer Program team with an App Store Connect API key (Issuer ID, Key ID, `.p8`) uploaded to EAS.
 - Google Play Console developer account with a service account that has release rights for `io.wopee.demos.tazumo`; its JSON key is uploaded to EAS.
 
 ### Credentials
+
 - Use EAS-managed credentials: `eas credentials` generates and stores the iOS distribution certificate, provisioning profiles and the Android upload keystore on Expo servers.
 - Never commit `.p8`, `.p12`, `.mobileprovision`, `.jks`/`.keystore`, Play service-account JSON, `credentials.json` or `.env` files. Keep a backup of the Android keystore in the organization password manager, because losing it blocks Play updates.
 - Rotate `EXPO_TOKEN` and the App Store Connect key when a maintainer leaves.
 
 ### Setup (one time)
+
 ```sh
 npx eas-cli login
 cd apps/mobile
@@ -80,6 +92,7 @@ Suggested `eas.json` profiles:
 ```
 
 ### Delivery
+
 1. `preview` builds for internal testers: `eas build --profile preview --platform all`. Android installs from the APK link; iOS uses ad hoc devices registered with `eas device:create`.
 2. `production` builds: `eas build --profile production --platform all`, then `eas submit --platform ios` (TestFlight) and `eas submit --platform android` (Play internal testing track).
 3. Promote from TestFlight and the internal track to wider tracks only after accessibility, language and smoke checks pass, and only once the name is cleared.
