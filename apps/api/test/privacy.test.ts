@@ -159,21 +159,32 @@ describe('GDPR erasure and export, running as tazumo_api', () => {
   test('the runtime role cannot rewrite identities and the database validates erasure input', async () => {
     await assert.rejects(appRole.pool.query(`UPDATE users SET subject = 'attacker-sub' WHERE id = $1`, [ids.admin]), /permission denied/);
     await assert.rejects(
-      appRole.pool.query(`SELECT * FROM erase_user($1, 'erased:nothex', $1, 'self', 'r', interval '1 hour')`, [ids.customer]),
+      appRole.pool.query(`SELECT * FROM erase_user($1, 'erased:nothex', $1, 'self', 'r')`, [ids.customer]),
       /invalid pseudonym/
     );
     await assert.rejects(
-      appRole.pool.query(`SELECT * FROM erase_user($1, $2, $1, 'root', 'r', interval '1 hour')`, [ids.customer, 'erased:' + 'a'.repeat(64)]),
+      appRole.pool.query(`SELECT * FROM erase_user($1, $2, $1, 'root', 'r')`, [ids.customer, 'erased:' + 'a'.repeat(64)]),
       /invalid initiator/
+    );
+    await assert.rejects(
+      appRole.pool.query(`SELECT * FROM erase_user($1, $2, $3, 'admin', 'r')`, [ids.exporter, 'erased:' + 'b'.repeat(64), ids.customer]),
+      /actor does not hold the initiator role/
+    );
+    await assert.rejects(
+      appRole.pool.query(`SELECT * FROM erase_user($1, $2, $3, 'self', 'r')`, [ids.exporter, 'erased:' + 'b'.repeat(64), ids.customer]),
+      /actor does not hold the initiator role/
     );
   });
 
   test('recognition of erased subjects ends after the token-lifetime window', async () => {
     assert.equal((await app.inject({ method: 'POST', url: '/v1/me/erasure', headers: as('forgotten') })).statusCode, 200);
+    await db.pool.query(`UPDATE users SET erased_at = erased_at - interval '23 hours' WHERE id = $1`, [ids.forgotten]);
+    assert.equal((await db.pool.query(`SELECT forget_erased_subjects() AS n`)).rows[0].n, 0, 'still inside the 24 h window');
+    assert.match((await userRow(ids.forgotten)).subject, /^erased:[0-9a-f]{64}$/);
     await db.pool.query(`UPDATE users SET erased_at = erased_at - interval '2 hours' WHERE id = $1`, [ids.forgotten]);
-    const forgotten = await appRole.pool.query(`SELECT forget_erased_subjects(interval '3660 seconds') AS n`);
-    assert.ok(forgotten.rows[0].n >= 1);
+    assert.ok((await db.pool.query(`SELECT forget_erased_subjects() AS n`)).rows[0].n >= 1);
     assert.match((await userRow(ids.forgotten)).subject, /^erased:r:/);
+    await assert.rejects(appRole.pool.query(`SELECT forget_erased_subjects()`), /permission denied/, 'the runtime cannot end recognition');
   });
 
   test('users without permission cannot erase others', async () => {

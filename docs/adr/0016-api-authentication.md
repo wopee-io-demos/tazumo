@@ -46,8 +46,9 @@ Alternatives considered:
     - INSERT only on `audit_events`;
     - no UPDATE on `users` at all.
   - **Erasure and export (migration `0004`) go through `SECURITY DEFINER` functions** with a pinned `search_path` and EXECUTE granted only to `tazumo_api`:
-    - `erase_user(...)` validates the pseudonym format and the initiator, refuses admin targets (and staff targets when support initiates), and performs the update, grant deletion and audit insert itself.
-    - `forget_erased_subjects(...)` replaces keyed-hash tombstones with random ones once the recognition window has passed.
+    - `erase_user(...)` validates the pseudonym format, and checks that the actor holds the initiator role (or is the target, for `self`). It refuses admin targets, and staff targets when support initiates, then performs the update, grant deletion and audit insert itself.
+    - **Honest limit:** the runtime supplies the actor ID, so code running as `tazumo_api` could name any existing admin or support user as actor and erase non-admin users under that name. It could already forge audit rows through INSERT.
+    - `forget_erased_subjects()` replaces keyed-hash tombstones with random ones after a fixed 24 h 2 min window (lifetime cap plus 2× tolerance). Only the owner can execute it: `erase_user` calls it, and operators schedule `pnpm --filter @tazumo/api db:forget-erased` with owner credentials, for example daily.
     - `export_audit_events(uuid)` returns per-user audit metadata (time, action, resource, `self`/`staff`, whitelisted details). It never returns `request_id` or other users' details.
     - **Honest limit:** code running as `tazumo_api`, for example after SQL injection, can call it for any user ID and so read per-user audit metadata. It still cannot read the audit table directly.
     - A `SECURITY DEFINER` trigger rejects grants to erased users, and this check holds under concurrency.

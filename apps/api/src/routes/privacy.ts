@@ -9,10 +9,10 @@ type Initiator = 'self' | 'admin' | 'support';
 type ErasureOutcome =
   | { status: 200; userId: string; erasedAt: string }
   | { status: 404 | 409; code: string; message: string; details?: Record<string, unknown> };
-type PrivacyOptions = { pool: pg.Pool; pseudonymizer: Pseudonymizer; recognitionWindowSeconds: number };
+type PrivacyOptions = { pool: pg.Pool; pseudonymizer: Pseudonymizer };
 
 async function eraseUser(
-  { pool, pseudonymizer, recognitionWindowSeconds }: PrivacyOptions,
+  { pool, pseudonymizer }: PrivacyOptions,
   { targetId, actorId, initiator, requestId }: { targetId: string; actorId: string; initiator: Initiator; requestId: string }
 ): Promise<ErasureOutcome> {
   const target = await pool.query<{ issuer: string; subject: string }>('SELECT issuer, subject FROM users WHERE id = $1', [targetId]);
@@ -21,8 +21,8 @@ async function eraseUser(
   const pseudonym = subject.startsWith('erased:') ? 'erased:' + '0'.repeat(64) : pseudonymizer.erasedSubject(issuer, subject);
   const { rows } = await pool.query<{ outcome: string; erasedAt: Date | null; blockers: string[] | null }>(
     `SELECT result_outcome AS outcome, result_erased_at AS "erasedAt", result_blockers AS blockers
-       FROM erase_user($1, $2, $3, $4, $5, make_interval(secs => $6))`,
-    [targetId, pseudonym, actorId, initiator, requestId, recognitionWindowSeconds]
+       FROM erase_user($1, $2, $3, $4, $5)`,
+    [targetId, pseudonym, actorId, initiator, requestId]
   );
   const result = rows[0];
   switch (result.outcome) {
@@ -94,6 +94,7 @@ export async function privacyRoutes(app: FastifyInstance, options: PrivacyOption
         [userId]
       );
       await client.query('COMMIT');
+      client.release();
       return {
         userId,
         issuer: user.rows[0].issuer,
@@ -104,9 +105,8 @@ export async function privacyRoutes(app: FastifyInstance, options: PrivacyOption
       };
     } catch (error) {
       await client.query('ROLLBACK').catch(() => {});
+      client.release(error as Error);
       throw error;
-    } finally {
-      client.release();
     }
   });
 }

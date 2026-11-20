@@ -29,6 +29,10 @@ export async function resolvePrincipal(pool: pg.Pool, token: VerifiedToken, pseu
         token.issuer,
         token.subject
       ]);
+      if (!existing.rows[0]) {
+        await rejectIfErased();
+        throw new AuthError(401, 'subject_erased');
+      }
       userId = existing.rows[0].id;
     }
     await rejectIfErased();

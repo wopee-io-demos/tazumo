@@ -81,14 +81,14 @@ Two fixed-window limiters (`src/rate-limit.ts`) are attached by the same contrac
   - `POST /v1/me/erasure`: self-service.
   - `POST /v1/admin/users/{userId}/erasure`: admin or support; others get 403.
   - `GET /v1/me/export`.
-- **Erasure:** the app computes the pseudonym (HMAC with an HKDF-derived erasure key, length-prefixed input) and calls `erase_user(target, pseudonym, actor, initiator, request_id, recognition_window)`. This `SECURITY DEFINER` function does everything in one transaction:
-  1. Locks the user row.
+- **Erasure:** the app computes the pseudonym (HMAC with an HKDF-derived erasure key, length-prefixed input) and calls `erase_user(target, pseudonym, actor, initiator, request_id)`. This `SECURITY DEFINER` function does everything in one transaction:
+  1. Checks that the actor holds the initiator role, or is the target for `self`, then locks the user row.
   2. If the user is already erased, returns the original `erased_at` (idempotent).
   3. Checks blockers: an `admin` grant, or a staff grant when support initiates. Either gives 409 with `details.blockers`.
   4. Re-tombstones any older record holding the same pseudonym with a random value.
   5. Sets `subject` to the pseudonym and records `erased_at`.
   6. Deletes all grants and inserts the audit row `user:erase` with `{initiator}`.
-  7. Forgets keyed-hash tombstones older than the recognition window.
+  7. Forgets keyed-hash tombstones older than the fixed recognition window (24 h 2 min). Operators also schedule `db:forget-erased` as the owner.
 - **Supporting guarantees:**
   - A CHECK keeps `erased_at` and the `erased:` prefix consistent.
   - Tokens whose `sub` starts with `erased:` are rejected.

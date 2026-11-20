@@ -2,7 +2,6 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import Fastify, { type FastifyError, type FastifyRequest, type FastifyServerOptions } from 'fastify';
 import type pg from 'pg';
 import { createAuthenticate, type AuthOptions } from './auth/plugin.ts';
-import { clockToleranceSeconds } from './auth/jwt.ts';
 import { createPseudonymizer } from './auth/pseudonym.ts';
 import { componentSchemas, requiresBearer } from './contract.ts';
 import { createRateLimits, type RateLimitOptions } from './rate-limit.ts';
@@ -96,6 +95,6 @@ export function buildApp({ pool, logger = false, auth, rateLimits, trustProxy = 
   app.register(catalogueRoutes, { pool });
   app.register(identityRoutes, { pool });
   app.register(adminRoutes, { pool });
-  app.register(privacyRoutes, { pool, pseudonymizer, recognitionWindowSeconds: (auth?.maxTokenLifetimeSeconds ?? 3_600) + clockToleranceSeconds });
+  app.register(privacyRoutes, { pool, pseudonymizer });
   return app;
 }

@@ -52,7 +52,7 @@ Every option uses the same erasure pattern on Tazumo's side:
    - The cost: a fresh login within about a minute of the erasure is also rejected.
    - A token issued later (only possible if the provider still or again has the account) creates a new, unlinked user with only the `customer` role.
    - Erasing that new user again re-tombstones the older record with a random value; the newer erasure takes over recognition.
-   - **Recognition window:** recognition is needed only for `AUTH_MAX_TOKEN_LIFETIME` (default 1 h, configurable up to 24 h) plus tolerance. After that, `forget_erased_subjects` replaces the keyed hash with a random tombstone, removing the long-term re-identification handle. It runs on every erasure and can also be scheduled.
+   - **Recognition window:** recognition is needed only while pre-erasure tokens can still be valid: the 24 h lifetime cap plus twice the clock tolerance, fixed at 24 h 2 min regardless of the configured lifetime. After that, `forget_erased_subjects` replaces the keyed hash with a random tombstone, removing the long-term re-identification handle. It runs on every erasure, and operators schedule `db:forget-erased` daily as the owner.
    - Rotating `AUTH_LOG_SALT` ends recognition early. Rotate it only once the last erasure is older than the recognition window.
    - **Not yet enforced:** erasure is irreversible, yet any valid access token can trigger it. Once a provider is wired in, require recent authentication (`auth_time` with `max_age`) for self-service erasure.
 

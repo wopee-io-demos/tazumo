@@ -62,6 +62,12 @@
     - the export includes whitelisted details;
     - ADR-0016 was corrected.
   - Nits: `logSalt` is required, HMAC domain separation, a consistent export snapshot, a re-authentication note in ADR-0017.
+- [x] Re-review on 75b9346: no blockers. Then fixed:
+  - The existing-user race returned 500; it now returns 401.
+  - The recognition window was a caller parameter, which allowed premature forgetting. It is now fixed in the function, EXECUTE is revoked from the runtime, and an owner-run `db:forget-erased` script exists.
+  - `erase_user` checks that the actor holds the initiator role.
+  - The export releases its connection on errors.
+  - ADR-0016 states the remaining limits honestly.
 - [ ] Current-head CI green (record run URLs).
 - [ ] Merge and record the merge SHA on #56.
 
