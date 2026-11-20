@@ -13,10 +13,12 @@
     "bundle:mobile": "pnpm --filter @tazumo/mobile exec expo export --platform ios && pnpm --filter @tazumo/mobile exec expo export --platform android"
   },
   "devDependencies": {
+    "@actions/expressions": "0.3.61",
     "@axe-core/playwright": "4.14.0",
     "@playwright/test": "^1.56.0",
     "ajv": "8.20.0",
-    "ajv-formats": "3.0.1"
+    "ajv-formats": "3.0.1",
+    "yaml": "2.9.1"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
