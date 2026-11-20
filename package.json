@@ -1,0 +1,26 @@
+{
+  "name": "tazumo",
+  "private": true,
+  "packageManager": "pnpm@10.11.0",
+  "scripts": {
+    "dev:web": "pnpm --filter @tazumo/web dev",
+    "dev:mobile": "pnpm --filter @tazumo/mobile start",
+    "build": "pnpm --filter @tazumo/web build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm --filter @tazumo/core test",
+    "test:e2e": "playwright test",
+    "bundle:mobile": "pnpm --filter @tazumo/mobile exec expo export --platform ios && pnpm --filter @tazumo/mobile exec expo export --platform android"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ],
+    "overrides": {
+      "postcss": "^8.5.18",
+      "image-size": "^2.0.3"
+    }
+  }
+}

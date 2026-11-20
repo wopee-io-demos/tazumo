@@ -1,0 +1,7 @@
+packages:
+  - 'apps/*'
+  - 'packages/*'
+
+# Expo SDK 53 native autolinking is incompatible with pnpm isolated installs.
+# See https://docs.expo.dev/guides/monorepos/
+nodeLinker: hoisted
