@@ -1,3 +1,4 @@
+import { isIP } from 'node:net';
 import type { AuthOptions } from './auth/plugin.ts';
 
 export type Config = {
@@ -6,7 +7,7 @@ export type Config = {
   host: string;
   port: number;
   logLevel: string;
-  trustProxy: false | ((address: string, hop: number) => boolean) | string[];
+  trustProxy: false | string[];
 };
 
 const logLevels = ['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'];
@@ -23,12 +24,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
 
 function loadTrustProxy(value: string | undefined): Config['trustProxy'] {
   if (!value) return false;
-  if (/^\d+$/.test(value)) {
-    const hops = Number(value);
-    return (_address, hop) => hop < hops;
+  const entries = value.split(',').map((entry) => entry.trim()).filter(Boolean);
+  if (entries.length === 0 || entries.some((entry) => isIP(entry.split('/')[0]) === 0)) {
+    throw new Error('TRUST_PROXY must be a comma-separated list of proxy IP addresses or CIDRs');
   }
-  if (value === 'true') throw new Error('TRUST_PROXY must be a hop count or a comma-separated list of proxy addresses/CIDRs, not true');
-  return value.split(',').map((entry) => entry.trim()).filter(Boolean);
+  return entries;
 }
 
 const loopbackHosts = ['127.0.0.1', 'localhost', '[::1]'];

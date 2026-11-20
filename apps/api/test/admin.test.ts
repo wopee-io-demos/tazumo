@@ -166,6 +166,7 @@ describe('admin role grants, running as the least-privilege tazumo_api role', ()
       appPool.query(`INSERT INTO user_roles (user_id, role) VALUES ($1, 'admin')`, [ids.customer]),
       /row-level security/
     );
+    await assert.rejects(appPool.query(`INSERT INTO user_roles (user_id, role) VALUES ($1, 'courier')`, [ids.customer]), /row-level security/);
     const removed = await appPool.query(`DELETE FROM user_roles WHERE user_id = $1 AND role = 'admin'`, [ids.admin]);
     assert.equal(removed.rowCount, 0);
     assert.equal((await db.pool.query(`SELECT 1 FROM user_roles WHERE user_id = $1 AND role = 'admin'`, [ids.admin])).rowCount, 1);

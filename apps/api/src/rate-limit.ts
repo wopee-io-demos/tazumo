@@ -1,4 +1,4 @@
-import { isIPv6 } from 'node:net';
+import { isIP, isIPv6 } from 'node:net';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { apiError } from './errors.ts';
 
@@ -11,12 +11,14 @@ export const defaultLimits = {
 } satisfies Record<'ip' | 'principal', LimitRule>;
 
 type Decision = { allowed: true } | { allowed: false; retryAfterSeconds: number };
+const overflowFactor = 10;
 
 export class FixedWindowLimiter {
   readonly rule: LimitRule;
   readonly #now: () => number;
   readonly #maxKeys: number;
   readonly #windows = new Map<string, { start: number; count: number }>();
+  #overflow = { start: 0, count: 0 };
 
   constructor(rule: LimitRule, now: () => number = Date.now, maxKeys = 100_000) {
     this.rule = rule;
@@ -34,7 +36,7 @@ export class FixedWindowLimiter {
     let window = this.#windows.get(key);
     if (!window || now - window.start >= this.rule.windowMs) {
       this.#windows.delete(key);
-      if (this.#windows.size >= this.#maxKeys) return { allowed: false, retryAfterSeconds: this.#retryAfter(this.#oldestStart(), now) };
+      if (this.#windows.size >= this.#maxKeys) return this.#hitOverflow(now);
       window = { start: now, count: 0 };
       this.#windows.set(key, window);
     }
@@ -47,8 +49,11 @@ export class FixedWindowLimiter {
     return Math.max(1, Math.ceil((start + this.rule.windowMs - now) / 1000));
   }
 
-  #oldestStart() {
-    return this.#windows.values().next().value?.start ?? this.#now();
+  #hitOverflow(now: number): Decision {
+    if (now - this.#overflow.start >= this.rule.windowMs) this.#overflow = { start: now, count: 0 };
+    this.#overflow.count++;
+    if (this.#overflow.count <= this.rule.limit * overflowFactor) return { allowed: true };
+    return { allowed: false, retryAfterSeconds: this.#retryAfter(this.#overflow.start, now) };
   }
 
   #sweep(now: number) {
@@ -69,6 +74,7 @@ function expandIPv6(address: string): string[] {
 export function clientKey(ip: string): string {
   const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/i.exec(ip);
   if (mapped) return mapped[1];
+  if (isIP(ip) === 0) return 'unparseable';
   if (!isIPv6(ip)) return ip;
   return `${expandIPv6(ip.toLowerCase()).slice(0, 4).map((part) => part.padStart(4, '0')).join(':')}::/64`;
 }

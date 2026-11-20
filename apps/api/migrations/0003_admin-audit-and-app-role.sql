@@ -8,8 +8,9 @@ BEGIN
   SELECT * INTO existing FROM pg_roles WHERE rolname = 'tazumo_api';
   IF NOT FOUND THEN
     CREATE ROLE tazumo_api NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
-  ELSIF existing.rolcanlogin OR existing.rolsuper OR existing.rolbypassrls OR existing.rolcreaterole OR existing.rolcreatedb THEN
-    RAISE EXCEPTION 'role tazumo_api exists with unsafe attributes (login, superuser, bypassrls, createrole or createdb)';
+  ELSIF existing.rolcanlogin OR existing.rolsuper OR existing.rolbypassrls OR existing.rolcreaterole OR existing.rolcreatedb
+     OR existing.rolreplication OR EXISTS (SELECT 1 FROM pg_auth_members WHERE member = existing.oid) THEN
+    RAISE EXCEPTION 'role tazumo_api exists with unsafe attributes (login, superuser, bypassrls, createrole, createdb, replication or role memberships)';
   END IF;
   EXECUTE format('GRANT USAGE ON SCHEMA %I TO tazumo_api', current_schema());
 END;
@@ -22,8 +23,8 @@ GRANT INSERT ON audit_events TO tazumo_api;
 
 ALTER TABLE user_roles ENABLE ROW LEVEL SECURITY;
 CREATE POLICY user_roles_runtime_read ON user_roles FOR SELECT TO tazumo_api USING (true);
-CREATE POLICY user_roles_runtime_insert ON user_roles FOR INSERT TO tazumo_api WITH CHECK (role <> 'admin');
-CREATE POLICY user_roles_runtime_delete ON user_roles FOR DELETE TO tazumo_api USING (role <> 'admin');
+CREATE POLICY user_roles_runtime_insert ON user_roles FOR INSERT TO tazumo_api WITH CHECK (role IN ('customer', 'merchant_staff', 'support'));
+CREATE POLICY user_roles_runtime_delete ON user_roles FOR DELETE TO tazumo_api USING (role IN ('merchant_staff', 'support'));
 
 -- Down Migration
 DROP POLICY user_roles_runtime_delete ON user_roles;

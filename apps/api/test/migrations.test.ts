@@ -52,14 +52,18 @@ test('database rejects invalid money and identifiers', async () => {
   }
 });
 
-test('migration 0003 refuses an existing tazumo_api role with unsafe attributes', async () => {
+test('migration 0003 refuses an existing tazumo_api role with unsafe attributes or memberships', async () => {
   const db = await createTestDb();
   const fresh = await createTestDb({ migrated: false });
   try {
     await db.pool.query('ALTER ROLE tazumo_api LOGIN');
     await assert.rejects(migrate({ databaseUrl: databaseUrl(), direction: 'up', schema: fresh.schema }), /unsafe attributes/);
+    await db.pool.query('ALTER ROLE tazumo_api NOLOGIN');
+    await db.pool.query('GRANT pg_read_all_data TO tazumo_api');
+    await assert.rejects(migrate({ databaseUrl: databaseUrl(), direction: 'up', schema: fresh.schema }), /unsafe attributes/);
   } finally {
     await db.pool.query('ALTER ROLE tazumo_api NOLOGIN');
+    await db.pool.query('REVOKE pg_read_all_data FROM tazumo_api');
     await fresh.drop();
     await db.drop();
   }

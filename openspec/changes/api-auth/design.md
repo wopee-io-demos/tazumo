@@ -39,10 +39,11 @@ Two fixed-window limiters (`src/rate-limit.ts`) are attached by the same contrac
 - **Over the limit:** 429 `rate_limited` with `Retry-After` (seconds until the window resets).
 - **State and memory:** state is in memory per instance, bounded at 100k keys per layer.
   - Windows are kept in start order, and expired windows are swept from the front in amortised O(1).
-  - If the table is still full of live windows, new keys are refused with 429 (fail closed) rather than evicting a live, possibly blocked, key.
+  - If the table is still full of live windows, new keys share one overflow bucket allowed ten times the per-key limit. A live, possibly blocked key is never evicted.
+  - **Known availability risk:** a flood of more than 100k distinct keys (IPv4 addresses or /64s) pushes new clients into the shared overflow bucket until windows expire. A shared store with larger capacity, or upstream DDoS protection, is the mitigation.
 - **Fixed-window burst:** a fixed window can admit up to twice the limit across a window boundary. This is accepted for now; a sliding window is the upgrade path.
 - **Multi-instance:** a deployment with several instances needs a shared store (for example PostgreSQL or Redis) before limits are global.
-- **Proxies:** `TRUST_PROXY` configures Fastify's `trustProxy`, as a hop count or a comma-separated list of proxy addresses or CIDRs. It is off by default, so behind a proxy every client shares the proxy's bucket until it is set.
+- **Proxies:** `TRUST_PROXY` configures Fastify's `trustProxy` as a comma-separated list of proxy IP addresses or CIDRs. Hop counts are rejected, because they would let direct clients pick their own key through `X-Forwarded-For`. It is off by default, so behind a proxy every client shares the proxy's bucket until it is set. Any value that is not an IP address falls into a single shared `unparseable` key.
 - **Testing:** the limiter takes an injectable clock, so tests advance time without sleeping.
 
 ### Admin role grants
@@ -70,8 +71,8 @@ Two fixed-window limiters (`src/rate-limit.ts`) are attached by the same contrac
   - INSERT on `audit_events`.
 - Operators create a login role `IN ROLE tazumo_api` for the server. Migrations and seed keep using the owner.
 - Every future migration that adds a table must grant `tazumo_api` exactly what the runtime needs.
-- Migration `0003` also enables row-level security on `user_roles`. `tazumo_api` may read all grants but cannot insert or delete `admin` grants. The schema owner, used for migrations and the first admin, is not subject to these policies.
-- A pre-existing `tazumo_api` role with LOGIN, SUPERUSER, BYPASSRLS, CREATEROLE or CREATEDB aborts the migration. The migration needs CREATEROLE unless the role already exists. Use one cluster per environment, or restrict CONNECT per database.
+- Migration `0003` also enables row-level security on `user_roles`. `tazumo_api` may read all grants, insert only `customer`, `merchant_staff` and `support` grants, and delete only `merchant_staff` and `support` grants. The schema owner, used for migrations and the first admin, is not subject to these policies.
+- A pre-existing `tazumo_api` role with LOGIN, SUPERUSER, BYPASSRLS, CREATEROLE, CREATEDB or REPLICATION, or with any role membership, aborts the migration. The migration needs CREATEROLE unless the role already exists. Use one cluster per environment, or restrict CONNECT per database.
 - Migration `0003` also adds `audit_events.details jsonb`.
 
 ## Next slices

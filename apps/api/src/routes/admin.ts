@@ -81,6 +81,7 @@ export async function adminRoutes(app: FastifyInstance, { pool }: { pool: pg.Poo
     const rejected = precheck(request, reply);
     if (rejected) return rejected;
     const outcome = await change(request, 'role:grant');
+    if (outcome.status === 403) request.log.warn({ action: 'role:manage', role: request.params.role }, 'role change denied');
     if (outcome.code) return reply.code(outcome.status).send(apiError(request, outcome.code, outcome.message!));
     return reply.code(outcome.status).send({ role: request.params.role, merchantId: request.query.merchantId ?? null });
   });
@@ -89,6 +90,7 @@ export async function adminRoutes(app: FastifyInstance, { pool }: { pool: pg.Poo
     const rejected = precheck(request, reply);
     if (rejected) return rejected;
     const outcome = await change(request, 'role:revoke');
+    if (outcome.status === 403) request.log.warn({ action: 'role:manage', role: request.params.role }, 'role change denied');
     if (outcome.code) return reply.code(outcome.status).send(apiError(request, outcome.code, outcome.message!));
     return reply.code(204).send();
   });

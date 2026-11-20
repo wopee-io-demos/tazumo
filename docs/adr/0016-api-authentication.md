@@ -44,8 +44,9 @@ Alternatives considered:
     - SELECT and INSERT on `users`;
     - SELECT, INSERT and DELETE on `user_roles`;
     - INSERT only on `audit_events`.
-  - **Row-level security on `user_roles`:** `tazumo_api` cannot insert or delete `admin` grants, so even SQL injection in the runtime cannot create an admin.
-  - **Migration preconditions:** the migration needs a schema owner with CREATEROLE (or a pre-created `tazumo_api` role). It refuses an existing `tazumo_api` role that has LOGIN, SUPERUSER, BYPASSRLS, CREATEROLE or CREATEDB. Roles are cluster-wide, so use one cluster per environment, or `REVOKE CONNECT ON DATABASE ... FROM PUBLIC` and grant CONNECT per environment's login role. Revoking `TEMP` from PUBLIC is also recommended.
+  - **Row-level security on `user_roles`:** `tazumo_api` may insert only `customer`, `merchant_staff` and `support` grants, and delete only the latter two. Even SQL injection in the runtime therefore cannot create an admin or courier grant.
+  - **Side effect:** any future non-owner role with SELECT on `user_roles` (for example reporting) sees no rows unless it gets its own policy.
+  - **Migration preconditions:** the migration needs a schema owner with CREATEROLE (or a pre-created `tazumo_api` role). It refuses an existing `tazumo_api` role that has LOGIN, SUPERUSER, BYPASSRLS, CREATEROLE, CREATEDB or REPLICATION, or that is a member of any other role. Roles are cluster-wide, so use one cluster per environment, or `REVOKE CONNECT ON DATABASE ... FROM PUBLIC` and grant CONNECT per environment's login role. Revoking `TEMP` from PUBLIC is also recommended.
   - **Production deployment:** run the server as a login member of `tazumo_api`, and run migrations and seed as the schema owner. That role cannot update, delete, truncate or read the audit log, disable its triggers or drop it (all covered by tests). The owner still can, and the down migration drops the table, so owner credentials must stay out of the runtime.
 
 ### Authorization

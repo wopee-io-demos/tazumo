@@ -28,6 +28,14 @@
   - An existing `tazumo_api` role with unsafe attributes is refused, and the CREATEROLE and per-cluster preconditions are documented.
   - ADR-0017 corrected: hyperscaler exposure, `at+jwt` row, pseudonymisation wording.
   - Nits: row-level security on admin grants, admin re-check in the transaction, deny logging, concurrency test, a meaningful flood/JWKS test, independent admin tests, guarded down migration, 429 on every BearerAuth operation.
+- [x] Re-review on 813e289: 17 of 23 findings resolved. Then fixed:
+  - Hop-count `TRUST_PROXY` (direct clients could choose their own key) is replaced by an IP/CIDR list only, and non-IP values share one key.
+  - A full limiter table now sends new keys to an overflow bucket (10x the limit) instead of locking everyone out; the remaining risk is documented.
+  - The `tazumo_api` safety check also covers REPLICATION and role memberships.
+  - Row-level security allows inserting only `customer`, `merchant_staff` and `support`.
+  - UUID `pattern` added to the contract parameters.
+  - In-transaction denials are logged.
+  - ADR-0017 re-identification wording corrected.
 - [ ] Current-head CI green (record run URLs).
 - [ ] Merge and record the merge SHA on #56.
 

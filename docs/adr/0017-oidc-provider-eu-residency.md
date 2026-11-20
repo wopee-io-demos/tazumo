@@ -44,7 +44,7 @@ Every option uses the same erasure pattern on Tazumo's side:
 
 The row is then pseudonymous, not anonymous. It is still personal data under GDPR (Art. 4(5), Recital 26), because `users.id` links audit rows, request IDs and, later, orders. Keeping it with the audit trail relies on the Art. 17(3) exemptions (legal obligation, or establishing and defending legal claims), and that basis must be documented.
 
-Logs carry an HMAC of issuer and subject (ADR-0016). Once the provider account is deleted, that tag can no longer be linked back to a person. Rotating `AUTH_LOG_SALT` on a schedule, and expiring logs by retention, limits re-identification while backups still hold the account.
+Logs carry an HMAC of issuer and subject (ADR-0016). That tag can be linked back to a person until both the provider account and Tazumo's own backups holding the subject have expired. Request IDs in log lines also link to `audit_events`, and through it to the pseudonymous `users.id`. Rotating `AUTH_LOG_SALT` on a schedule, and expiring logs by retention, limits re-identification while backups still hold the account.
 
 What differs per provider:
 

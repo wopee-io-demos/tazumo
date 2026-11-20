@@ -25,9 +25,11 @@ test('limiter memory is bounded and a full table never frees a blocked key', () 
   now = 100;
   assert.deepEqual(limiter.hit('a'), { allowed: true });
   assert.deepEqual(limiter.hit('b'), { allowed: true });
-  assert.deepEqual(limiter.hit('c'), { allowed: false, retryAfterSeconds: 1 }, 'new keys fail closed while the table is full');
+  assert.deepEqual(limiter.hit('c'), { allowed: true }, 'new keys share the overflow bucket while the table is full');
   assert.equal(limiter.size, 3);
   assert.equal(limiter.hit('x').allowed, false, 'blocked key stays blocked');
+  for (let i = 0; i < 9; i++) assert.equal(limiter.hit(`overflow-${i}`).allowed, true);
+  assert.deepEqual(limiter.hit('overflow-last'), { allowed: false, retryAfterSeconds: 1 }, 'overflow bucket allows 10x the limit');
   now = 1_000;
   assert.deepEqual(limiter.hit('c'), { allowed: true }, 'expired windows are swept');
   assert.ok(limiter.size <= 3);
@@ -52,6 +54,7 @@ test('client keys group IPv6 by /64 and unwrap IPv4-mapped addresses', () => {
   assert.equal(clientKey('2001:db8::1'), '2001:0db8:0000:0000::/64');
   assert.equal(clientKey('::ffff:203.0.113.9'), '203.0.113.9');
   assert.equal(clientKey('203.0.113.9'), '203.0.113.9');
+  assert.equal(clientKey('not-an-ip'), clientKey('also-not-an-ip'), 'non-IP values share one key');
 });
 
 describe('rate limits on authenticated routes', () => {
