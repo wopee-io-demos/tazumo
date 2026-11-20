@@ -14,11 +14,12 @@ test('cart quantity and transparent no-checkout policy',async({page})=>{
   await page.goto('/');
   await page.getByRole('button',{name:'Add Margherita pizza to cart'}).click();
   await page.getByRole('button',{name:/View cart, 1 items/}).click();
-  await expect(page.getByRole('dialog')).toBeVisible();
-  await expect(page.getByText('€11.90')).toBeVisible();
-  await expect(page.getByRole('button',{name:'Checkout coming later'})).toBeDisabled();
-  await page.getByRole('button',{name:'Remove one Margherita pizza'}).click();
-  await expect(page.getByText('Your basket is empty.')).toBeVisible();
+  const dialog=page.getByRole('dialog');
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByText('€11.90').first()).toBeVisible();
+  await expect(dialog.getByRole('button',{name:'Checkout coming later'})).toBeDisabled();
+  await dialog.getByRole('button',{name:'Remove one Margherita pizza'}).click();
+  await expect(dialog.getByText('Your basket is empty.')).toBeVisible();
 });
 test('palette independent from catalogue',async({page})=>{
   await page.goto('/');
