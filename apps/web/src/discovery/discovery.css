@@ -5,7 +5,7 @@
 .merchantList{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px}
 .merchantCard{display:flex;gap:14px;align-items:flex-start;padding:18px;border-radius:20px;border:1px solid color-mix(in srgb,var(--ink) 14%,transparent);background:var(--tint)}
 .merchantCard:has(a:focus-visible){outline:3px solid var(--ink);outline-offset:3px}
-.merchantCard h3{font-size:18px;margin:0 0 6px}
+.merchantCard .merchantName{font-family:'Plus Jakarta Sans',sans-serif;font-size:18px;font-weight:700;margin:0 0 6px}
 .merchantCard p{margin:4px 0;font-size:14px;line-height:1.4}
 .merchantEmoji{font-size:38px;line-height:1}
 .merchantMeta{font-weight:700}
