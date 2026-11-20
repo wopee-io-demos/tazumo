@@ -153,7 +153,7 @@ export function priceBreakdown(market: MarketConfig, order: OrderInput): PriceBr
     throw new CommerceRuleError('empty_order', 'An order needs at least one line');
   }
   if (order.lines.length > MAX_LINES) {
-    throw new CommerceRuleError('invalid_line', `An order may have at most ${MAX_LINES} lines`, { lines: order.lines.length });
+    throw new CommerceRuleError('too_many_lines', `An order may have at most ${MAX_LINES} lines`, { lines: order.lines.length });
   }
   const fmt = (minor: number) => formatMinor(market, minor);
   const seen = new Set<string>();

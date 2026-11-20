@@ -56,5 +56,9 @@ The commerce package SHALL reject invalid input with a typed `CommerceRuleError`
 - THEN the breakdown throws `currency_mismatch`
 
 #### Scenario: Other invalid input
-- WHEN the order or a line is not an object, the order is empty or has more than 100 lines, `vatRateId` is not a string, the order repeats a line ID, uses an unknown VAT category or rate, has a negative or non-finite distance, lies beyond the last delivery band, or overflows the safe integer range
+- WHEN the order or a line is not an object, the order is empty, `vatRateId` is not a string, the order repeats a line ID, uses an unknown VAT category or rate, has a negative or non-finite distance, lies beyond the last delivery band, or overflows the safe integer range
 - THEN the breakdown throws `empty_order`, `invalid_line`, `duplicate_line`, `unknown_vat_category`, `unknown_vat_rate`, `invalid_distance`, `outside_delivery_area` or `amount_overflow`
+
+#### Scenario: Too many lines
+- WHEN an order has more than 100 lines
+- THEN the breakdown throws `too_many_lines`

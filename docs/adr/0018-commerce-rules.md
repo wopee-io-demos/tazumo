@@ -18,7 +18,7 @@ Checkout must show customers exactly what they pay and why: item subtotal, VAT p
 6. **Fees are synthetic and labelled so in data and output:** delivery fee = base + distance band (bands inclusive at the upper bound, beyond the last band → `outside_delivery_area`); small-order surcharge = the gap to a threshold, capped. Fees are taxed at the market's standard rate as a platform service.
 7. **Rounding:** CZK payable totals round half up to whole crowns (`payableIncrementMinor: 100`), shown as a separate `rounding` component that is not subject to VAT. Whole-crown amounts display without halers; amounts that are not whole crowns (VAT) keep two decimals. EUR is never rounded.
 8. **Transparency:** the result lists `components` in display order, each with an English explanation and a `synthetic` flag, always ending with `payable`. Components with `addsToPayable` sum to `payableMinor`; VAT contained in inclusive prices is shown but not added. `dataStatus` carries the re-verify flag, retrieval date and a notice for the UI.
-9. **Errors:** invalid input, including non-object input and more than 100 lines, throws `CommerceRuleError` with a stable `code` (`invalid_quantity`, `currency_mismatch`, `unknown_vat_rate`, …). The API maps client mistakes to 400/422 and server-data errors to 500 (see the OpenSpec design).
+9. **Errors:** invalid input, including non-object input and more than 100 lines (`too_many_lines`), throws `CommerceRuleError` with a stable `code` (`invalid_quantity`, `currency_mismatch`, `unknown_vat_rate`, …). The API maps client mistakes to 400/422 and server-data errors to 500 (see the OpenSpec design).
 
 ### VAT rates (research data, retrieved 2026-11-20, re-verify before real use)
 

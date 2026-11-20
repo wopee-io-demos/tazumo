@@ -216,10 +216,16 @@ export function assertValidMarket(market: MarketConfig): void {
     if (r.id !== id) problems.push(`rate key ${id} does not match its id`);
     if (!Number.isSafeInteger(r.basisPoints) || r.basisPoints < 0 || r.basisPoints > 10000) problems.push(`rate ${id} out of range`);
   }
+  const overrides: unknown = market.vat.categoryOverrides;
   for (const category of vatCategories) {
     if (!Object.hasOwn(market.vat.rates, market.vat.categoryDefaults[category])) problems.push(`category ${category} has no rate`);
-    for (const id of market.vat.categoryOverrides[category] ?? []) {
-      if (!Object.hasOwn(market.vat.rates, id)) problems.push(`category ${category} override ${id} is not defined`);
+    const list = typeof overrides === 'object' && overrides !== null ? (overrides as Record<string, unknown>)[category] : undefined;
+    if (!Array.isArray(list)) {
+      problems.push(`category ${category} needs an overrides array`);
+      continue;
+    }
+    for (const id of list) {
+      if (typeof id !== 'string' || !Object.hasOwn(market.vat.rates, id)) problems.push(`category ${category} override ${String(id)} is not defined`);
     }
   }
   if (typeof market.pricesIncludeVat !== 'boolean') problems.push('pricesIncludeVat must be a boolean');

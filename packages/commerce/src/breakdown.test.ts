@@ -227,7 +227,7 @@ test('unknown categories, rates, markets and malformed orders are rejected', () 
   rejects('outside_delivery_area', order([line('x', eur(100))], 7000.1));
   for (const code of ['PL', 'sk', '__proto__', 'toString', '']) rejects('unknown_market', () => getMarket(code));
   const tooMany = Array.from({ length: 101 }, (_, i) => line(`l${i}`, eur(100)));
-  rejects('invalid_line', order(tooMany));
+  rejects('too_many_lines', order(tooMany));
   assert.equal(priceBreakdown(markets.DE, { deliveryDistanceMeters: 0, lines: tooMany.slice(0, 100) }).lines.length, 100);
 });
 
@@ -266,4 +266,9 @@ test('an inconsistent market configuration is rejected', () => {
   }
   const badOverride: MarketConfig = { ...markets.DE, vat: { ...markets.DE.vat, categoryOverrides: { ...markets.DE.vat.categoryOverrides, food: ['zero'] } } };
   rejects('invalid_market_config', () => priceBreakdown(badOverride, { deliveryDistanceMeters: 0, lines: [line('x', eur(100))] }));
+  const { gifts: _omitted, ...partial } = markets.DE.vat.categoryOverrides;
+  for (const categoryOverrides of [undefined, partial, { ...markets.DE.vat.categoryOverrides, gifts: 'standard' }]) {
+    const cfg = { ...markets.DE, vat: { ...markets.DE.vat, categoryOverrides } } as unknown as MarketConfig;
+    rejects('invalid_market_config', () => priceBreakdown(cfg, { deliveryDistanceMeters: 0, lines: [line('x', eur(100), { vatCategory: 'gifts', vatRateId: 'reduced' })] }));
+  }
 });

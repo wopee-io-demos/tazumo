@@ -23,12 +23,12 @@ export function roundToIncrement(minor: number, increment: number): number {
   return toSafeNumber(divideRoundHalfUp(BigInt(minor), BigInt(increment)) * BigInt(increment), 'rounded amount');
 }
 
+const formatters = new Map<string, Intl.NumberFormat>();
+
 /**
  * Formats minor units for the market locale. With `wholeUnitDisplay` (CZK), whole-crown amounts are shown
  * without a fraction; amounts that are not whole crowns (such as VAT) keep two decimals so nothing is hidden.
  */
-const formatters = new Map<string, Intl.NumberFormat>();
-
 export function formatMinor(market: MarketConfig, minor: number): string {
   const digits = market.rounding.wholeUnitDisplay && minor % 100 === 0 ? 0 : 2;
   const key = `${market.locale}|${market.currency}|${digits}`;
