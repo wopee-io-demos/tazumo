@@ -1,6 +1,6 @@
 # Tazumo acceptance matrix for all Wopee demos
 
-Canonical source: `contracts/sut.json` v0.1.0. This is a **synthetic, non-transactional** marketplace SUT. Its real checkout and courier dispatch capabilities are disabled.
+Canonical source: `contracts/sut.json` v0.2.0. This is a **synthetic, non-transactional** marketplace SUT. Its real checkout and courier dispatch capabilities are disabled.
 
 | Lifecycle | mobile-agent | mobile-demo | web-demo | web-demo-pw-cli |
 | --- | --- | --- | --- | --- |

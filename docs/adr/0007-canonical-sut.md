@@ -15,7 +15,8 @@ The generic mobile-agent skills remain portable. The web-demo uses hosted Wopee 
 - No live commerce or delivery tracking is asserted.
 - Until a test backend/reset endpoint exists, isolate browser context/native app state between attempts.
 - A real web deployment and native app binaries are prerequisites for genuine end-to-end proofs.
-- CI checks for contract drift; release an updated contract when changing `sut-*` selectors. Update downstream cases together.
+- CI checks for contract drift in both apps and enforces semantic versioning against the base branch: removing or changing an ID is a major bump, adding one is minor (see [SUT-CONTRACT](../SUT-CONTRACT.md#versioning)). Update downstream cases together.
+- Concrete pizza-specific keys stay for readability; ID families are published as `selectorTemplates` with fixture placeholders, rather than enumerating every product (rejected: unbounded contract growth) or publishing prefixes only (rejected: prefix queries collide, e.g. `sut-merchant-list`).
 - Hosted browser dispatch cannot reach localhost without a tunnel/hosting setup. Signed iOS App Store builds are separate from Simulator artifacts.
 
 Related issue #32 and OpenSpec `canonical-sut`.

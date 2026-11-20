@@ -1,15 +1,15 @@
-# Tazumo canonical SUT change
+# Change: Canonical cross-platform SUT contract
 
-Issue #32. Supply a stable test surface on web and native clients without coupling demo tests to CSS or localized visible labels.
+Issues: [#32](https://github.com/wopee-io-demos/tazumo/issues/32), [#53](https://github.com/wopee-io-demos/tazumo/issues/53), [#63](https://github.com/wopee-io-demos/tazumo/issues/63). ADRs: [0007](../../../docs/adr/0007-canonical-sut.md), [0008](../../../docs/adr/0008-self-hosted-ci-runners.md). Supersedes PR #33.
 
-## Requirements
-- Stable named UI automation identifiers for search, category, product, add-to-cart, cart, locale and palette on web and native platforms.
-- Shared fixture IDs and expected synthetic behavior. Invalid or unavailable checkout actions are never represented as real transactions.
-- Changes to identifier contract must bump schema version and update four demo repositories.
+## Why
+The Wopee demo repositories (web-demo, web-demo-pw-cli, mobile-demo) need one stable, versioned test surface on web and native that does not depend on CSS, rendered order or localized labels.
 
-## Acceptance
-- [x] Declare v0.1 SUT contract and stable selectors.
-- [x] Expose matching identifiers in web and native React clients.
-- [x] Add web E2E assertion for canonical selectors.
-- [ ] Confirm latest GitHub Actions build/tests green and install native build on devices.
-- [ ] Cross-repository integration and end-to-end live demo runs.
+## What changes
+- `contracts/sut.json` v0.2.0: fixtures, web and native `selectors`, `selectorTemplates` with fixture placeholders, web hash `routes`, journeys with `platforms`, capability boundaries (checkout and tracking not real).
+- Stable `sut-*` IDs on the web (#33 IDs plus #50 discovery IDs) and native (#33 IDs plus #45 detail/cart screen IDs).
+- `scripts/check-sut-contract.mjs` (`pnpm check:sut`) scans every source file of both apps and enforces semantic versioning against the base branch in CI.
+- Contract unit tests (`tests/contract/sut-contract.test.mts`) and a Chromium journey on contract selectors only (`tests/e2e/sut-contract.spec.ts`).
+
+## Out of scope
+Appium runs against native IDs, a deployed web instance, a fixture reset endpoint, and edits to downstream repositories.

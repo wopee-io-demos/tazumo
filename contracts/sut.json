@@ -86,13 +86,38 @@
       "languageEnglish": "sut-language-en",
       "languageCzech": "sut-language-cs",
       "categoryGroceries": "sut-category-groceries",
-      "checkoutDisabled": "sut-checkout-disabled"
+      "checkoutDisabled": "sut-checkout-disabled",
+      "openProductPizza": "sut-open-product-pizza",
+      "cartScreenOpen": "sut-cart-screen-open",
+      "navBack": "sut-nav-back",
+      "navCart": "sut-nav-cart",
+      "detailScreen": "sut-detail-screen",
+      "detailTitle": "sut-detail-title",
+      "detailPrice": "sut-detail-price",
+      "detailAdd": "sut-detail-add",
+      "detailQuantity": "sut-detail-quantity",
+      "cartScreen": "sut-cart-screen",
+      "cartEmpty": "sut-cart-empty",
+      "cartLinePizza": "sut-cart-line-pizza",
+      "cartIncreasePizza": "sut-cart-increase-pizza",
+      "cartDecreasePizza": "sut-cart-decrease-pizza",
+      "cartRemovePizza": "sut-cart-remove-pizza",
+      "cartQuantityPizza": "sut-cart-quantity-pizza",
+      "cartSubtotal": "sut-cart-subtotal",
+      "cartPrototypeNote": "sut-cart-prototype-note",
+      "cartCheckoutDisabled": "sut-cart-checkout-disabled"
     },
     "selectorTemplates": {
       "product": "sut-product-{productId}",
       "add": "sut-add-{productId}",
+      "openProduct": "sut-open-product-{productId}",
       "category": "sut-category-{category}",
-      "language": "sut-language-{language}"
+      "language": "sut-language-{language}",
+      "cartLine": "sut-cart-line-{productId}",
+      "cartIncrease": "sut-cart-increase-{productId}",
+      "cartDecrease": "sut-cart-decrease-{productId}",
+      "cartRemove": "sut-cart-remove-{productId}",
+      "cartQuantity": "sut-cart-quantity-{productId}"
     },
     "locatorStrategies": {
       "ios": "accessibility id",
@@ -195,6 +220,22 @@
         "open cart",
         "remove Margherita pizza",
         "assert empty cart"
+      ]
+    },
+    {
+      "id": "native-detail-cart",
+      "platforms": [
+        "ios",
+        "android"
+      ],
+      "steps": [
+        "open Margherita pizza detail",
+        "add to cart",
+        "open cart screen",
+        "increase quantity",
+        "decrease quantity",
+        "remove Margherita pizza",
+        "assert empty cart and checkout disabled"
       ]
     }
   ],

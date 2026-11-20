@@ -35,7 +35,7 @@ export async function loadRepo(){
 export function checkRepo({contract,core,sources}){
   const errors=[...checkSelectors(contract,sources,core),...checkRoutes(contract,sources,core),...checkFixtures(contract,core)];
   const native=sources.native.map(s=>s.text).join('\n');
-  for(const id of ['sut-checkout-disabled'])
+  for(const id of ['sut-checkout-disabled','sut-cart-checkout-disabled'])
     if(!new RegExp(`testID="${id}"[^>]*disabled=\\{true\\}`).test(native))errors.push(`native ${id} must be a genuinely disabled control`);
   if(!/data-testid="sut-checkout-disabled"[^>]*\bdisabled\b/.test(sources.web.map(s=>s.text).join('\n')))errors.push('web sut-checkout-disabled must be a disabled button');
   return errors;
