@@ -1,117 +1,119 @@
 #!/usr/bin/env node
-// Runs one mobile-agent case (tap/type/see/absent) against a local Appium server via the W3C WebDriver API.
+// Android executor for the mobile-agent case format over Appium's W3C WebDriver API.
+// Mirrors mobile-agent skills/wopee-mobile-run/scripts/native.py (validation, step semantics, report.json shape) and
+// additionally saves a screenshot and UI tree after every step.
 // Usage: node run-case.mjs <case.json> <outDir> [--expect-fail]
 import {readFileSync,writeFileSync,mkdirSync} from 'node:fs';
 import {join} from 'node:path';
 
-const args=process.argv.slice(2);
-const [casePath,outDir]=args.filter(a=>!a.startsWith('--'));
-const expectFail=args.includes('--expect-fail');
-const platform='android';
-const server=process.env.APPIUM_URL??'http://127.0.0.1:4723';
-const stepTimeout=Number(process.env.STEP_TIMEOUT_MS??30000);
-const firstStepTimeout=Number(process.env.FIRST_STEP_TIMEOUT_MS??90000);
-if(!casePath||!outDir){console.error('usage: run-case.mjs <case.json> <outDir> [--expect-fail]');process.exit(2)}
+const ELEMENT='element-6066-11e4-a52e-4f735466cecf';
+const STRATEGIES=new Set(['id','accessibility id','class name','xpath']);
+const ACTIONS=new Set(['tap','type','see','absent','dismiss']);
 
-const testCase=JSON.parse(readFileSync(casePath,'utf8'));
-const target=testCase.platforms?.[platform];
-if(!target?.app||!Array.isArray(target.steps)||target.steps.length===0)throw new Error(`case ${testCase.id} has no ${platform} steps`);
-mkdirSync(outDir,{recursive:true});
+export class ExpectationError extends Error {}
 
-const W3C_ELEMENT='element-6066-11e4-a52f-4ce19ad4dfda';
-async function call(method,path,body){
- const res=await fetch(server+path,{method,headers:{'content-type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});
- const json=await res.json().catch(()=>({}));
- if(!res.ok)throw Object.assign(new Error(json.value?.message??`${method} ${path} -> ${res.status}`),{status:res.status,error:json.value?.error});
- return json.value;
+export function validate(testCase,platform='android'){
+ const spec=testCase.platforms?.[platform];
+ if(!spec)throw new Error(`No ${platform} platform in case`);
+ for(const value of [testCase.id,testCase.intent,spec.app])if(typeof value!=='string'||!value.trim())throw new Error('Case id, intent and app must be non-empty strings');
+ const steps=spec.steps;
+ if(!Array.isArray(steps)||steps.length===0||!['see','absent'].includes(steps.at(-1).action))throw new Error('End the case with an observable assertion');
+ for(const step of steps){
+  if(!ACTIONS.has(step.action))throw new Error(`Unsupported action: ${step.action}`);
+  if(!STRATEGIES.has(step.by)||!step.value)throw new Error('Expected a locator strategy and non-empty value');
+  if(step.action==='type'&&typeof step.text!=='string')throw new Error('Typing requires text');
+ }
+ return spec;
 }
+
+export function client(server){
+ return async function call(method,path,body){
+  const res=await fetch(server.replace(/\/$/,'')+path,{method,headers:{'content-type':'application/json'},body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(180000)});
+  const text=await res.text();
+  if(!res.ok){
+   if(text.includes('stale element reference')&&method==='GET'&&path.endsWith('/displayed'))return false;
+   throw new Error(`Appium HTTP ${res.status}: ${text.slice(0,600)}`);
+  }
+  return JSON.parse(text).value;
+ };
+}
+
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 
-const capabilities={
- platformName:'Android',
- 'appium:automationName':'UiAutomator2',
- 'appium:appPackage':target.app,
- 'appium:appActivity':process.env.APP_ACTIVITY??'.MainActivity',
- 'appium:noReset':true,
- 'appium:forceAppLaunch':true,
- 'appium:autoGrantPermissions':true,
- 'appium:newCommandTimeout':300,
- 'appium:uiautomator2ServerLaunchTimeout':120000,
- 'appium:uiautomator2ServerInstallTimeout':120000,
- 'appium:adbExecTimeout':120000
-};
-
-let session;
-const sid=()=>`/session/${session}`;
-
-function locators(step){
- if(step.by==='id')return [['id',step.value],['xpath',`//*[@resource-id="${step.value}"]`]];
- return [[step.by,step.value]];
-}
-
-async function findOnce(step){
- for(const [using,value] of locators(step)){
-  try{const el=await call('POST',`${sid()}/element`,{using,value});return {id:el[W3C_ELEMENT]??el.ELEMENT,matchedBy:using}}
-  catch(e){if(e.error!=='no such element')throw e}
- }
- return null;
-}
-
-async function find(step,timeout){
+export async function perform(step,call,timeout){
  const end=Date.now()+timeout;
  while(true){
-  const found=await findOnce(step);
-  if(found&&await call('GET',`${sid()}/element/${found.id}/displayed`))return found;
-  if(Date.now()>end)return null;
-  await sleep(500);
+  const matches=await call('POST','/elements',{using:step.by,value:step.value});
+  const visible=[];
+  for(const match of matches){
+   const element='/element/'+encodeURIComponent(match[ELEMENT]);
+   if(await call('GET',element+'/displayed'))visible.push(element);
+  }
+  if(step.action==='absent'&&visible.length===0)return;
+  if(step.action!=='absent'&&visible.length>0){
+   if(visible.length!==1)throw new ExpectationError(`Ambiguous locator: ${step.value}`);
+   if(step.action==='tap'||step.action==='dismiss')await call('POST',visible[0]+'/click',{});
+   else if(step.action==='type'){await call('POST',visible[0]+'/clear',{});await call('POST',visible[0]+'/value',{text:step.text})}
+   return;
+  }
+  if(step.action==='dismiss')return;
+  if(Date.now()>=end)throw new ExpectationError(`Expected ${step.action}: ${step.value}`);
+  await sleep(350);
  }
 }
 
-async function capture(name){
+export async function execute(testCase,call,folder,{timeout=15000,firstTimeout=timeout,extra={}}={}){
+ const spec=validate(testCase);
+ const report={case:testCase.id,platform:'android',app:spec.app,wopee:testCase.wopee??null,steps:[],outcome:'infrastructure-failed'};
+ mkdirSync(folder,{recursive:true});
+ let session;
+ const capture=async name=>{
+  for(const [path,file,write] of [['/source',`${name}.xml`,v=>v],['/screenshot',`${name}.png`,v=>Buffer.from(v,'base64')]]){
+   try{writeFileSync(join(folder,file),write(await call('GET',session+path)))}
+   catch(e){(report.evidenceErrors??=[]).push(e.message)}
+  }
+ };
  try{
-  writeFileSync(join(outDir,`${name}.png`),Buffer.from(await call('GET',`${sid()}/screenshot`),'base64'));
-  writeFileSync(join(outDir,`${name}.xml`),await call('GET',`${sid()}/source`));
- }catch(e){console.error(`capture ${name} failed: ${e.message}`)}
-}
-
-const report={case:testCase.id,intent:testCase.intent,platform,app:target.app,expectFail,startedAt:new Date().toISOString(),steps:[],status:'failed'};
-let failure;
-try{
- session=(await call('POST','/session',{capabilities:{alwaysMatch:capabilities,firstMatch:[{}]}})).sessionId;
- for(const [i,step] of target.steps.entries()){
-  const started=Date.now(),entry={index:i+1,...step,status:'failed'};
-  report.steps.push(entry);
-  const label=`${String(i+1).padStart(2,'0')}-${step.action}`;
-  try{
-   const timeout=i===0?firstStepTimeout:stepTimeout;
-   if(step.action==='absent'){
-    if(await find(step,Math.min(timeout,5000)))throw new Error(`expected absent: ${step.by}=${step.value}`);
-   }else{
-    const el=await find(step,timeout);
-    if(!el)throw new Error(`not found within ${timeout} ms: ${step.by}=${step.value}`);
-    entry.matchedBy=el.matchedBy;
-    if(step.action==='tap')await call('POST',`${sid()}/element/${el.id}/click`,{});
-    else if(step.action==='type')await call('POST',`${sid()}/element/${el.id}/value`,{text:String(step.text??'')});
-    else if(step.action!=='see')throw new Error(`unknown action ${step.action}`);
-    if(step.action!=='see')await sleep(700);
-   }
-   entry.status='passed';
-  }catch(e){entry.error=e.message;throw e}
-  finally{entry.ms=Date.now()-started;await capture(entry.status==='passed'?label:`${label}-failed`)}
+  if(!(await call('GET','/status'))?.ready)throw new Error('Appium server is not ready');
+  const caps={...extra,platformName:'android','appium:automationName':'UiAutomator2','appium:noReset':true,'appium:appPackage':spec.app};
+  session='/session/'+(await call('POST','/session',{capabilities:{alwaysMatch:caps}})).sessionId;
+  const device=(method,path,body)=>call(method,session+path,body);
+  for(const [i,step] of spec.steps.entries()){
+   report.currentStep=i+1;
+   await perform(step,device,i===0?firstTimeout:timeout);
+   report.steps.push({index:i+1,action:step.action,outcome:'completed'});
+   await capture(`${String(i+1).padStart(2,'0')}-${step.action}`);
+  }
+  report.outcome='passed';
+ }catch(e){
+  if(e instanceof ExpectationError)report.outcome='failed';
+  report.error=e.message;
+ }finally{
+  if(session){
+   await capture('final');
+   try{await call('DELETE',session)}catch(e){report.cleanupError=e.message}
+   if(report.outcome==='passed'&&(report.evidenceErrors||report.cleanupError))report.outcome='infrastructure-failed';
+  }
+  writeFileSync(join(folder,'report.json'),JSON.stringify(report,null,2)+'\n');
  }
- report.status='passed';
-}catch(e){failure=e;report.error=e.message}
-finally{
- if(session)await call('DELETE',sid()).catch(()=>{});
- report.finishedAt=new Date().toISOString();
- writeFileSync(join(outDir,'report.json'),JSON.stringify(report,null,2)+'\n');
+ return report;
 }
 
-for(const s of report.steps)console.log(`${s.status==='passed'?'PASS':'FAIL'} ${s.index} ${s.action} ${s.by}=${s.value}${s.matchedBy?` (matched by ${s.matchedBy})`:''}${s.error?` :: ${s.error}`:''}`);
-console.log(`case ${testCase.id}: ${report.status}${expectFail?' (expected to fail)':''}`);
-if(expectFail){
- const steps=report.steps,expected=steps.length===target.steps.length&&steps.at(-1).status==='failed'&&steps.slice(0,-1).every(s=>s.status==='passed');
- console.log(expected?'negative check: failed on the last step as expected':'negative check: did not fail as expected');
- process.exit(expected?0:1);
+if(import.meta.url===`file://${process.argv[1]}`){
+ const args=process.argv.slice(2),[casePath,outDir]=args.filter(a=>!a.startsWith('--')),expectFail=args.includes('--expect-fail');
+ if(!casePath||!outDir){console.error('usage: run-case.mjs <case.json> <outDir> [--expect-fail]');process.exit(2)}
+ const testCase=JSON.parse(readFileSync(casePath,'utf8'));
+ const report=await execute(testCase,client(process.env.APPIUM_URL??'http://127.0.0.1:4723'),outDir,{
+  timeout:Number(process.env.STEP_TIMEOUT_MS??15000),
+  firstTimeout:Number(process.env.FIRST_STEP_TIMEOUT_MS??90000),
+  extra:{'appium:appActivity':'.MainActivity','appium:forceAppLaunch':true,'appium:autoGrantPermissions':true,'appium:newCommandTimeout':300,'appium:uiautomator2ServerLaunchTimeout':120000,'appium:uiautomator2ServerInstallTimeout':120000,'appium:adbExecTimeout':120000}
+ });
+ console.log(`${report.outcome} ${join(outDir,'report.json')}${report.error?` :: ${report.error}`:''}`);
+ if(expectFail){
+  const steps=testCase.platforms.android.steps.length;
+  const ok=report.outcome==='failed'&&report.currentStep===steps&&report.steps.length===steps-1;
+  console.log(ok?'negative check: expectation failed on the last step as required':'negative check: did not fail as required');
+  process.exit(ok?0:1);
+ }
+ process.exit(report.outcome==='passed'?0:1);
 }
-process.exit(failure?1:0);

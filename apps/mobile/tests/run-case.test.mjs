@@ -6,73 +6,109 @@ import {readFileSync,readdirSync,mkdtempSync,existsSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {execute,validate} from './run-case.mjs';
 
 const here=fileURLToPath(new URL('.',import.meta.url));
-const runner=join(here,'run-case.mjs');
-const smokeCase=join(here,'android-smoke.case.json');
-const negativeCase=join(here,'android-smoke.negative.case.json');
+const load=f=>JSON.parse(readFileSync(join(here,f),'utf8'));
+const smoke=load('android-smoke.case.json'),negative=load('android-smoke.negative.case.json');
+const ELEMENT='element-6066-11e4-a52e-4f735466cecf';
+const tmp=()=>mkdtempSync(join(tmpdir(),'tazumo-case-'));
 
-function fakeAppium(visible){
+// In-memory Appium: `screen` maps "by=value" to element count; `onClick` mutates it.
+function fakeDevice(screen,{onClick=()=>{},fail}={}){
  const log=[];
+ const call=async(method,path,body)=>{
+  log.push(`${method} ${path}${body?.text?` ${body.text}`:''}`);
+  if(fail?.(method,path))throw new Error('Appium HTTP 500: instrumentation crashed');
+  if(path==='/status')return {ready:true};
+  if(method==='POST'&&path==='/session')return {sessionId:'s1'};
+  if(path.endsWith('/elements')){const key=`${body.using}=${body.value}`;return Array.from({length:screen.get(key)??0},(_,i)=>({[ELEMENT]:`${key}#${i}`}))}
+  if(path.endsWith('/displayed'))return true;
+  if(path.endsWith('/click'))onClick(decodeURIComponent(path.split('/element/')[1].replace('/click','')).split('#')[0],screen);
+  if(path.endsWith('/screenshot'))return Buffer.from('png').toString('base64');
+  if(path.endsWith('/source'))return '<hierarchy/>';
+  return null;
+ };
+ return {call,log};
+}
+const allPresent=testCase=>new Map(testCase.platforms.android.steps.map(s=>[`${s.by}=${s.value}`,1]));
+
+test('the shipped cases are valid mobile-agent cases',()=>{
+ assert.equal(validate(smoke).steps.at(-1).action,'see');
+ assert.equal(validate(negative).steps.length,2);
+ assert.throws(()=>validate({id:'x',intent:'y',platforms:{android:{app:'a',steps:[{action:'tap',by:'id',value:'b'}]}}}),/observable assertion/);
+});
+
+test('smoke case passes, clicks each tap target once and captures every step',async()=>{
+ const {call,log}=fakeDevice(allPresent(smoke)),out=tmp();
+ const report=await execute(smoke,call,out,{timeout:50});
+ assert.equal(report.outcome,'passed',report.error);
+ assert.equal(report.steps.length,smoke.platforms.android.steps.length);
+ assert.deepEqual(log.filter(l=>l.endsWith('/click')).map(l=>l.split('/element/')[1].split('%23')[0]),['id%3Dsut-open-product-pizza','id%3Dsut-detail-add','id%3Dsut-nav-cart']);
+ assert.ok(existsSync(join(out,'01-see.png'))&&existsSync(join(out,'final.xml')));
+ assert.ok(log.includes('DELETE /session/s1'));
+});
+
+test('a missing element is an expectation failure on that step',async()=>{
+ const {call}=fakeDevice(new Map([['id=sut-open-product-pizza',1]]));
+ const report=await execute(negative,call,tmp(),{timeout:50});
+ assert.equal(report.outcome,'failed');
+ assert.equal(report.currentStep,2);
+ assert.match(report.error,/Expected see: sut-does-not-exist/);
+});
+
+test('ambiguous locators fail and infrastructure errors are not expectation failures',async()=>{
+ const ambiguous=await execute(negative,fakeDevice(new Map([['id=sut-open-product-pizza',2]])).call,tmp(),{timeout:50});
+ assert.equal(ambiguous.outcome,'failed');
+ assert.match(ambiguous.error,/Ambiguous/);
+ const crash=await execute(negative,fakeDevice(allPresent(negative),{fail:(m,p)=>p.endsWith('/elements')}).call,tmp(),{timeout:50});
+ assert.equal(crash.outcome,'infrastructure-failed');
+});
+
+test('absent waits for a disappearing element and type clears then sends text',async()=>{
+ const testCase={id:'t',intent:'i',platforms:{android:{app:'a',steps:[
+  {action:'type',by:'id',value:'sut-search',text:'Piazza'},
+  {action:'tap',by:'id',value:'sut-close'},
+  {action:'absent',by:'id',value:'sut-sheet'}]}}};
+ const screen=new Map([['id=sut-search',1],['id=sut-close',1],['id=sut-sheet',1]]);
+ const {call,log}=fakeDevice(screen,{onClick:()=>setTimeout(()=>screen.delete('id=sut-sheet'),400)});
+ const report=await execute(testCase,call,tmp(),{timeout:2000});
+ assert.equal(report.outcome,'passed',report.error);
+ assert.ok(log.some(l=>l.endsWith('/clear'))&&log.some(l=>l.endsWith('/value Piazza')));
+});
+
+test('CLI --expect-fail accepts only an expectation failure on the last step',async()=>{
+ const visible=new Set(['sut-open-product-pizza']);
  const server=createServer((req,res)=>{
   let body='';
   req.on('data',c=>body+=c);
   req.on('end',()=>{
-   log.push(`${req.method} ${req.url}`);
-   const send=(status,value)=>{res.writeHead(status,{'content-type':'application/json'});res.end(JSON.stringify({value}))};
-   if(req.method==='POST'&&req.url==='/session')return send(200,{sessionId:'s1',capabilities:{}});
-   if(req.url.endsWith('/element')){const {value}=JSON.parse(body);return visible.has(value)?send(200,{'element-6066-11e4-a52f-4ce19ad4dfda':value}):send(404,{error:'no such element',message:'not found'})}
-   if(req.url.endsWith('/displayed'))return send(200,true);
-   if(req.url.endsWith('/screenshot'))return send(200,Buffer.from('png').toString('base64'));
-   if(req.url.endsWith('/source'))return send(200,'<hierarchy/>');
-   send(200,null);
+   const send=v=>{res.writeHead(200,{'content-type':'application/json'});res.end(JSON.stringify({value:v}))};
+   if(req.url==='/status')return send({ready:true});
+   if(req.url==='/session')return send({sessionId:'s1'});
+   if(req.url.endsWith('/elements')){const {value}=JSON.parse(body);return send(visible.has(value)?[{[ELEMENT]:value}]:[])}
+   if(req.url.endsWith('/displayed'))return send(true);
+   if(req.url.endsWith('/screenshot'))return send('cG5n');
+   if(req.url.endsWith('/source'))return send('<hierarchy/>');
+   send(null);
   });
  });
- return new Promise(r=>server.listen(0,'127.0.0.1',()=>r({server,log,url:`http://127.0.0.1:${server.address().port}`})));
-}
-
-function run(url,casePath,...flags){
- const out=mkdtempSync(join(tmpdir(),'tazumo-case-'));
- const child=spawn(process.execPath,[runner,casePath,out,...flags],{env:{...process.env,APPIUM_URL:url,STEP_TIMEOUT_MS:'600',FIRST_STEP_TIMEOUT_MS:'600'}});
- let stdout='',stderr='';
- child.stdout.on('data',d=>stdout+=d);
- child.stderr.on('data',d=>stderr+=d);
- return new Promise(r=>child.on('close',status=>r({status,stdout,stderr,out,report:JSON.parse(readFileSync(join(out,'report.json'),'utf8'))})));
-}
-
-const caseValues=file=>JSON.parse(readFileSync(file,'utf8')).platforms.android.steps.map(s=>s.value);
-
-test('smoke case passes when every element is present and captures each step',async()=>{
- const values=caseValues(smokeCase),{server,log,url}=await fakeAppium(new Set(values));
+ await new Promise(r=>server.listen(0,'127.0.0.1',r));
+ const run=(file,...flags)=>new Promise(r=>{
+  const child=spawn(process.execPath,[join(here,'run-case.mjs'),join(here,file),tmp(),...flags],{env:{...process.env,APPIUM_URL:`http://127.0.0.1:${server.address().port}`,STEP_TIMEOUT_MS:'300',FIRST_STEP_TIMEOUT_MS:'300'}});
+  child.on('close',r);
+ });
  try{
-  const r=await run(url,smokeCase);
-  assert.equal(r.status,0,r.stdout+r.stderr);
-  assert.equal(r.report.status,'passed');
-  assert.equal(r.report.steps.length,values.length);
-  assert.ok(existsSync(join(r.out,'01-see.png'))&&existsSync(join(r.out,'01-see.xml')));
-  assert.ok(log.some(l=>l.startsWith('DELETE /session/s1')));
- }finally{server.close()}
-});
-
-test('a missing element fails the case, and --expect-fail accepts only that failure',async()=>{
- const {server,url}=await fakeAppium(new Set(['sut-open-product-pizza']));
- try{
-  const failed=await run(url,negativeCase);
-  assert.equal(failed.status,1);
-  assert.equal(failed.report.steps.at(-1).status,'failed');
-  assert.equal((await run(url,negativeCase,'--expect-fail')).status,0);
-  assert.equal((await run(url,smokeCase,'--expect-fail')).status,1,'failing on an early step is not the expected negative result');
+  assert.equal(await run('android-smoke.negative.case.json'),1);
+  assert.equal(await run('android-smoke.negative.case.json','--expect-fail'),0);
+  assert.equal(await run('android-smoke.case.json','--expect-fail'),1,'failing before the last step is not the expected negative result');
  }finally{server.close()}
 });
 
 test('every sut- identifier in the cases exists in the app source',()=>{
  const src=join(here,'..','src');
  const source=['App.tsx',...readdirSync(join(src,'screens')).map(f=>join('screens',f))].map(f=>readFileSync(join(src,f),'utf8')).join('\n');
- const ids=caseValues(smokeCase).flatMap(v=>v.match(/sut-[a-z0-9-]+/g)??[]);
+ const ids=smoke.platforms.android.steps.flatMap(s=>s.value.match(/sut-[a-z0-9-]+/g)??[]);
  assert.ok(ids.length>=8);
- for(const id of ids){
-  const literal=source.includes(id);
-  const templated=/-pizza$/.test(id)&&source.includes(id.replace(/pizza$/,'${p.id}'));
-  assert.ok(literal||templated,`missing ${id}`);
- }
+ for(const id of ids)assert.ok(source.includes(id)||source.includes(id.replace(/-pizza$/,'-${p.id}')),`missing ${id}`);
 });

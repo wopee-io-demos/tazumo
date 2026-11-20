@@ -10,7 +10,14 @@ CI built only an Android debug APK. That APK needs a Metro server, and nothing l
   - builds a release-variant x86_64 APK (debug keystore, JavaScript embedded);
   - boots an API 34 emulator through `reactivecircus/android-emulator-runner`;
   - installs the APK, starts Appium 3.9.0 with UiAutomator2 8.7.3 and runs `apps/mobile/tests/android-smoke.case.json`.
-- `apps/mobile/tests/run-case.mjs`: a dependency-free W3C WebDriver runner for the mobile-agent case format (`tap`, `type`, `see`, `absent`). It captures a screenshot and the UiAutomator XML after every step and writes `report.json`.
+- `apps/mobile/tests/run-case.mjs`: a dependency-free W3C WebDriver executor for the mobile-agent case format. It mirrors mobile-agent `skills/wopee-mobile-run/scripts/native.py`:
+  - the same validation;
+  - `/elements` with ambiguity rejection;
+  - `absent` polls until the element is gone;
+  - stale `displayed` counts as false;
+  - the same `report.json` shape, with `outcome` of `passed`, `failed` or `infrastructure-failed`.
+
+  It also captures a screenshot and the UiAutomator XML after every step. mobile-agent is private, so this public repo's pull-request CI cannot fetch `native.py` without a secret.
 - A negative case with a missing ID must fail on its last step (`--expect-fail`), so a runner that cannot fail is caught.
 - Unit tests run the runner against a fake WebDriver server and check that every case ID exists in the app source.
 
