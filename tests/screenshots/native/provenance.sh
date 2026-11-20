@@ -15,7 +15,7 @@ require('node:fs').writeFileSync(out,JSON.stringify({
   runner:`${env.RUNNER_OS??''} ${env.ImageOS??''} ${env.ImageVersion??''}`.trim(),
   device,os,build,
   fixtureData:'packages/core/src/index.ts products (synthetic, illustrative); cart = 2x Margherita pizza, 1x Sourdough loaf, 1x Fresh flowers',
-  optimiser:sh('pngquant --version'),
+  optimiser:`pngquant ${sh('pngquant --version')}`,
   driver:`Maestro ${sh('maestro --version 2>/dev/null | tail -1')} for taps; screenshots taken by the platform tool`,
   capturedAt:new Date().toISOString().replace(/\.\d+Z$/,'Z')
 },null,2)+'\n');

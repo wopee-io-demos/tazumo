@@ -57,7 +57,23 @@ SUT reference imagery captured from the real app. These are not Wopee or Appium 
 
 ### iOS and Android
 
-Not captured yet. Native screenshots from an iOS simulator and an Android emulator are tracked in [#37](https://github.com/wopee-io-demos/tazumo/issues/37).
+| | iOS simulator | Android emulator |
+| --- | --- | --- |
+| Catalogue | <img src="docs/screenshots/ios/catalogue.png" width="240" alt="iOS app catalogue: header, hero, category pills and first products"> | <img src="docs/screenshots/android/catalogue.png" width="240" alt="Android app catalogue: header, hero, category pills and first products"> |
+| Cart with items | <img src="docs/screenshots/ios/cart.png" width="240" alt="iOS basket summary: 2x Margherita pizza, Sourdough loaf, Fresh flowers, subtotal 46.20 euro, checkout disabled"> | <img src="docs/screenshots/android/cart.png" width="240" alt="Android basket summary with the same four items and subtotal 46.20 euro"> |
+
+| Provenance | iOS | Android |
+| --- | --- | --- |
+| Workflow run | [SUT screenshots #44811016593](https://github.com/wopee-io-demos/tazumo/actions/runs/44811016593) | same run |
+| SUT commit | [`3354ab6`](https://github.com/wopee-io-demos/tazumo/commit/3354ab63930c56ff8fb138e55c1682c54029a04c) (last change to `apps/mobile`, `packages`, workspace config) | same |
+| Capture commit | `e7c1390` (PR head of [#57](https://github.com/wopee-io-demos/tazumo/pull/57)) | same |
+| Build | Release `iphonesimulator` build with the JS bundle embedded, unsigned | Release-variant APK with the JS bundle embedded, signed with the debug keystore, x86_64 |
+| Device | iPhone 16 Pro simulator, iOS 26.2, Xcode 16.4, hosted `macos-15` | `sdk_gphone64_x86_64` emulator, Android 14 (API 34), hosted `ubuntu-latest` with KVM |
+| Capture | `xcrun simctl io screenshot`; taps by Maestro 1.41.0 | `adb exec-out screencap -p`; taps by Maestro 1.41.0 |
+| Fixture data | Same synthetic catalogue and cart as the web gallery | same |
+| Captured | 2026-11-20 ([`provenance.json`](docs/screenshots/ios/provenance.json)) | 2026-11-20 ([`provenance.json`](docs/screenshots/android/provenance.json)) |
+
+The PNGs are the exact files from the run's `tazumo-screenshots-ios` and `tazumo-screenshots-android` artifacts, optimised in CI with pngquant. Regenerate them by running the [SUT screenshots workflow](.github/workflows/screenshots.yml) (`workflow_dispatch`, or any PR touching `apps/mobile/**`, `packages/**` or the capture files), then `gh run download <run-id> -n tazumo-screenshots-ios -n tazumo-screenshots-android` into `docs/screenshots/`. Release builds are used because debug builds need a running Metro dev server.
 
 ## Delivery governance
 [GitHub Issues backlog](https://github.com/wopee-io-demos/tazumo/issues) is the operational tracker. Changes require issue, OpenSpec and, when relevant, ADR. Read [PR quality and merge policy](docs/PR-QUALITY.md).
