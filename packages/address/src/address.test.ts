@@ -71,5 +71,15 @@ test('unknown fields, wrong types and control characters are rejected', () => {
   assert.deepEqual(validateAddress('DE', { ...valid.DE, postalCode: 10115 }), { ok: false, errors: [{ path: 'postalCode', code: 'invalid_type' }] });
   assert.deepEqual(validateAddress('DE', { ...valid.DE, addressLine1: 'Erfundene\u0000Straße' }), { ok: false, errors: [{ path: 'addressLine1', code: 'invalid_characters' }] });
   for (const input of [null, 'Fiktívna 7', [valid.DE]]) assert.deepEqual(validateAddress('DE', input), { ok: false, errors: [{ path: '', code: 'invalid_type' }] });
-  assert.equal(validateAddress('DE', { ...valid.DE, instructions: 'Hinterhof\nzweiter Stock' }).ok, true);
+  assert.equal(validateAddress('DE', { ...valid.DE, instructions: 'Hinterhof\n\tzweiter Stock\r\n' }).ok, true);
+  for (const instructions of ['a\u0000b', 'a\u001b[31mb', 'a\u0085b', 'a\u202eb']) {
+    assert.deepEqual(validateAddress('DE', { ...valid.DE, instructions }), { ok: false, errors: [{ path: 'instructions', code: 'invalid_characters' }] }, JSON.stringify(instructions));
+  }
+});
+
+test('zero-width and bidirectional formatting characters are rejected, so they cannot fake a non-blank field', () => {
+  for (const hidden of ['\u200b', '\u200d', '\u2060', '\ufeff', '\u202e', '\u2066']) {
+    assert.deepEqual(validateAddress('SK', { ...valid.SK, addressLine1: hidden }), { ok: false, errors: [{ path: 'addressLine1', code: 'invalid_characters' }] }, JSON.stringify(hidden));
+    assert.deepEqual(validateAddress('SK', { ...valid.SK, city: `Vymyslené${hidden}Mesto` }), { ok: false, errors: [{ path: 'city', code: 'invalid_characters' }] });
+  }
 });

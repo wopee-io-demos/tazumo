@@ -43,7 +43,9 @@ const postalPatterns: Readonly<Record<AddressMarket, RegExp>> = {
   AT: /^\d{4}$/,
 };
 
-const controlCharacters = /[\u0000-\u001f\u007f-\u009f]/;
+/** C0/C1 controls plus zero-width and bidirectional formatting characters. Instructions may contain tab and line breaks. */
+const forbiddenInLine = /[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2060-\u2069\ufeff]/;
+const forbiddenInInstructions = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2060-\u2069\ufeff]/;
 
 export const isAddressMarket = (value: unknown): value is AddressMarket =>
   typeof value === 'string' && (addressMarkets as readonly string[]).includes(value);
@@ -90,8 +92,8 @@ export function validateAddress(market: AddressMarket, input: unknown): AddressV
       continue;
     }
     if (typeof value !== 'string') errors.push({ path: field, code: 'invalid_type' });
+    else if ((field === 'instructions' ? forbiddenInInstructions : forbiddenInLine).test(value)) errors.push({ path: field, code: 'invalid_characters' });
     else if (required && !tidy(value)) errors.push({ path: field, code: 'required' });
-    else if (field !== 'instructions' && controlCharacters.test(value)) errors.push({ path: field, code: 'invalid_characters' });
   }
   if (errors.length) return { ok: false, errors };
 

@@ -22,23 +22,24 @@ test('redaction keeps only the country and the first two postal digits', () => {
   assert.equal(redactAddress(null), '-- ***');
 });
 
-test('property: redaction output never contains the street, house number, city or instructions', () => {
+test('property: redaction depends only on country and postal code, never on street, house number, city or instructions', () => {
   const random = prng(94);
   for (let i = 0; i < 2_000; i++) {
-    const street = `${pick(random, letters, 4 + Math.floor(random() * 20)).trim() || 'ulica'}`;
-    const house = `${100 + Math.floor(random() * 9_900)}${random() < 0.3 ? '/' + Math.floor(random() * 99) : ''}`;
+    const street = pick(random, 'abcdefghijklmnopqrstuvwxyzáäčďéíĺľňóôŕšťúýžěřůßöü', 4 + Math.floor(random() * 20));
+    const house = `${1 + Math.floor(random() * 9_999)}${random() < 0.3 ? '/' + Math.floor(random() * 99) : ''}`;
+    const market = (['SK', 'CZ', 'DE', 'AT'] as const)[i % 4];
+    const postalCode = String(Math.floor(random() * 100_000)).padStart(5, '0').slice(0, market === 'AT' ? 4 : 5);
     const address: DeliveryAddress = {
-      countryCode: ['SK', 'CZ', 'DE', 'AT'][i % 4],
-      postalCode: String(Math.floor(random() * 100_000)).padStart(i % 4 === 3 ? 4 : 5, '0').slice(0, i % 4 === 3 ? 4 : 5),
+      countryCode: market,
+      postalCode,
       addressLine1: `${street} ${house}`,
-      addressLine2: pick(random, letters, 10),
+      addressLine2: `${pick(random, letters, 10)} ${house}`,
       city: pick(random, letters, 8),
-      instructions: pick(random, letters, 30),
+      instructions: `${house} ${pick(random, letters, 30)}`,
     };
     const out = redactAddress(address);
+    assert.equal(out, redactAddress({ countryCode: market, postalCode }));
     assert.match(out, /^[A-Z]{2} \d{2}\*{2,3}$/);
-    assert.ok(!out.toLowerCase().includes(street.toLowerCase()), out);
-    assert.ok(!out.includes(house), out);
-    assert.equal(out, redactAddress({ ...address, addressLine1: `${pick(random, letters, 12)} ${house}`, city: 'x', instructions: undefined }));
+    assert.ok(!out.toLowerCase().includes(street), out);
   }
 });

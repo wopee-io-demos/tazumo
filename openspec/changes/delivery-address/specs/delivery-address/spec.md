@@ -10,7 +10,7 @@ The system SHALL accept a delivery address only for a supported market (SK, CZ, 
 - THEN the result is `ok` with the normalized address, and diacritics are unchanged.
 
 #### Scenario: Invalid address
-- WHEN the postal code has the wrong format for the market, the country is unsupported or differs from the market, `city` or `addressLine1` is missing or blank, a field is over its length limit, a field is unknown or not a string, or a line contains control characters
+- WHEN the postal code has the wrong format for the market, the country is unsupported or differs from the market, `city` or `addressLine1` is missing or blank, a field is over its length limit, a field is unknown or not a string, or a field contains control characters, zero-width characters or bidirectional formatting characters (instructions may contain tab and line breaks)
 - THEN the result lists one error per problem, each with the field path and a code, and nothing is geocoded.
 
 ### Requirement: Idempotent normalization
@@ -21,7 +21,7 @@ The system SHALL normalize addresses by trimming and collapsing whitespace, appl
 - THEN they become `"SK"`, `"811 01"` and `"Fiktívna 7"`, and normalizing again changes nothing.
 
 ### Requirement: Provider-neutral geocoding
-The system SHALL resolve addresses through a `Geocoder` port that returns either a point with its precision or `not_found`. The fixture geocoder SHALL resolve only its fictional fixture addresses and SHALL return `not_found` for any other address, never a guess. Tests SHALL NOT call any network service.
+The system SHALL resolve addresses through a `Geocoder` port that returns a point with its precision, `not_found`, or `unavailable` for provider errors, which is never reported as `not_found`. The fixture geocoder, exported only from the `testing` entry point, SHALL resolve only its fictional fixture addresses and SHALL return `not_found` for any other address, never a guess. Tests SHALL NOT call any network service.
 
 #### Scenario: Fixture inside and outside a zone
 - WHEN the fictional SK "inside" and "outside" fixtures are resolved and checked against the synthetic merchant zone
