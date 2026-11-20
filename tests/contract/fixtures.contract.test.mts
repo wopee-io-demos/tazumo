@@ -1,34 +1,42 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {products,categories} from '../../packages/core/src/index.ts';
-import {createValidator,toApiProduct,toApiMerchants,fixtureUuid} from './openapi.mts';
+import {createValidator,toApiProduct,toApiMerchants,buildSeed} from './openapi.mts';
+
+const seed=buildSeed();
 
 const v=createValidator();
 const validateProduct=v.schema('Product');
 const validateMerchant=v.schema('Merchant');
 const validateProductsResponse=v.pointer('/paths/~1v1~1merchants~1%7BmerchantId%7D~1products/get/responses/200/content/application~1json/schema');
+const validateMarketsResponse=v.pointer('/paths/~1v1~1markets/get/responses/200/content/application~1json/schema');
 const validateMerchantsResponse=v.pointer('/paths/~1v1~1merchants/get/responses/200/content/application~1json/schema');
 const errors=(fn:{errors?:unknown})=>JSON.stringify(fn.errors,null,1);
 
 test('every synthetic product validates against the OpenAPI Product schema',()=>{
-  assert.ok(products.length>0);
-  for(const p of products){
-    const api=toApiProduct(p);
-    assert.ok(validateProduct(api),`${p.id}: ${errors(validateProduct)}`);
+  assert.equal(seed.products.length,products.length);
+  for(const fixture of products){
+    const row=seed.products.find(r=>r.slug===fixture.id);
+    assert.ok(row,`fixture ${fixture.id} missing from the API seed`);
+    const api=toApiProduct(row);
+    assert.ok(validateProduct(api),`${fixture.id}: ${errors(validateProduct)}`);
+    assert.equal(api.price.minorUnits,fixture.priceCents);
+    assert.equal(api.name,fixture.name);
   }
 });
 
 test('each merchant catalogue validates as its GET /v1/merchants/{merchantId}/products response',()=>{
-  const merchantIds=new Set(toApiMerchants(products).map(m=>m.id));
-  for(const merchant of new Set(products.map(p=>p.merchant))){
-    const body=products.filter(p=>p.merchant===merchant).map(p=>toApiProduct(p));
-    assert.ok(validateProductsResponse(body),`${merchant}: ${errors(validateProductsResponse)}`);
-    for(const product of body)assert.ok(merchantIds.has(product.merchantId),`${product.name} links to an unknown merchant`);
+  const merchantIds=new Set(seed.merchants.map(m=>m.id));
+  for(const merchant of seed.merchants){
+    const body=seed.products.filter(p=>p.merchantId===merchant.id).map(toApiProduct);
+    assert.ok(body.length>0,`${merchant.name} has no products`);
+    assert.ok(validateProductsResponse(body),`${merchant.name}: ${errors(validateProductsResponse)}`);
   }
+  for(const product of seed.products)assert.ok(merchantIds.has(product.merchantId),`${product.name} links to an unknown merchant`);
 });
 
 test('merchants derived from the fixtures validate and never claim live ordering or ETAs',()=>{
-  const merchants=toApiMerchants(products);
+  const merchants=toApiMerchants(seed);
   assert.equal(merchants.length,new Set(products.map(p=>p.merchant)).size);
   assert.ok(validateMerchantsResponse(merchants),errors(validateMerchantsResponse));
   for(const m of merchants){
@@ -38,13 +46,16 @@ test('merchants derived from the fixtures validate and never claim live ordering
   }
 });
 
-test('fixture identifiers are unique and project to stable unique UUIDs',()=>{
+test('fixture identifiers are unique and map to stable unique UUIDs and slugs',()=>{
   const ids=products.map(p=>p.id);
   assert.equal(new Set(ids).size,ids.length);
-  const uuids=products.map(p=>toApiProduct(p).id);
-  assert.equal(new Set(uuids).size,uuids.length);
-  assert.equal(fixtureUuid('product','pizza'),fixtureUuid('product','pizza'));
-  assert.notEqual(fixtureUuid('product','pizza'),fixtureUuid('merchant','pizza'));
+  assert.equal(new Set(seed.products.map(p=>p.id)).size,seed.products.length);
+  assert.equal(new Set(seed.merchants.map(m=>m.slug)).size,seed.merchants.length);
+  assert.deepEqual(buildSeed(),seed);
+});
+
+test('the demo market validates as a GET /v1/markets response',()=>{
+  assert.ok(validateMarketsResponse(seed.markets),errors(validateMarketsResponse));
 });
 
 test('fixture prices are whole minor units and categories are declared',()=>{
@@ -54,7 +65,7 @@ test('fixture prices are whole minor units and categories are declared',()=>{
   }
 });
 
-const valid=toApiProduct(products[0]);
+const valid=toApiProduct(seed.products[0]);
 const malformed:[string,unknown,string][]=[
   ['negative price',{...valid,price:{...valid.price,minorUnits:-1}},'minimum'],
   ['fractional minor units',{...valid,price:{...valid.price,minorUnits:11.9}},'type'],
@@ -72,8 +83,8 @@ for(const [label,body,keyword] of malformed){
   });
 }
 
-test('the projection does not hide a malformed core fixture',()=>{
-  const broken={...products[0],priceCents:-50};
+test('the projection does not hide a malformed seed row',()=>{
+  const broken={...seed.products[0],priceMinor:-50};
   assert.equal(validateProduct(toApiProduct(broken)),false);
-  assert.equal(validateProductsResponse([...products.map(p=>toApiProduct(p)),toApiProduct(broken)]),false);
+  assert.equal(validateProductsResponse([...seed.products.map(toApiProduct),toApiProduct(broken)]),false);
 });

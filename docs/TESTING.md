@@ -21,12 +21,12 @@ Playwright starts the Vite dev server itself. Locally it reuses a server already
 | Layer | Location | What it proves | Evidence class |
 | --- | --- | --- | --- |
 | Unit | `packages/core/src/*.test.ts` | Catalogue filtering, cart arithmetic, localization | fixture/unit |
-| Contract (projection conformance) | `tests/contract/` | The synthetic products and merchants in `@tazumo/core`, projected into API shape, fit the `Product`, `Merchant` and response schemas in `contracts/openapi.json`, and every product links to a merchant; malformed products are rejected | fixture/unit |
+| Contract (projection conformance) | `tests/contract/` | The synthetic catalogue in `@tazumo/core`, seeded with the API's `buildSeed()` and mapped to response shape, fits the `Market`, `Product`, `Merchant` and response schemas in `contracts/openapi.json`, and every product links to a merchant; malformed products are rejected | fixture/unit |
 | Browser E2E | `tests/e2e/marketplace.spec.ts`, `tests/e2e/regression.spec.ts` | Category, search, cart, palette and language journeys, plus failure scenarios | browser (Chromium) |
 | Accessibility | `tests/e2e/a11y.spec.ts` | No serious or critical axe violations outside the baseline on the catalogue (all four palettes), search results, empty results and the cart | browser (Chromium) |
 | Native smoke | not implemented yet | See ADR-0010 | native simulator/emulator |
 
-Contract tests project the core fixtures into API shape in `tests/contract/openapi.mts`: deterministic UUIDv5 identifiers, `Money` in EUR minor units, `available: true`, merchants with `acceptingOrders: false` and no delivery estimate. The projection lives in the tests because the core fixtures are a UI catalogue, not API payloads, and no code produces API payloads yet. The fixture data it actually checks is names, descriptions, prices (whole, non-negative minor units) and the product-to-merchant grouping; identifiers, availability and currency come from the projection. When an API or mock server lands, it should own this mapping and the contract tests should validate its output instead.
+Contract tests build the seed from `@tazumo/core` with `buildSeed()` from `apps/api/src/fixtures.ts`, the same function that seeds the API database, so identifiers and slugs match the reference API. `tests/contract/openapi.mts` then maps seed rows to the response shape that `apps/api/src/routes/catalogue.ts` selects in SQL (EUR `Money`, `available: true`, merchants with `acceptingOrders: false`, no delivery estimate, `synthetic: true`). This keeps the check database-free; the API's own tests validate live responses against the same contract with PostgreSQL. If the SQL response shape changes, update the mapping too.
 
 ## Failure scenarios
 
