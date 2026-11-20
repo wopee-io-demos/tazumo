@@ -7,7 +7,7 @@ import {
   roles,
   transitionOnboarding,
   validateStoreProfile,
-  type Actor,
+  type Principal,
   type MerchantOnboarding,
   type OnboardingCommand,
   type StoreProfile,
@@ -24,20 +24,21 @@ const profile: StoreProfile = {
 };
 const draft: MerchantOnboarding = { merchantId, state: 'draft', profile, updatedAt: '2026-11-01T08:00:00.000Z' };
 
-const staff: Actor = { userId: 'u-staff', role: 'merchant_staff', merchantId };
-const otherStaff: Actor = { userId: 'u-other', role: 'merchant_staff', merchantId: '7d1c3f0e-0000-4000-8000-000000000002' };
-const support: Actor = { userId: 'u-support', role: 'support' };
-const admin: Actor = { userId: 'u-admin', role: 'admin' };
-const customer: Actor = { userId: 'u-customer', role: 'customer' };
-const courier: Actor = { userId: 'u-courier', role: 'courier' };
+const customerGrant = { role: 'customer', merchantId: null } as const;
+const staff: Principal = { userId: 'u-staff', grants: [customerGrant, { role: 'merchant_staff', merchantId }] };
+const otherStaff: Principal = { userId: 'u-other', grants: [{ role: 'merchant_staff', merchantId: '7d1c3f0e-0000-4000-8000-000000000002' }] };
+const support: Principal = { userId: 'u-support', grants: [customerGrant, { role: 'support', merchantId: null }] };
+const admin: Principal = { userId: 'u-admin', grants: [{ role: 'admin', merchantId: null }] };
+const customer: Principal = { userId: 'u-customer', grants: [customerGrant] };
+const courier: Principal = { userId: 'u-courier', grants: [{ role: 'courier', merchantId: null }] };
 const at = '2026-11-20T10:00:00Z';
 
-function run(start: MerchantOnboarding, steps: [OnboardingCommand, Actor, string?][]) {
+function run(start: MerchantOnboarding, steps: [OnboardingCommand, Principal, string?][]) {
   let merchant = start;
   const audit = [];
   for (const [command, actor, reason] of steps) {
     const result = transitionOnboarding(merchant, command, actor, at, reason);
-    assert.ok(result.ok, `${command} by ${actor.role} from ${merchant.state}: ${!result.ok && result.error}`);
+    assert.ok(result.ok, `${command} by ${actor.userId} from ${merchant.state}: ${!result.ok && result.error}`);
     merchant = result.value;
     audit.push(result.audit);
   }
@@ -84,7 +85,7 @@ test('rejection carries a reason and the merchant can revise and resubmit', () =
 });
 
 test('illegal transitions are refused without an audit entry', () => {
-  const cases: [MerchantOnboarding['state'], OnboardingCommand, Actor][] = [
+  const cases: [MerchantOnboarding['state'], OnboardingCommand, Principal][] = [
     ['draft', 'approve', admin],
     ['draft', 'go_live', admin],
     ['submitted', 'approve', support],
@@ -101,11 +102,12 @@ test('illegal transitions are refused without an audit entry', () => {
 });
 
 test('roles outside the transition rule, and staff of another merchant, are forbidden', () => {
-  const cases: [MerchantOnboarding['state'], OnboardingCommand, Actor][] = [
+  const cases: [MerchantOnboarding['state'], OnboardingCommand, Principal][] = [
     ['draft', 'submit', customer],
     ['draft', 'submit', courier],
     ['draft', 'submit', otherStaff],
-    ['draft', 'submit', { userId: 'u-x', role: 'merchant_staff' }],
+    ['draft', 'submit', { userId: 'u-x', grants: [] }],
+    ['draft', 'submit', { userId: 'u-y' } as Principal],
     ['draft', 'submit', support],
     ['submitted', 'start_review', staff],
     ['in_review', 'approve', staff],
@@ -118,7 +120,7 @@ test('roles outside the transition rule, and staff of another merchant, are forb
   ];
   for (const [state, command, actor] of cases) {
     const result = transitionOnboarding({ ...draft, state }, command, actor, at, 'reason');
-    assert.deepEqual(result, { ok: false, error: 'forbidden' }, `${command} by ${actor.role} from ${state}`);
+    assert.deepEqual(result, { ok: false, error: 'forbidden' }, `${command} by ${actor.userId} from ${state}`);
   }
 });
 
@@ -172,6 +174,30 @@ test('store profile validation reports each invalid field by path', () => {
     { path: 'legalEntity.vatId', code: 'invalid_format' },
   ]);
   assert.deepEqual(validateStoreProfile({ ...profile, name: 'n'.repeat(201) }), [{ path: 'name', code: 'too_long' }]);
+});
+
+test('a principal with several grants is matched by the rule and the matched role is audited', () => {
+  const both: Principal = { userId: 'u-both', grants: [{ role: 'support', merchantId: null }, { role: 'merchant_staff', merchantId }] };
+  const submitted = transitionOnboarding(draft, 'submit', both, at);
+  assert.ok(submitted.ok);
+  assert.equal(submitted.audit.details.actorRole, 'merchant_staff');
+  const review = transitionOnboarding(submitted.value, 'start_review', both, at);
+  assert.ok(review.ok);
+  assert.equal(review.audit.details.actorRole, 'support');
+});
+
+test('reasons must be strings of at most 500 characters', () => {
+  const inReview = { ...draft, state: 'in_review' } as const;
+  assert.deepEqual(transitionOnboarding(inReview, 'reject', admin, at, 42 as unknown as string), { ok: false, error: 'reason_required' });
+  assert.deepEqual(transitionOnboarding(inReview, 'reject', admin, at, 'r'.repeat(501)), { ok: false, error: 'reason_too_long' });
+  assert.ok(transitionOnboarding(inReview, 'reject', admin, at, 'r'.repeat(500)).ok);
+  assert.deepEqual(transitionOnboarding(draft, 'submit', staff, '2026-11-20T10:00:00'), { ok: false, error: 'invalid_instant' });
+});
+
+test('profile lengths count raw characters like the merchants CHECK, and non-strings are rejected', () => {
+  assert.deepEqual(validateStoreProfile({ ...profile, name: ` ${'n'.repeat(199)} ` }), [{ path: 'name', code: 'too_long' }]);
+  assert.deepEqual(validateStoreProfile({ ...profile, slug: 7 as unknown as string }), [{ path: 'slug', code: 'invalid_format' }]);
+  assert.equal(validateStoreProfile({} as StoreProfile).length, 11);
 });
 
 test('role names match apps/api policy and the user_roles CHECK constraint', () => {

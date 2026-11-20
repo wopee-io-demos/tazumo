@@ -1,4 +1,4 @@
-import { isStaffOf, toInstant, type Actor, type AuditEntry, type Result } from './actors.ts';
+import { matchingRole, toInstant, type AuditEntry, type Principal, type Result } from './actors.ts';
 
 export const declineReasons = ['out_of_stock', 'too_busy', 'closing_soon', 'other'] as const;
 export type DeclineReason = (typeof declineReasons)[number];
@@ -39,20 +39,27 @@ const audit = (acceptance: OrderAcceptance, actorUserId: string | null, action: 
   details: { merchantId: acceptance.merchantId, ...details },
 });
 
-export type RespondError = 'forbidden' | 'already_decided' | 'window_expired' | 'reason_required' | 'invalid_instant';
+export type RespondError = 'forbidden' | 'invalid_decision' | 'already_decided' | 'window_expired' | 'reason_required' | 'invalid_instant';
+
+const deadlinePassed = (acceptance: OrderAcceptance, instant: Date) => {
+  const deadline = toInstant(acceptance.deadline);
+  return !deadline || instant >= deadline;
+};
 
 export function respondToOrder(
   acceptance: OrderAcceptance,
   decision: 'accept' | 'decline',
-  actor: Actor,
+  principal: Principal,
   at: Date | string,
   reason?: DeclineReason,
 ): Result<OrderAcceptance, RespondError> {
-  if (!isStaffOf(actor, acceptance.merchantId)) return { ok: false, error: 'forbidden' };
+  const role = matchingRole(principal, acceptance.merchantId, ['own_staff']);
+  if (!role) return { ok: false, error: 'forbidden' };
+  if (decision !== 'accept' && decision !== 'decline') return { ok: false, error: 'invalid_decision' };
   if (acceptance.state !== 'pending') return { ok: false, error: 'already_decided' };
   const instant = toInstant(at);
   if (!instant) return { ok: false, error: 'invalid_instant' };
-  if (instant >= new Date(acceptance.deadline)) return { ok: false, error: 'window_expired' };
+  if (deadlinePassed(acceptance, instant)) return { ok: false, error: 'window_expired' };
   if (decision === 'decline' && !(declineReasons as readonly string[]).includes(reason ?? '')) return { ok: false, error: 'reason_required' };
 
   const decidedAt = instant.toISOString();
@@ -63,8 +70,8 @@ export function respondToOrder(
   return {
     ok: true,
     value,
-    audit: audit(acceptance, actor.userId, decision, decidedAt, {
-      actorRole: actor.role,
+    audit: audit(acceptance, principal.userId, decision, decidedAt, {
+      actorRole: role,
       ...(decision === 'decline' ? { reason } : {}),
     }),
   };
@@ -74,10 +81,11 @@ export function expireIfDue(acceptance: OrderAcceptance, now: Date | string): Re
   if (acceptance.state !== 'pending') return { ok: false, error: 'already_decided' };
   const instant = toInstant(now);
   if (!instant) return { ok: false, error: 'invalid_instant' };
-  if (instant < new Date(acceptance.deadline)) return { ok: false, error: 'not_due' };
+  if (!deadlinePassed(acceptance, instant)) return { ok: false, error: 'not_due' };
+  const decidedAt = toInstant(acceptance.deadline)?.toISOString() ?? instant.toISOString();
   return {
     ok: true,
-    value: { ...acceptance, state: 'auto_declined', decidedAt: acceptance.deadline, declineReason: 'window_expired' },
+    value: { ...acceptance, state: 'auto_declined', decidedAt, declineReason: 'window_expired' },
     audit: audit(acceptance, null, 'auto_decline', instant.toISOString(), { actorRole: 'system', deadline: acceptance.deadline }),
   };
 }

@@ -1,4 +1,4 @@
-import { isStaffOf, toInstant, type Actor, type Result } from './actors.ts';
+import { matchingRole, toInstant, type Principal, type Result, type Rule } from './actors.ts';
 import { validateStoreProfile, type FieldError, type StoreProfile } from './profile.ts';
 
 export const onboardingStates = ['draft', 'submitted', 'in_review', 'approved', 'rejected', 'live', 'suspended'] as const;
@@ -13,11 +13,11 @@ export type MerchantOnboarding = {
   updatedAt: string;
 };
 
-export type OnboardingError = 'illegal_transition' | 'forbidden' | 'reason_required' | 'invalid_profile' | 'invalid_instant';
+export type OnboardingError = 'illegal_transition' | 'forbidden' | 'reason_required' | 'reason_too_long' | 'invalid_profile' | 'invalid_instant';
 
-type Who = 'own_staff' | 'support' | 'admin';
+export const maxReasonLength = 500;
 
-const transitions: Record<OnboardingCommand, { from: OnboardingState; to: OnboardingState; who: Who[]; reason?: true }> = {
+const transitions: Record<OnboardingCommand, { from: OnboardingState; to: OnboardingState; who: Rule[]; reason?: true }> = {
   submit: { from: 'draft', to: 'submitted', who: ['own_staff'] },
   start_review: { from: 'submitted', to: 'in_review', who: ['support', 'admin'] },
   approve: { from: 'in_review', to: 'approved', who: ['support', 'admin'] },
@@ -31,22 +31,21 @@ const transitions: Record<OnboardingCommand, { from: OnboardingState; to: Onboar
 export const allowedCommands = (state: OnboardingState): OnboardingCommand[] =>
   (Object.keys(transitions) as OnboardingCommand[]).filter((command) => transitions[command].from === state);
 
-const permitted = (actor: Actor, merchantId: string, who: Who[]) =>
-  who.some((w) => (w === 'own_staff' ? isStaffOf(actor, merchantId) : actor.role === w));
-
 export function transitionOnboarding(
   merchant: MerchantOnboarding,
   command: OnboardingCommand,
-  actor: Actor,
+  principal: Principal,
   at: Date | string,
   reason?: string,
 ): Result<MerchantOnboarding, OnboardingError> & { fieldErrors?: FieldError[] } {
   const rule = Object.hasOwn(transitions, command) ? transitions[command] : undefined;
   if (!rule) return { ok: false, error: 'illegal_transition' };
-  if (!permitted(actor, merchant.merchantId, rule.who)) return { ok: false, error: 'forbidden' };
+  const role = matchingRole(principal, merchant.merchantId, rule.who);
+  if (!role) return { ok: false, error: 'forbidden' };
   if (merchant.state !== rule.from) return { ok: false, error: 'illegal_transition' };
-  const trimmedReason = reason?.trim().slice(0, 500);
+  const trimmedReason = typeof reason === 'string' ? reason.trim() : '';
   if (rule.reason && !trimmedReason) return { ok: false, error: 'reason_required' };
+  if (trimmedReason.length > maxReasonLength) return { ok: false, error: 'reason_too_long' };
   const instant = toInstant(at);
   if (!instant) return { ok: false, error: 'invalid_instant' };
   if (command === 'submit') {
@@ -59,12 +58,12 @@ export function transitionOnboarding(
     ok: true,
     value: { ...merchant, state: rule.to, updatedAt: occurredAt },
     audit: {
-      actorUserId: actor.userId,
+      actorUserId: principal.userId,
       action: `merchant_onboarding:${command}`,
       resourceType: 'merchant',
       resourceId: merchant.merchantId,
       occurredAt,
-      details: { actorRole: actor.role, from: rule.from, to: rule.to, ...(trimmedReason ? { reason: trimmedReason } : {}) },
+      details: { actorRole: role, from: rule.from, to: rule.to, ...(trimmedReason ? { reason: trimmedReason } : {}) },
     },
   };
 }

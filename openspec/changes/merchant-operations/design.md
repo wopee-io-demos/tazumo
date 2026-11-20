@@ -5,7 +5,7 @@ Decisions and alternatives are in ADR-0019. This slice ships only `packages/merc
 ## Package layout
 | Module | Exports |
 | --- | --- |
-| `actors.ts` | `roles` (same list as `apps/api/src/auth/policy.ts`), `Actor`, `AuditEntry`, `Result` |
+| `actors.ts` | `roles`, `Grant` and `Principal` (same shapes as `apps/api/src/auth/policy.ts`), `matchingRole`, `AuditEntry`, `Result`, `toInstant` |
 | `profile.ts` | `StoreProfile`, `validateStoreProfile` |
 | `onboarding.ts` | `onboardingStates`, `transitionOnboarding`, `allowedCommands`, `acceptsOrders` |
 | `hours.ts` | `OpeningHours`, `validateOpeningHours`, `isOpenAt`, `localTime` |
@@ -13,7 +13,7 @@ Decisions and alternatives are in ADR-0019. This slice ships only `packages/merc
 | `inventory.ts` | `Availability`, `isAvailableAt`, `checkOrderable` |
 | `acceptance.ts` | `openAcceptanceWindow`, `respondToOrder`, `expireIfDue`, `declineReasons` |
 
-All functions are pure and take the instant as an argument, so the API supplies `now()` and tests need no fake clock.
+All functions are pure and take the instant as an argument, so the API supplies `now()` and tests need no fake clock. String instants must be ISO 8601 with `Z` or an explicit offset, so results never depend on the server's timezone. The API passes its `request.principal` unchanged; the domain picks the first grant that satisfies the rule (in the order of the table below) and audits that role.
 
 ## Onboarding transitions
 | Command | From | To | Allowed actors | Reason |
@@ -33,7 +33,8 @@ The actor check runs before the state check, so a caller without rights cannot p
 - Role names and the `merchant_staff ⇔ merchant_id` rule match `user_roles` (0002); a test reads the policy module and the migration.
 - `AuditEntry` maps to `audit_events (actor_user_id, action, resource_type, resource_id, details)` (0002, 0003). The API adds `request_id` and `occurred_at` may be taken from the entry or `now()`.
 - Profile `name`, `slug` and `marketCode` use the `merchants` CHECK rules (0001).
-- `merchants.accepting_orders` stays the merchant's own pause switch. The effective rule is `state = 'live' AND accepting_orders`.
+- `merchants.accepting_orders` stays the merchant's own pause switch. The effective rule is `state = 'live' AND accepting_orders` (`checkOrderable` returns `merchant_paused` otherwise).
+- `merchants.name`, `slug` and `market_code` stay the source of truth. The API builds a `StoreProfile` from those columns plus `merchant_onboarding.profile` (address, contact, legal entity). A profile write in `draft` updates both tables in one transaction, so there is no second copy to reconcile.
 - `products.available` stays as the discovery flag; the API keeps it in sync with `availability_status` (below) until discovery reads the new columns.
 - `merchants.delivery_eta_minutes` is not touched: ETAs are out of scope.
 
@@ -43,7 +44,7 @@ CREATE TABLE merchant_onboarding (
   merchant_id uuid PRIMARY KEY REFERENCES merchants (id) ON DELETE RESTRICT,
   state text NOT NULL DEFAULT 'draft'
     CHECK (state IN ('draft', 'submitted', 'in_review', 'approved', 'rejected', 'live', 'suspended')),
-  profile jsonb NOT NULL,
+  profile jsonb NOT NULL DEFAULT '{}'::jsonb,
   version integer NOT NULL DEFAULT 0,
   updated_at timestamptz NOT NULL DEFAULT now()
 );
@@ -82,17 +83,23 @@ CREATE TABLE merchant_order_acceptances (
   deadline timestamptz NOT NULL CHECK (deadline > received_at),
   decided_at timestamptz,
   decline_reason text CHECK (decline_reason IN ('out_of_stock', 'too_busy', 'closing_soon', 'other', 'window_expired')),
-  CHECK ((state = 'pending') = (decided_at IS NULL))
+  CHECK ((state = 'pending') = (decided_at IS NULL)),
+  CHECK ((state IN ('declined', 'auto_declined')) = (decline_reason IS NOT NULL)),
+  CHECK ((decline_reason = 'window_expired') = (state = 'auto_declined'))
 );
 CREATE INDEX merchant_order_acceptances_due_idx ON merchant_order_acceptances (deadline) WHERE state = 'pending';
+
+INSERT INTO merchant_onboarding (merchant_id, state)
+SELECT id, 'live' FROM merchants WHERE synthetic;
 
 ALTER TABLE audit_events
   ADD COLUMN actor_kind text NOT NULL DEFAULT 'user' CHECK (actor_kind IN ('user', 'system')),
   ALTER COLUMN actor_user_id DROP NOT NULL,
   ADD CHECK ((actor_kind = 'user') = (actor_user_id IS NOT NULL));
 ```
+- The backfill starts the existing synthetic seed merchants as `live` with an empty profile, so Discovery keeps showing them; `apps/api/src/seed.ts` must insert the same row for new seed merchants. Non-synthetic merchants do not exist yet and would start in `draft`.
 - `order_id` gets a foreign key once an `orders` table exists.
-- Runtime grants for `tazumo_api`: SELECT, INSERT, UPDATE on the new tables; UPDATE on the three new `products` columns only; no DELETE on `merchant_onboarding` or `merchant_order_acceptances`.
+- Runtime grants for `tazumo_api`: SELECT, INSERT, UPDATE on the new tables; UPDATE on `products (available, availability_status, available_from, available_until)` only; no DELETE on `merchant_onboarding` or `merchant_order_acceptances`.
 - Concurrency: transitions use `UPDATE ... WHERE merchant_id = $1 AND version = $2`, and a lost race returns 409.
 - Down migration drops the tables and columns; the `audit_events` change is reversible only while no system rows exist, so the down step must refuse if any exist.
 
@@ -104,7 +111,7 @@ ALTER TABLE audit_events
 | `POST /v1/merchants/{merchantId}/onboarding/transitions` | per transition table | `transitionOnboarding` | body `{ command, reason?, version }`; 409 `illegal_transition` or version conflict; 422 `reason_required`/`invalid_profile`; 403/404 as ADR-0016 |
 | `PUT /v1/merchants/{merchantId}/opening-hours` | own staff, admin | `validateOpeningHours` | |
 | `PUT /v1/merchants/{merchantId}/delivery-zones` | own staff, admin | `validateDeliveryZone` | replaces the set |
-| `POST /v1/merchants/{merchantId}/delivery-check` | anonymous | `checkDelivery` | coordinates in the body, never logged |
+| `POST /v1/merchants/{merchantId}/delivery-check` | anonymous | `checkDelivery` | 404 unless the merchant is `live` (existence not revealed, ADR-0016); coordinates in the body, never logged |
 | `PATCH /v1/merchants/{merchantId}/products/{productId}/availability` | own staff | `validateAvailability` | keeps `products.available` in sync |
 | `POST /v1/merchants/{merchantId}/orders/{orderId}/acceptance` | own staff | `respondToOrder` | waits for the orders domain |
 
@@ -113,4 +120,4 @@ ALTER TABLE audit_events
 - Auto-decline sweeper: a periodic job selects due rows with `FOR UPDATE SKIP LOCKED`, calls `expireIfDue` and writes system audit rows. Until the `audit_events` change lands, auto-declines must not be persisted.
 
 ## Testing approach
-Unit tests under `node --test` with fixed instants: every transition and refusal, profile field errors, DST spring-forward and fall-back in Europe/Bratislava and Europe/Berlin, overnight intervals and exceptions, haversine reference distances and the inclusive radius, availability windows, and the acceptance window boundaries. A drift test compares role names with `apps/api`.
+Unit tests under `node --test` with fixed instants: every transition and refusal, multi-grant principals, profile field errors, DST spring-forward and fall-back in Europe/Bratislava, Europe/Berlin and America/New_York, malformed hours failing closed, overnight intervals and exceptions, haversine reference distances and the inclusive radius, availability windows, and the acceptance window boundaries. A drift test compares role names with `apps/api`.

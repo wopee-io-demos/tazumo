@@ -33,15 +33,25 @@ function isRealDate(date: string) {
 
 export function validateOpeningHours(hours: OpeningHours): string[] {
   const errors: string[] = [];
-  if (!isValidTimeZone(hours.timeZone)) errors.push('timeZone');
-  const checkIntervals = (path: string, intervals: Interval[]) =>
-    intervals.forEach((interval, i) => {
-      if (!timePattern.test(interval.open) || interval.open === '24:00') errors.push(`${path}[${i}].open`);
-      if (!timePattern.test(interval.close)) errors.push(`${path}[${i}].close`);
+  if (!isValidTimeZone(hours?.timeZone)) errors.push('timeZone');
+  const isRecord = (value: unknown) => typeof value === 'object' && value !== null && !Array.isArray(value);
+  const checkIntervals = (path: string, intervals: unknown) => {
+    if (!Array.isArray(intervals)) {
+      errors.push(path);
+      return;
+    }
+    intervals.forEach((interval: Partial<Interval> | null, i) => {
+      const open = String(interval?.open);
+      if (!timePattern.test(open) || open === '24:00') errors.push(`${path}[${i}].open`);
+      if (!timePattern.test(String(interval?.close))) errors.push(`${path}[${i}].close`);
     });
+  };
+  if (!isRecord(hours?.weekly)) errors.push('weekly');
+  if (hours?.exceptions !== undefined && !isRecord(hours.exceptions)) errors.push('exceptions');
+  if (errors.includes('weekly') || errors.includes('exceptions')) return errors;
   for (const [day, intervals] of Object.entries(hours.weekly)) {
     if (!(weekdays as readonly string[]).includes(day)) errors.push(`weekly.${day}`);
-    else checkIntervals(`weekly.${day}`, intervals ?? []);
+    else checkIntervals(`weekly.${day}`, intervals);
   }
   for (const [date, intervals] of Object.entries(hours.exceptions ?? {})) {
     if (!isRealDate(date)) errors.push(`exceptions.${date}`);
@@ -79,10 +89,11 @@ const intervalsFor = (hours: OpeningHours, date: string) =>
  * runs past midnight (open === close means 24 hours). In a DST spring-forward gap the skipped local
  * times never occur; in a fall-back overlap both occurrences of a local time are treated alike.
  * An exception date replaces that day's weekly intervals, including their overnight tail.
+ * Invalid hours (see `validateOpeningHours`) are treated as closed.
  */
 export function isOpenAt(hours: OpeningHours, at: Date | string): boolean {
   const instant = toInstant(at);
-  if (!instant || !isValidTimeZone(hours.timeZone)) return false;
+  if (!instant || validateOpeningHours(hours).length) return false;
   const { date, minuteOfDay } = localTime(instant, hours.timeZone);
   const today = intervalsFor(hours, date).some(({ open, close }) => {
     const start = minutes(open);

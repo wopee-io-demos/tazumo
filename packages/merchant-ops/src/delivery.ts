@@ -9,8 +9,8 @@ const isPoint = (p: GeoPoint) =>
 
 export function validateDeliveryZone(zone: DeliveryZone): string[] {
   const errors: string[] = [];
-  if (!isPoint(zone.center)) errors.push('center');
-  if (!Number.isFinite(zone.radiusMeters) || zone.radiusMeters <= 0 || zone.radiusMeters > maxRadiusMeters) errors.push('radiusMeters');
+  if (!isPoint(zone?.center)) errors.push('center');
+  if (!Number.isInteger(zone?.radiusMeters) || zone.radiusMeters <= 0 || zone.radiusMeters > maxRadiusMeters) errors.push('radiusMeters');
   return errors;
 }
 
@@ -29,7 +29,7 @@ export function checkDelivery(
 ): { deliverable: true; distanceMeters: number } | { deliverable: false; reason: 'invalid_destination' | 'outside_zone' } {
   if (!isPoint(destination)) return { deliverable: false, reason: 'invalid_destination' };
   let nearest = Infinity;
-  for (const zone of zones) {
+  for (const zone of Array.isArray(zones) ? zones : []) {
     if (validateDeliveryZone(zone).length) continue;
     const d = distanceMeters(zone.center, destination);
     if (d <= zone.radiusMeters) nearest = Math.min(nearest, d);

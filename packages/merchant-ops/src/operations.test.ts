@@ -10,7 +10,7 @@ import {
   respondToOrder,
   validateAvailability,
   validateDeliveryZone,
-  type Actor,
+  type Principal,
   type OpeningHours,
 } from './index.ts';
 
@@ -31,15 +31,18 @@ test('delivery zone check is inclusive at the radius, picks the nearest zone and
     deliverable: true,
     distanceMeters: 0,
   });
-  const boundary = { lat: 48.1486, lng: 17.2 };
-  const exact = distanceMeters(bratislava, boundary);
-  assert.equal(checkDelivery([{ center: bratislava, radiusMeters: exact }], boundary).deliverable, true);
-  assert.equal(checkDelivery([{ center: bratislava, radiusMeters: exact - 0.01 }], boundary).deliverable, false);
+  const equator = { lat: 0, lng: 0 };
+  const quarterDegreeNorth = { lat: 0.25, lng: 0 };
+  assert.equal(checkDelivery([{ center: equator, radiusMeters: 27_799 }], quarterDegreeNorth).deliverable, true);
+  assert.equal(checkDelivery([{ center: equator, radiusMeters: 27_798 }], quarterDegreeNorth).deliverable, false);
+  assert.equal(checkDelivery([{ center: bratislava, radiusMeters: 0 } as never, { center: bratislava, radiusMeters: 1 }], bratislava).deliverable, true);
+  assert.deepEqual(checkDelivery(null as never, bratislava), { deliverable: false, reason: 'outside_zone' });
   assert.deepEqual(checkDelivery([{ center: bratislava, radiusMeters: d }], vienna), { deliverable: false, reason: 'outside_zone' });
   assert.deepEqual(checkDelivery([{ center: bratislava, radiusMeters: 5_000 }], { lat: 0, lng: 200 }), { deliverable: false, reason: 'invalid_destination' });
   assert.deepEqual(checkDelivery([], bratislava), { deliverable: false, reason: 'outside_zone' });
   assert.deepEqual(validateDeliveryZone({ center: { lat: Number.NaN, lng: 0 }, radiusMeters: 0 }), ['center', 'radiusMeters']);
   assert.deepEqual(validateDeliveryZone({ center: bratislava, radiusMeters: 50_001 }), ['radiusMeters']);
+  assert.deepEqual(validateDeliveryZone({ center: bratislava, radiusMeters: 1_000.5 }), ['radiusMeters']);
 });
 
 test('inventory availability: in stock, out of stock and scheduled windows', () => {
@@ -53,21 +56,24 @@ test('inventory availability: in stock, out of stock and scheduled windows', () 
   assert.deepEqual(validateAvailability({ status: 'scheduled', from: '2026-11-20T10:00:00Z', until: '2026-11-20T10:00:00Z' }), ['until']);
   assert.deepEqual(validateAvailability({ status: 'scheduled', from: 'soon' }), ['from']);
   assert.equal(isAvailableAt({ status: 'scheduled', from: 'soon' }, '2026-11-20T10:00:00Z'), false);
+  assert.deepEqual(validateAvailability({ status: 'scheduled', from: '2026-11-20T10:00:00' }), ['from']);
+  assert.deepEqual(validateAvailability({ status: 'scheduled', from: '2026-11-20T11:00:00+01:00', until: '2026-11-20T10:30:00Z' }), []);
 });
 
 test('an item is orderable only when the merchant is live, open and the item available', () => {
   const hours: OpeningHours = { timeZone: 'Europe/Bratislava', weekly: { fri: [{ open: '08:00', close: '20:00' }] } };
   const at = '2026-11-20T10:00:00Z';
-  const input = { onboardingState: 'live', hours, availability: { status: 'in_stock' } } as const;
+  const input = { onboardingState: 'live', acceptingOrders: true, hours, availability: { status: 'in_stock' } } as const;
   assert.deepEqual(checkOrderable(input, at), { ok: true });
   assert.deepEqual(checkOrderable({ ...input, onboardingState: 'suspended' }, at), { ok: false, reason: 'merchant_not_live' });
   assert.deepEqual(checkOrderable({ ...input, onboardingState: 'approved' }, at), { ok: false, reason: 'merchant_not_live' });
+  assert.deepEqual(checkOrderable({ ...input, acceptingOrders: false }, at), { ok: false, reason: 'merchant_paused' });
   assert.deepEqual(checkOrderable(input, '2026-11-20T19:00:00Z'), { ok: false, reason: 'merchant_closed' });
   assert.deepEqual(checkOrderable({ ...input, availability: { status: 'out_of_stock' } }, at), { ok: false, reason: 'item_unavailable' });
 });
 
 const merchantId = '7d1c3f0e-0000-4000-8000-000000000001';
-const staff: Actor = { userId: 'u-staff', role: 'merchant_staff', merchantId };
+const staff: Principal = { userId: 'u-staff', grants: [{ role: 'merchant_staff', merchantId }] };
 const pending = openAcceptanceWindow('order-1', merchantId, '2026-11-20T10:00:00Z', 5);
 
 test('acceptance window: accept or decline before the deadline, audited', () => {
@@ -91,14 +97,18 @@ test('acceptance window: accept or decline before the deadline, audited', () => 
 
 test('acceptance window: refusals for wrong actor, missing reason, late or repeated responses', () => {
   const at = '2026-11-20T10:01:00Z';
-  const other: Actor = { userId: 'u-other', role: 'merchant_staff', merchantId: '7d1c3f0e-0000-4000-8000-000000000002' };
-  for (const actor of [other, { userId: 'u-admin', role: 'admin' }, { userId: 'u-c', role: 'customer' }] as Actor[]) {
+  const other: Principal = { userId: 'u-other', grants: [{ role: 'merchant_staff', merchantId: '7d1c3f0e-0000-4000-8000-000000000002' }] };
+  const admin: Principal = { userId: 'u-admin', grants: [{ role: 'admin', merchantId: null }] };
+  for (const actor of [other, admin, { userId: 'u-c', grants: [{ role: 'customer', merchantId: null }] }] as Principal[]) {
     assert.deepEqual(respondToOrder(pending, 'accept', actor, at), { ok: false, error: 'forbidden' });
   }
   assert.deepEqual(respondToOrder(pending, 'decline', staff, at), { ok: false, error: 'reason_required' });
   assert.deepEqual(respondToOrder(pending, 'decline', staff, at, 'nope' as never), { ok: false, error: 'reason_required' });
   assert.deepEqual(respondToOrder(pending, 'accept', staff, '2026-11-20T10:05:00Z'), { ok: false, error: 'window_expired' });
   assert.deepEqual(respondToOrder(pending, 'accept', staff, 'later'), { ok: false, error: 'invalid_instant' });
+  assert.deepEqual(respondToOrder(pending, 'accept', staff, '2026-11-20T10:01:00'), { ok: false, error: 'invalid_instant' });
+  assert.deepEqual(respondToOrder(pending, 'yes' as never, staff, at), { ok: false, error: 'invalid_decision' });
+  assert.deepEqual(respondToOrder({ ...pending, deadline: 'x' }, 'accept', staff, at), { ok: false, error: 'window_expired' });
   const accepted = respondToOrder(pending, 'accept', staff, at);
   assert.ok(accepted.ok);
   assert.deepEqual(respondToOrder(accepted.value, 'decline', staff, at, 'other'), { ok: false, error: 'already_decided' });

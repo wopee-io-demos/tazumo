@@ -55,6 +55,19 @@ for (const timeZone of zones) {
   });
 }
 
+test('America/New_York changes on different dates (8 March and 1 November 2026)', () => {
+  expectOpen({ timeZone: 'America/New_York', weekly: { sun: [{ open: '01:00', close: '03:00' }] } }, [
+    ['2026-03-08T06:00:00Z', true],
+    ['2026-03-08T06:59:00Z', true],
+    ['2026-03-08T07:00:00Z', false],
+    ['2026-03-29T00:30:00Z', false],
+    ['2026-11-01T05:00:00Z', true],
+    ['2026-11-01T06:30:00Z', true],
+    ['2026-11-01T07:59:00Z', true],
+    ['2026-11-01T08:00:00Z', false],
+  ]);
+});
+
 test('overnight intervals spill into the next day and stop at close', () => {
   const hours: OpeningHours = { timeZone: 'Europe/Bratislava', weekly: { fri: [{ open: '18:00', close: '02:00' }] } };
   expectOpen(hours, [
@@ -113,6 +126,14 @@ test('invalid configuration is reported and fails closed', () => {
     'exceptions.2026-12-24[0].open',
   ]);
   assert.equal(isOpenAt(bad, '2026-11-16T10:00:00Z'), false);
+  for (const interval of [{ open: '08:00', close: '25:00' }, { open: '24:00', close: '02:00' }, { open: '8', close: '20:00' }]) {
+    const hours = { timeZone: 'Europe/Bratislava', weekly: { fri: [interval], sat: [interval] } };
+    assert.notDeepEqual(validateOpeningHours(hours), []);
+    assert.equal(isOpenAt(hours, '2026-11-20T21:00:00Z'), false);
+    assert.equal(isOpenAt(hours, '2026-11-20T23:30:00Z'), false);
+  }
+  assert.deepEqual(validateOpeningHours({ timeZone: 'Europe/Berlin' } as OpeningHours), ['weekly']);
+  assert.deepEqual(validateOpeningHours({ timeZone: 'Europe/Berlin', weekly: { mon: 'x' } } as unknown as OpeningHours), ['weekly.mon']);
   assert.equal(isOpenAt({ timeZone: 'Europe/Berlin', weekly: weekdays }, 'yesterday'), false);
   assert.deepEqual(validateOpeningHours({ timeZone: 'Europe/Bratislava', weekly: weekdays, exceptions: { '2026-12-24': [] } }), []);
 });

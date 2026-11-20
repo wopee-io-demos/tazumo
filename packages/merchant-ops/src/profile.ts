@@ -20,33 +20,36 @@ const vatPattern = /^[A-Z]{2}[A-Za-z0-9]{2,13}$/;
 export function validateStoreProfile(profile: StoreProfile): FieldError[] {
   const errors: FieldError[] = [];
   const text = (path: string, value: string | undefined, max: number, optional = false) => {
-    const trimmed = value?.trim() ?? '';
-    if (!trimmed) {
+    if (value === undefined || value === null || (typeof value === 'string' && !value.trim())) {
       if (!optional) errors.push({ path, code: 'required' });
       return false;
     }
-    if (trimmed.length > max) {
+    if (typeof value !== 'string') {
+      errors.push({ path, code: 'invalid_format' });
+      return false;
+    }
+    if (value.length > max) {
       errors.push({ path, code: 'too_long' });
       return false;
     }
     return true;
   };
   const pattern = (path: string, value: string | undefined, regex: RegExp, max: number, optional = false) => {
-    if (text(path, value, max, optional) && !regex.test(value!)) errors.push({ path, code: 'invalid_format' });
+    if (text(path, value, max, optional) && !regex.test(value as string)) errors.push({ path, code: 'invalid_format' });
   };
 
-  text('name', profile.name, 200);
-  pattern('slug', profile.slug, slugPattern, 64);
-  pattern('marketCode', profile.marketCode, slugPattern, 64);
-  text('address.line1', profile.address?.line1, 200);
-  text('address.line2', profile.address?.line2, 200, true);
-  text('address.city', profile.address?.city, 120);
-  pattern('address.postalCode', profile.address?.postalCode, postalPattern, 12);
-  pattern('address.countryCode', profile.address?.countryCode, countryPattern, 2);
-  pattern('contact.email', profile.contact?.email, emailPattern, 254);
-  pattern('contact.phone', profile.contact?.phone, phonePattern, 16);
-  text('legalEntity.registeredName', profile.legalEntity?.registeredName, 200);
-  pattern('legalEntity.registrationNumber', profile.legalEntity?.registrationNumber, registrationPattern, 32);
-  pattern('legalEntity.vatId', profile.legalEntity?.vatId, vatPattern, 15, true);
+  text('name', profile?.name, 200);
+  pattern('slug', profile?.slug, slugPattern, 64);
+  pattern('marketCode', profile?.marketCode, slugPattern, 64);
+  text('address.line1', profile?.address?.line1, 200);
+  text('address.line2', profile?.address?.line2, 200, true);
+  text('address.city', profile?.address?.city, 120);
+  pattern('address.postalCode', profile?.address?.postalCode, postalPattern, 12);
+  pattern('address.countryCode', profile?.address?.countryCode, countryPattern, 2);
+  pattern('contact.email', profile?.contact?.email, emailPattern, 254);
+  pattern('contact.phone', profile?.contact?.phone, phonePattern, 16);
+  text('legalEntity.registeredName', profile?.legalEntity?.registeredName, 200);
+  pattern('legalEntity.registrationNumber', profile?.legalEntity?.registrationNumber, registrationPattern, 32);
+  pattern('legalEntity.vatId', profile?.legalEntity?.vatId, vatPattern, 15, true);
   return errors;
 }
