@@ -1,0 +1,27 @@
+{
+  "name": "@wopee-io-demos/tazumo-test-kit",
+  "version": "0.0.0",
+  "description": "Versioned synthetic marketplace fixtures and brand tokens for automated Tazumo testing.",
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.mjs"
+    },
+    "./marketplace.json": "./dist/marketplace.json"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wopee-io-demos/tazumo.git",
+    "directory": "packages/test-kit"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
+    "tag": "test"
+  },
+  "license": "UNLICENSED",
+  "private": false
+}

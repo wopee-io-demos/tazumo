@@ -1,0 +1,16 @@
+.git
+.github
+node_modules
+**/node_modules
+**/dist
+**/.expo
+**/android
+**/ios
+**/.env*
+.env*
+test-results
+playwright-report
+docs
+openspec
+contracts
+scripts

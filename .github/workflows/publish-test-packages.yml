@@ -1,0 +1,109 @@
+name: Publish organization test packages
+on:
+  workflow_dispatch:
+    inputs:
+      publish_web:
+        description: 'Publish GHCR web test image'
+        required: true
+        type: boolean
+        default: true
+      publish_npm:
+        description: 'Publish organization-scoped npm test kit'
+        required: true
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: tazumo-test-packages
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.11.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: pnpm install --no-frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+      - name: Generate and test synthetic package
+        run: |
+          node --experimental-strip-types scripts/build-test-kit.mjs
+          node --experimental-strip-types --test scripts/test-test-kit.mjs
+      - name: Review npm package contents
+        working-directory: packages/test-kit
+        run: npm pack --dry-run --json
+
+  web-image:
+    name: Push GHCR web preview
+    if: github.event.inputs.publish_web == 'true'
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/web/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/wopee-io-demos/tazumo-web:test-${{ github.run_number }}
+            ghcr.io/wopee-io-demos/tazumo-web:sha-${{ github.sha }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/wopee-io-demos/tazumo
+            org.opencontainers.image.revision=${{ github.sha }}
+          provenance: true
+
+  npm-test-kit:
+    name: Publish GitHub npm test kit
+    if: github.event.inputs.publish_npm == 'true'
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.11.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: 'https://npm.pkg.github.com'
+          scope: '@wopee-io-demos'
+      - run: pnpm install --no-frozen-lockfile
+      - name: Version and build fixture kit
+        run: |
+          npm version "0.0.${{ github.run_number }}" --no-git-tag-version
+          cd ../..
+          node --experimental-strip-types scripts/build-test-kit.mjs
+          node --experimental-strip-types --test scripts/test-test-kit.mjs
+        working-directory: packages/test-kit
+      - name: Publish to organization GitHub Packages
+        run: npm publish --tag test
+        working-directory: packages/test-kit
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
