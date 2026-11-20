@@ -28,3 +28,14 @@ test('palette independent from catalogue',async({page})=>{
   await expect(page.getByRole('heading',{name:'Margherita pizza'})).toBeVisible();
   await expect(page.locator('.app')).toHaveCSS('--primary','#087F62');
 });
+
+test('cart traps focus and closes with Escape, restoring opener focus',async({page})=>{
+ await page.goto('/');
+ const opener=page.getByRole('button',{name:/View cart/});
+ await opener.click();
+ await expect(page.getByRole('dialog')).toBeVisible();
+ await expect(page.getByRole('button',{name:'Close cart'})).toBeFocused();
+ await page.keyboard.press('Escape');
+ await expect(page.getByRole('dialog')).not.toBeVisible();
+ await expect(opener).toBeFocused();
+});
