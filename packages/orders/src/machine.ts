@@ -1,4 +1,5 @@
 import {
+  acceptanceStates,
   declineReasons,
   systemSources,
   terminalStatuses,
@@ -161,13 +162,14 @@ function normalizeAcceptance(value: unknown): Result<Normalized> {
     return fail('acceptance_mismatch', 'acceptance IDs must be UUIDs');
   }
   if (!receivedAt || !deadline || !decidedAt) return fail('acceptance_mismatch', 'acceptance is not decided or has invalid times');
+  if (typeof value.state !== 'string' || !(acceptanceStates as readonly string[]).includes(value.state)) return fail('acceptance_mismatch', 'unknown acceptance state');
   if (value.declineReason !== undefined && !known.includes(value.declineReason)) return fail('reason_required');
   return {
     ok: true,
     value: {
       orderId: value.orderId.toLowerCase(),
       merchantId: value.merchantId.toLowerCase(),
-      state: String(value.state),
+      state: value.state as string,
       receivedAt,
       deadline,
       decidedAt,
@@ -298,8 +300,8 @@ export function createOrder(input: CreateOrderInput, actor: Actor, at: string, k
   return state.ok ? { ok: true, value: { state: state.value, event, replayed: false } } : state;
 }
 
-const eventActors = new Map<EventType, { system: readonly string[]; users: readonly Who[] }>(
-  Object.values(rules).map((r) => [r.event, { system: r.system ?? [], users: (r.users ?? []).map((u) => u.who) }]),
+const eventActors = new Map<EventType, { system: readonly string[]; users: Rule['users'] & {} }>(
+  Object.values(rules).map((r) => [r.event, { system: r.system ?? [], users: r.users ?? [] }]),
 );
 
 function validEventActor(event: OrderEvent, state: OrderState): boolean {
@@ -308,7 +310,8 @@ function validEventActor(event: OrderEvent, state: OrderState): boolean {
   if (!allowed || !isObject(a)) return false;
   if (a.kind === 'system') return (systemSources as readonly unknown[]).includes(a.source) && allowed.system.includes(a.source as string);
   if (a.kind !== 'user' || typeof a.userId !== 'string' || a.userId.length === 0) return false;
-  return allowed.users.some((who) => {
+  return allowed.users.some(({ who, from }) => {
+    if (from && !from.includes(state.status)) return false;
     if (!roleOf[who].includes(a.role as Role)) return false;
     if (who === 'customer') return sameId(a.userId, state.customerUserId);
     if (who === 'own_staff') return sameId(a.merchantId, state.merchantId);

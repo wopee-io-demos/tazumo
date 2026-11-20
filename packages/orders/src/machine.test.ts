@@ -123,6 +123,10 @@ describe('order lifecycle', () => {
       const r = applyCommand(log, command, actor, minute(30), key, options);
       assert.equal(r.ok ? 'ok' : r.error, 'idempotency_conflict');
     }
+    const cancelled = run(reach('preparing'), [[{ type: 'cancel', reason: 'merchant_unreachable' }, support]]);
+    const otherSupport = user('u-support-2', { role: 'support', merchantId: null });
+    const byOther = applyCommand(cancelled, { type: 'cancel', reason: 'merchant_unreachable' }, otherSupport, minute(50), cancelled.at(-1)!.idempotencyKey, options);
+    assert.equal(byOther.ok ? 'ok' : byOther.error, 'idempotency_conflict');
   });
 
   it('authorizes before the idempotency lookup, so revoked or unrelated actors learn nothing', () => {
@@ -263,6 +267,7 @@ describe('order lifecycle', () => {
       acceptance('accepted', { orderId: OTHER_ORDER }),
       acceptance('accepted', { merchantId: OTHER_MERCHANT }),
       acceptance('accepted', { decidedAt: 'yesterday' }),
+      { ...acceptance('accepted'), state: ['accepted'] } as unknown as AcceptanceDecision,
     ]) {
       const r = applyCommand(reach('confirmed'), { type: 'merchant_accept', acceptance: bad }, staff, minute(40), 'acceptance-case', options);
       assert.equal(r.ok ? 'ok' : r.error, 'acceptance_mismatch', JSON.stringify(bad));
@@ -368,6 +373,14 @@ describe('order lifecycle', () => {
       const source = readFileSync(new URL(file, dir), 'utf8');
       assert.doesNotMatch(source, /Date\.now|new Date\(\)|setTimeout|setInterval|performance\.now|\beta\b|duration/i, file);
     }
+  });
+
+  it('rejects a support cancellation re-attributed to the customer after confirmation', () => {
+    const log = run(reach('preparing'), [[{ type: 'cancel', reason: 'merchant_unreachable' }, support]]);
+    const forged = log.map((e, i) => (i === log.length - 1 ? { ...e, actor: { kind: 'user' as const, userId: 'u-customer', role: 'customer' as const } } : e));
+    assert.equal(replay(forged).ok ? 'ok' : 'invalid', 'invalid');
+    const early = run(reach('payment_pending'), [[{ type: 'cancel' }, customer]]);
+    assert.ok(replay(early).ok);
   });
 
   it('rejects a courier event from someone other than the assigned courier in replay', () => {
