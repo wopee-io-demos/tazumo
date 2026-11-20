@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Tazumo Marketplace API",
-    "version": "0.1.0-draft",
-    "description": "Contract proposal, not an implemented or production-accessible service. All prices are server-calculated. Checkout is disabled in the current clients."
+    "version": "0.2.0-draft",
+    "description": "Contract proposal. Only the read-only Discovery operations have a reference implementation in apps/api (synthetic fixture data, not deployed). All prices are server-calculated. Checkout is disabled in the current clients."
   },
   "servers": [
     {
@@ -56,7 +56,8 @@
             "required": true,
             "schema": {
               "type": "string"
-            }
+            },
+            "description": "Market code. Values outside ^[a-z0-9-]{1,64}$ or unknown markets return 400."
           }
         ],
         "responses": {
@@ -113,6 +114,16 @@
                   "items": {
                     "$ref": "#/components/schemas/Product"
                   }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
                 }
               }
             }
@@ -499,6 +510,11 @@
             "type": "string",
             "format": "uuid"
           },
+          "slug": {
+            "type": "string",
+            "pattern": "^[a-z0-9-]{1,64}$",
+            "description": "Stable human-readable identifier, unique per resource type (for example the fixture product ID `pizza`)"
+          },
           "marketCode": {
             "type": "string"
           },
@@ -521,6 +537,10 @@
             ],
             "minimum": 0,
             "description": "Estimated only, not a promise"
+          },
+          "synthetic": {
+            "type": "boolean",
+            "description": "True when the record is synthetic demonstration data, not a real merchant or offer"
           }
         }
       },
@@ -538,9 +558,19 @@
             "type": "string",
             "format": "uuid"
           },
+          "slug": {
+            "type": "string",
+            "pattern": "^[a-z0-9-]{1,64}$",
+            "description": "Stable human-readable identifier, unique per resource type (for example the fixture product ID `pizza`)"
+          },
           "merchantId": {
             "type": "string",
             "format": "uuid"
+          },
+          "category": {
+            "type": "string",
+            "description": "Catalogue category code",
+            "example": "food"
           },
           "name": {
             "type": "string"
@@ -553,6 +583,10 @@
           },
           "available": {
             "type": "boolean"
+          },
+          "synthetic": {
+            "type": "boolean",
+            "description": "True when the record is synthetic demonstration data, not a real merchant or offer"
           }
         }
       },
