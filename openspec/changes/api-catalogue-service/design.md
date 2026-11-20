@@ -36,7 +36,7 @@ Discovery stays anonymous. Everything that touches a customer, merchant or order
 - **Testing**: integration tests mint tokens from a local test JWKS; negative tests for expired, wrong-audience, wrong-issuer, unsigned (`alg: none`) and cross-tenant access.
 - **Open questions**: which OIDC provider (EU data residency), merchant staff invitation flow, and whether couriers authenticate through the same provider.
 
-Tracked as a follow-up issue linked from #5.
+Tracked as follow-up issue #56.
 
 ## Running locally
 ```sh

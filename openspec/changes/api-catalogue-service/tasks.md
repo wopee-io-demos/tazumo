@@ -7,9 +7,10 @@
 - [x] Contract `0.2.0-draft`: additive `slug`, `category`, `synthetic`; 400 on products route. `node scripts/validate-openapi.mjs` passes.
 - [x] Security basics: input validation, generic 500s, log redaction (no query, IP, credentials), `/health` 200/503. Evidence: `test/security.test.ts`.
 - [x] `.github/workflows/api.yml`: `services: postgres`, same `runs-on` expression as `ci.yml`, tests plus migrate/seed/smoke of the running server.
-- [x] Auth/authorization design written in design.md (not implemented).
+- [x] Auth/authorization design written in design.md (not implemented); follow-up issue #56.
 - [ ] Current-head CI green for the PR (record run URL).
-- [ ] Independent review findings resolved and recorded in the PR.
+- [x] Independent review (reviewed 13b6245): blocker (invalid api.yml env context) and should-fix items fixed in a1147b6; API integration run 44808810011 green on a1147b6 (24/24 tests, migrate/seed/smoke/rollback).
+- [ ] Re-review of the fixes recorded in the PR.
 - [ ] Merge and record merge SHA on issue #5.
 
 Not implemented and not claimed: authentication, quotes, orders, payments, courier dispatch or tracking, deployment.
