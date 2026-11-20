@@ -4,7 +4,7 @@ import { createPool } from './db.ts';
 
 const config = loadConfig();
 const pool = createPool({ databaseUrl: config.databaseUrl });
-const app = buildApp({ pool, logger: { level: config.logLevel } });
+const app = buildApp({ pool, logger: { level: config.logLevel }, auth: config.auth });
 
 const shutdown = async (signal: string) => {
   app.log.info({ signal }, 'shutting down');

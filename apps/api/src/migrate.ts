@@ -35,6 +35,7 @@ if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.me
     process.exit(2);
   }
   const { databaseUrl } = loadConfig();
-  const applied = await migrate({ databaseUrl, direction, log: (message) => console.log(message) });
+  const count = process.argv[3] === 'all' ? Infinity : undefined;
+  const applied = await migrate({ databaseUrl, direction, count, log: (message) => console.log(message) });
   console.log(`${direction}: ${applied.length} migration(s) applied`);
 }

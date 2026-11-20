@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Tazumo Marketplace API",
-    "version": "0.2.0-draft",
-    "description": "Contract proposal. Only the read-only Discovery operations have a reference implementation in apps/api (synthetic fixture data, not deployed). All prices are server-calculated. Checkout is disabled in the current clients."
+    "version": "0.3.0-draft",
+    "description": "Contract proposal. The read-only Discovery operations and the Identity operations (/v1/me, merchant staff) have a reference implementation in apps/api (synthetic fixture data, not deployed). All prices are server-calculated. Checkout is disabled in the current clients."
   },
   "servers": [
     {
@@ -17,6 +17,9 @@
     },
     {
       "name": "Orders"
+    },
+    {
+      "name": "Identity"
     }
   ],
   "paths": {
@@ -403,6 +406,158 @@
           },
           "404": {
             "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me": {
+      "get": {
+        "tags": [
+          "Identity"
+        ],
+        "summary": "Get the authenticated principal and its role grants",
+        "description": "The first authenticated call creates the user record with the customer role. Tazumo stores only the token issuer and subject, no profile data.",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authenticated principal",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Principal"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Bearer challenge (RFC 6750)",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication not configured or identity provider keys unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/merchants/{merchantId}/staff": {
+      "get": {
+        "tags": [
+          "Identity"
+        ],
+        "summary": "List role grants for a merchant",
+        "description": "Allowed for staff of that merchant, support and admin (support and admin reads are audited). Customers get 404 and other staff get 403.",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "merchantId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Staff grants",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/StaffMember"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Bearer challenge (RFC 6750)",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication not configured or identity provider keys unavailable",
             "content": {
               "application/json": {
                 "schema": {
@@ -805,6 +960,78 @@
             "format": "date-time"
           }
         }
+      },
+      "RoleGrant": {
+        "type": "object",
+        "required": [
+          "role",
+          "merchantId"
+        ],
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "customer",
+              "merchant_staff",
+              "courier",
+              "support",
+              "admin"
+            ]
+          },
+          "merchantId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Set only for merchant_staff"
+          }
+        },
+        "additionalProperties": false
+      },
+      "Principal": {
+        "type": "object",
+        "required": [
+          "userId",
+          "roles"
+        ],
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RoleGrant"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "StaffMember": {
+        "type": "object",
+        "required": [
+          "userId",
+          "role"
+        ],
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "customer",
+              "merchant_staff",
+              "courier",
+              "support",
+              "admin"
+            ]
+          }
+        },
+        "additionalProperties": false
       }
     }
   }

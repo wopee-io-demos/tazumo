@@ -14,12 +14,12 @@ const tables = async (db: Awaited<ReturnType<typeof createTestDb>>) =>
 test('migrations create the catalogue schema, are idempotent and reversible', async () => {
   const db = await createTestDb();
   try {
-    assert.deepEqual(await tables(db), ['catalogue_categories', 'markets', 'merchants', 'products']);
+    assert.deepEqual(await tables(db), ['audit_events', 'catalogue_categories', 'markets', 'merchants', 'products', 'user_roles', 'users']);
     assert.equal((await migrate({ databaseUrl: databaseUrl(), direction: 'up', schema: db.schema })).length, 0);
-    await migrate({ databaseUrl: databaseUrl(), direction: 'down', schema: db.schema });
+    await migrate({ databaseUrl: databaseUrl(), direction: 'down', count: Infinity, schema: db.schema });
     assert.deepEqual(await tables(db), []);
     await migrate({ databaseUrl: databaseUrl(), direction: 'up', schema: db.schema });
-    assert.equal((await tables(db)).length, 4);
+    assert.equal((await tables(db)).length, 7);
   } finally {
     await db.drop();
   }
