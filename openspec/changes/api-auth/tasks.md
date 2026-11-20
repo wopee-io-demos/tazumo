@@ -48,8 +48,21 @@
 - [x] Negative tests: customer and staff get 403, double erasure has no new effect, old tokens get 401, an admin target gets 409, unknown user 404, malformed ID 400, `erased:` subjects are rejected, and no erased subject remains in `users` or `audit_events`.
 - [x] Mutation checks: removing the erased-token check, the blockers, or the policy denial each makes a test fail.
 - [x] Migration `0004` and contract `0.5.0-draft`; ADR-0017 erasure section updated.
+- [x] Independent review on 4b268bc. 2 blockers and 9 should-fix findings, all resolved:
+  - Blocker: the column UPDATE grant allowed taking over an admin and un-erasing. Replaced by the `SECURITY DEFINER` `erase_user`; the runtime has no UPDATE on `users`.
+  - Blocker: a second erasure of the same subject collided. The older tombstone is now re-tombstoned at random.
+  - Should-fix:
+    - the `resolvePrincipal` race is closed by a re-check after the upsert;
+    - grants to erased users are refused (trigger plus 409);
+    - support can no longer erase staff (`staff_grant` blocker);
+    - the clock tolerance is applied after erasure;
+    - token tests derive `iat` from `erasedAt`;
+    - the export function's limits are documented;
+    - recognition uses its own HKDF key and expires after the token-lifetime window;
+    - the export includes whitelisted details;
+    - ADR-0016 was corrected.
+  - Nits: `logSalt` is required, HMAC domain separation, a consistent export snapshot, a re-authentication note in ADR-0017.
 - [ ] Current-head CI green (record run URLs).
-- [ ] Independent review findings resolved and recorded in the PR.
 - [ ] Merge and record the merge SHA on #56.
 
 Not implemented: provider wiring (pending ADR-0017), a shared rate-limit store, courier scopes, payments, orders.

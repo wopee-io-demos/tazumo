@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { buildApp } from '../src/app.ts';
 import { clientKey, FixedWindowLimiter } from '../src/rate-limit.ts';
 import { assertMatchesContract, createTestDb, type TestDb } from './helpers.ts';
-import { audience, issuer, mint, signingKey, startIdp, type SigningKey, type TestIdp } from './idp.ts';
+import { audience, issuer, logSalt, mint, signingKey, startIdp, type SigningKey, type TestIdp } from './idp.ts';
 
 test('fixed window limiter counts per key and resets on a simulated clock', () => {
   let now = 0;
@@ -70,7 +70,7 @@ describe('rate limits on authenticated routes', () => {
     idp = await startIdp([key]);
     app = buildApp({
       pool: db.pool,
-      auth: { issuer, audience, jwksUrl: idp.url },
+      auth: { issuer, audience, logSalt, jwksUrl: idp.url },
       rateLimits: { ip: { limit: 5, windowMs: 60_000 }, principal: { limit: 2, windowMs: 60_000 }, now: () => clock }
     });
     await app.ready();
@@ -103,7 +103,7 @@ describe('rate limits on authenticated routes', () => {
     const floodIdp = await startIdp([key]);
     const flooded = buildApp({
       pool: db.pool,
-      auth: { issuer, audience, jwksUrl: floodIdp.url },
+      auth: { issuer, audience, logSalt, jwksUrl: floodIdp.url },
       rateLimits: { ip: { limit: 5, windowMs: 60_000 }, now: () => clock }
     });
     try {

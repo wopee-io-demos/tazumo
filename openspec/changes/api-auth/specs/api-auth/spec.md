@@ -99,11 +99,19 @@ The service SHALL let users erase themselves and let admin or support users eras
 - THEN the service responds 409 `erasure_blocked` with the list of blockers.
 
 #### Scenario: Token issued after erasure
-- WHEN a token for the same subject is issued after the erasure
-- THEN a new, unlinked user with only the `customer` role is provisioned.
+- WHEN a token for the same subject is issued after the erasure plus the clock tolerance
+- THEN a new, unlinked user with only the `customer` role is provisioned, and erasing that user again succeeds.
+
+#### Scenario: Support erasing staff
+- WHEN a support user asks to erase a user with a support, merchant staff or courier grant
+- THEN the service responds 409 `erasure_blocked` with blocker `staff_grant`.
+
+#### Scenario: Grants to erased users
+- WHEN anyone, including the runtime role directly, grants a role to an erased user
+- THEN the grant is refused.
 
 ### Requirement: Personal data export
-The service SHALL return to an authenticated user the identity data, role grants and audit events about them that Tazumo holds, and nothing about other users. The runtime database role SHALL NOT gain general read access to the audit log for this.
+The service SHALL return to an authenticated user the identity data, role grants and audit events about them that Tazumo holds, including whitelisted event details, and nothing about other users. Audit rows SHALL be read through a function that returns per-user metadata only; the runtime database role SHALL NOT be able to SELECT the audit table directly.
 
 #### Scenario: Export
 - WHEN a user requests `GET /v1/me/export`

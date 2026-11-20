@@ -818,6 +818,16 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Target user has been erased",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
           }
         }
       },
@@ -940,6 +950,16 @@
           },
           "503": {
             "description": "Authentication not configured or identity provider keys unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Target user has been erased",
             "content": {
               "application/json": {
                 "schema": {
@@ -1754,7 +1774,8 @@
                 "action",
                 "resourceType",
                 "resourceId",
-                "initiatedBy"
+                "initiatedBy",
+                "details"
               ],
               "properties": {
                 "occurredAt": {
@@ -1776,6 +1797,26 @@
                     "self",
                     "staff"
                   ]
+                },
+                "details": {
+                  "type": "object",
+                  "description": "Whitelisted event details (role, merchantId, initiator); never personal data of other people",
+                  "properties": {
+                    "role": {
+                      "type": "string"
+                    },
+                    "merchantId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "format": "uuid"
+                    },
+                    "initiator": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
                 }
               },
               "additionalProperties": false

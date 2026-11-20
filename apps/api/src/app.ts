@@ -2,6 +2,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import Fastify, { type FastifyError, type FastifyRequest, type FastifyServerOptions } from 'fastify';
 import type pg from 'pg';
 import { createAuthenticate, type AuthOptions } from './auth/plugin.ts';
+import { clockToleranceSeconds } from './auth/jwt.ts';
 import { createPseudonymizer } from './auth/pseudonym.ts';
 import { componentSchemas, requiresBearer } from './contract.ts';
 import { createRateLimits, type RateLimitOptions } from './rate-limit.ts';
@@ -53,6 +54,7 @@ export function buildApp({ pool, logger = false, auth, rateLimits, trustProxy = 
   for (const schema of componentSchemas()) app.addSchema(schema);
   app.decorateRequest('principal', null);
 
+  if (auth && !auth.logSalt) throw new Error('auth.logSalt is required when authentication is configured');
   const pseudonymizer = createPseudonymizer(auth?.logSalt ?? randomBytes(32).toString('hex'));
   const authenticate = createAuthenticate(pool, auth, pseudonymizer);
   const limits = createRateLimits(rateLimits);
@@ -94,6 +96,6 @@ export function buildApp({ pool, logger = false, auth, rateLimits, trustProxy = 
   app.register(catalogueRoutes, { pool });
   app.register(identityRoutes, { pool });
   app.register(adminRoutes, { pool });
-  app.register(privacyRoutes, { pool, pseudonymizer });
+  app.register(privacyRoutes, { pool, pseudonymizer, recognitionWindowSeconds: (auth?.maxTokenLifetimeSeconds ?? 3_600) + clockToleranceSeconds });
   return app;
 }

@@ -4,7 +4,7 @@ import type pg from 'pg';
 import { buildApp } from '../src/app.ts';
 import { seed } from '../src/seed.ts';
 import { assertMatchesContract, createAppRolePool, createTestDb, type TestDb } from './helpers.ts';
-import { audience, issuer, mint, signingKey, startIdp, type SigningKey, type TestIdp } from './idp.ts';
+import { audience, issuer, logSalt, mint, signingKey, startIdp, type SigningKey, type TestIdp } from './idp.ts';
 
 const now = () => Math.floor(Date.now() / 1000);
 
@@ -24,15 +24,19 @@ describe('GDPR erasure and export, running as tazumo_api', () => {
     appRole = await createAppRolePool(db);
     key = await signingKey('privacy');
     idp = await startIdp([key]);
-    app = buildApp({ pool: appRole.pool, auth: { issuer, audience, jwksUrl: idp.url, logSalt: 'p'.repeat(32) } });
+    app = buildApp({ pool: appRole.pool, auth: { issuer, audience, logSalt, jwksUrl: idp.url } });
     await app.ready();
-    for (const name of ['admin', 'support', 'staff', 'customer', 'self', 'target', 'target2', 'exporter']) {
+    for (const name of ['admin', 'support', 'support2', 'staff', 'customer', 'self', 'target', 'target2', 'exporter', 'again', 'forgotten']) {
       tokens[name] = await mint(key, { sub: subjects(name), iat: now() - 5 });
       const res = await app.inject({ method: 'GET', url: '/v1/me', headers: { authorization: `Bearer ${tokens[name]}` } });
       assert.equal(res.statusCode, 200);
       ids[name] = res.json().userId;
     }
-    await db.pool.query(`INSERT INTO user_roles (user_id, role) VALUES ($1, 'admin'), ($2, 'support')`, [ids.admin, ids.support]);
+    await db.pool.query(`INSERT INTO user_roles (user_id, role) VALUES ($1, 'admin'), ($2, 'support'), ($3, 'support')`, [
+      ids.admin,
+      ids.support,
+      ids.support2
+    ]);
     await db.pool.query(`INSERT INTO user_roles (user_id, role, merchant_id) SELECT $1, 'merchant_staff', id FROM merchants LIMIT 1`, [ids.staff]);
   });
   after(async () => {
@@ -66,8 +70,13 @@ describe('GDPR erasure and export, running as tazumo_api', () => {
     assert.equal(data.subject, subjects('exporter'));
     assert.deepEqual(data.roles.map((r: { role: string }) => r.role).sort(), ['customer', 'support']);
     assert.deepEqual(
-      data.auditEvents.map((e: { action: string; resourceId: string; initiatedBy: string }) => [e.action, e.resourceId, e.initiatedBy]),
-      [['role:grant', ids.exporter, 'staff']]
+      data.auditEvents.map((e: { action: string; resourceId: string; initiatedBy: string; details: object }) => [
+        e.action,
+        e.resourceId,
+        e.initiatedBy,
+        e.details
+      ]),
+      [['role:grant', ids.exporter, 'staff', { role: 'support' }]]
     );
     const other = (await app.inject({ method: 'GET', url: '/v1/me/export', headers: as('customer') })).json();
     assert.deepEqual(other.auditEvents, []);
@@ -84,9 +93,11 @@ describe('GDPR erasure and export, running as tazumo_api', () => {
     assert.equal((await db.pool.query('SELECT 1 FROM user_roles WHERE user_id = $1', [ids.self])).rowCount, 0);
     assert.deepEqual(await eraseAudit(ids.self), [{ actor_user_id: ids.self, details: { initiator: 'self' } }]);
 
-    for (const token of [tokens.self, await mint(key, { sub: subjects('self'), iat: now() - 1 })]) {
+    const erasedSecond = Math.ceil(Date.parse(res.json().erasedAt) / 1000);
+    for (const iat of [null, erasedSecond - 1, erasedSecond + 59]) {
+      const token = iat === null ? tokens.self : await mint(key, { sub: subjects('self'), iat });
       const again = await app.inject({ method: 'GET', url: '/v1/me', headers: { authorization: `Bearer ${token}` } });
-      assert.equal(again.statusCode, 401, 'tokens issued before the erasure are rejected');
+      assert.equal(again.statusCode, 401, `token with iat ${iat ?? 'original'} must be rejected`);
       assert.equal(again.json().code, 'invalid_token');
     }
     const doubleErase = await app.inject({ method: 'POST', url: '/v1/me/erasure', headers: as('self') });
@@ -95,7 +106,8 @@ describe('GDPR erasure and export, running as tazumo_api', () => {
   });
 
   test('a token issued after the erasure re-provisions a new, unlinked customer', async () => {
-    const later = await mint(key, { sub: subjects('self'), iat: now() + 2 });
+    await db.pool.query(`UPDATE users SET erased_at = erased_at - interval '10 minutes' WHERE id = $1`, [ids.self]);
+    const later = await mint(key, { sub: subjects('self'), iat: now() - 5 });
     const res = await app.inject({ method: 'GET', url: '/v1/me', headers: { authorization: `Bearer ${later}` } });
     assert.equal(res.statusCode, 200);
     assert.notEqual(res.json().userId, ids.self);
@@ -113,6 +125,55 @@ describe('GDPR erasure and export, running as tazumo_api', () => {
     assert.deepEqual(await eraseAudit(ids.target), [{ actor_user_id: ids.admin, details: { initiator: 'admin' } }]);
     assert.equal((await eraseAs('support', ids.target2)).statusCode, 200);
     assert.deepEqual(await eraseAudit(ids.target2), [{ actor_user_id: ids.support, details: { initiator: 'support' } }]);
+  });
+
+  test('erasing a re-provisioned subject again supersedes the older tombstone', async () => {
+    const first = await app.inject({ method: 'POST', url: '/v1/me/erasure', headers: as('again') });
+    assert.equal(first.statusCode, 200);
+    await db.pool.query(`UPDATE users SET erased_at = erased_at - interval '10 minutes' WHERE id = $1`, [ids.again]);
+    const fresh = await mint(key, { sub: subjects('again'), iat: now() - 5 });
+    const reprovisioned = await app.inject({ method: 'GET', url: '/v1/me', headers: { authorization: `Bearer ${fresh}` } });
+    assert.equal(reprovisioned.statusCode, 200);
+    const second = await app.inject({ method: 'POST', url: '/v1/me/erasure', headers: { authorization: `Bearer ${fresh}` } });
+    assert.equal(second.statusCode, 200);
+    assert.match((await userRow(ids.again)).subject, /^erased:r:[0-9a-f]{64}$/, 'older record gets a random tombstone');
+    assert.match((await userRow(reprovisioned.json().userId)).subject, /^erased:[0-9a-f]{64}$/);
+  });
+
+  test('erased users cannot receive grants, even through the runtime role directly', async () => {
+    const res = await app.inject({ method: 'PUT', url: `/v1/admin/users/${ids.target}/roles/support`, headers: as('admin') });
+    assert.equal(res.statusCode, 409);
+    assert.equal(res.json().code, 'user_erased');
+    assertMatchesContract('put', '/v1/admin/users/{userId}/roles/{role}', 409, res.json());
+    await assert.rejects(appRole.pool.query(`INSERT INTO user_roles (user_id, role) VALUES ($1, 'support')`, [ids.target]), /user_erased/);
+  });
+
+  test('support cannot erase staff accounts; admins can', async () => {
+    const blocked = await eraseAs('support', ids.support2);
+    assert.equal(blocked.statusCode, 409);
+    assert.deepEqual(blocked.json().details, { blockers: ['staff_grant'] });
+    assert.deepEqual((await eraseAs('support', ids.staff)).json().details, { blockers: ['staff_grant'] });
+    assert.equal((await eraseAs('admin', ids.support2)).statusCode, 200);
+  });
+
+  test('the runtime role cannot rewrite identities and the database validates erasure input', async () => {
+    await assert.rejects(appRole.pool.query(`UPDATE users SET subject = 'attacker-sub' WHERE id = $1`, [ids.admin]), /permission denied/);
+    await assert.rejects(
+      appRole.pool.query(`SELECT * FROM erase_user($1, 'erased:nothex', $1, 'self', 'r', interval '1 hour')`, [ids.customer]),
+      /invalid pseudonym/
+    );
+    await assert.rejects(
+      appRole.pool.query(`SELECT * FROM erase_user($1, $2, $1, 'root', 'r', interval '1 hour')`, [ids.customer, 'erased:' + 'a'.repeat(64)]),
+      /invalid initiator/
+    );
+  });
+
+  test('recognition of erased subjects ends after the token-lifetime window', async () => {
+    assert.equal((await app.inject({ method: 'POST', url: '/v1/me/erasure', headers: as('forgotten') })).statusCode, 200);
+    await db.pool.query(`UPDATE users SET erased_at = erased_at - interval '2 hours' WHERE id = $1`, [ids.forgotten]);
+    const forgotten = await appRole.pool.query(`SELECT forget_erased_subjects(interval '3660 seconds') AS n`);
+    assert.ok(forgotten.rows[0].n >= 1);
+    assert.match((await userRow(ids.forgotten)).subject, /^erased:r:/);
   });
 
   test('users without permission cannot erase others', async () => {
@@ -152,7 +213,7 @@ describe('GDPR erasure and export, running as tazumo_api', () => {
       (await db.pool.query('SELECT * FROM users')).rows,
       (await db.pool.query('SELECT * FROM audit_events')).rows
     ]);
-    for (const name of ['target', 'target2']) assert.ok(!dump.includes(subjects(name)), `${name} subject leaked`);
+    for (const name of ['target', 'target2', 'support2', 'again', 'forgotten']) assert.ok(!dump.includes(subjects(name)), `${name} subject leaked`);
     const selfRows = (await db.pool.query(`SELECT 1 FROM users WHERE subject = $1`, [subjects('self')])).rowCount;
     assert.equal(selfRows, 1, 'only the re-provisioned record carries the subject again');
   });

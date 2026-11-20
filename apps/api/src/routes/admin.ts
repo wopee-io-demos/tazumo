@@ -35,8 +35,12 @@ export async function adminRoutes(app: FastifyInstance, { pool }: { pool: pg.Poo
     return inTransaction(pool, async (client) => {
       const actorIsAdmin = await client.query(`SELECT 1 FROM user_roles WHERE user_id = $1 AND role = 'admin'`, [actorId]);
       if (actorIsAdmin.rowCount === 0) return { status: 403, code: 'forbidden', message: 'Not allowed to manage these roles' };
-      const target = await client.query<{ id: string }>('SELECT id FROM users WHERE id = $1', [userId]);
+      const target = await client.query<{ id: string; erasedAt: Date | null }>(
+        'SELECT id, erased_at AS "erasedAt" FROM users WHERE id = $1',
+        [userId]
+      );
       if (target.rowCount === 0) return { status: 404, code: 'user_not_found', message: 'User not found' };
+      if (target.rows[0].erasedAt) return { status: 409, code: 'user_erased', message: 'User has been erased' };
       if (target.rows[0].id === actorId) return { status: 403, code: 'forbidden', message: 'Not allowed to manage these roles' };
       if (merchantId && (await client.query('SELECT 1 FROM merchants WHERE id = $1', [merchantId])).rowCount === 0) {
         return { status: 404, code: 'merchant_not_found', message: 'Merchant not found' };
@@ -66,7 +70,12 @@ export async function adminRoutes(app: FastifyInstance, { pool }: { pool: pg.Poo
   app.put<GrantRequest>(toFastifyPath(rolePath), { schema: routeSchema('put', rolePath) }, async (request, reply) => {
     const rejected = precheck(request, reply);
     if (rejected) return rejected;
-    const outcome = await change(request, 'role:grant');
+    const outcome = await change(request, 'role:grant').catch((error: { code?: string; message?: string }) => {
+      if (error.code === '23514' && error.message === 'user_erased') {
+        return { status: 409, code: 'user_erased', message: 'User has been erased' } satisfies Outcome;
+      }
+      throw error;
+    });
     if (outcome.status === 403) request.log.warn({ action: 'role:manage', role: request.params.role }, 'role change denied');
     if (outcome.code) return reply.code(outcome.status).send(apiError(request, outcome.code, outcome.message!));
     return reply.code(outcome.status).send({ role: request.params.role, merchantId: request.query.merchantId ?? null });

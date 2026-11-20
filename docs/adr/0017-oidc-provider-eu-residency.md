@@ -40,7 +40,7 @@ Every option uses the same erasure pattern on Tazumo's side:
 
 1. Delete the account at the provider. Until a provider is chosen and wired in, this is an operator step.
 2. In one transaction (implemented in #56 slice 3, `POST /v1/me/erasure` and `POST /v1/admin/users/{userId}/erasure`):
-   - replace `users.subject` with `erased:<HMAC-SHA-256(AUTH_LOG_SALT, "erasure", issuer, subject)>`;
+   - replace `users.subject` with `erased:<HMAC-SHA-256(k_erasure, issuer, subject)>`, where `k_erasure` is derived from `AUTH_LOG_SALT` with HKDF under a separate label from the log-tag key, and the input is length-prefixed;
    - set `users.erased_at`;
    - delete all role grants;
    - write an audit event `user:erase` whose details hold only the initiator (`self`, `admin` or `support`).
@@ -48,9 +48,13 @@ Every option uses the same erasure pattern on Tazumo's side:
    - Erasure is refused (409) while dependent records exist. Today that is an `admin` grant; orders will add their own blockers.
 3. Keep `users.id`, so that `audit_events.actor_user_id` (ON DELETE RESTRICT, ADR-0016) stays valid but no longer resolves to a person.
 4. Tokens after erasure:
-   - Access tokens issued at or before `erased_at` are rejected with 401. The keyed hash lets the API recognise the erased subject without storing it.
+   - Access tokens whose `iat` is at or before `erased_at` plus the 60 s clock tolerance are rejected with 401. The keyed hash lets the API recognise the erased subject without storing it.
+   - The cost: a fresh login within about a minute of the erasure is also rejected.
    - A token issued later (only possible if the provider still or again has the account) creates a new, unlinked user with only the `customer` role.
-   - Rotating `AUTH_LOG_SALT` ends recognition. At most, tokens issued in the last hour before an erasure could then re-provision a user instead of being rejected, which the one-hour lifetime cap bounds.
+   - Erasing that new user again re-tombstones the older record with a random value; the newer erasure takes over recognition.
+   - **Recognition window:** recognition is needed only for `AUTH_MAX_TOKEN_LIFETIME` (default 1 h, configurable up to 24 h) plus tolerance. After that, `forget_erased_subjects` replaces the keyed hash with a random tombstone, removing the long-term re-identification handle. It runs on every erasure and can also be scheduled.
+   - Rotating `AUTH_LOG_SALT` ends recognition early. Rotate it only once the last erasure is older than the recognition window.
+   - **Not yet enforced:** erasure is irreversible, yet any valid access token can trigger it. Once a provider is wired in, require recent authentication (`auth_time` with `max_age`) for self-service erasure.
 
 The keyed hash is not reversible without the salt, but the row is pseudonymous, not anonymous. It is still personal data under GDPR (Art. 4(5), Recital 26), because `users.id` links audit rows, request IDs and, later, orders. Keeping it with the audit trail relies on the Art. 17(3) exemptions (legal obligation, or establishing and defending legal claims), and that basis must be documented.
 
