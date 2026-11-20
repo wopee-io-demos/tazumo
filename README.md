@@ -46,12 +46,12 @@ SUT reference imagery captured from the real app. These are not Wopee or Appium 
 
 | Provenance | Web |
 | --- | --- |
-| SUT commit | [`b1cd347`](https://github.com/wopee-io-demos/tazumo/commit/b1cd347bcc5bf6d96e35b36a4eb1b2807a46dce4) |
+| SUT commit | [`3354ab6`](https://github.com/wopee-io-demos/tazumo/commit/3354ab63930c56ff8fb138e55c1682c54029a04c), the last change to `apps/web`, `packages` and workspace config, unchanged at `main` [`b1cd347`](https://github.com/wopee-io-demos/tazumo/commit/b1cd347bcc5bf6d96e35b36a4eb1b2807a46dce4) |
 | Fixture data | Synthetic catalogue in `packages/core/src/index.ts`; cart = 2x Margherita pizza, 1x Sourdough loaf, 1x Fresh flowers |
-| Capture command | `bash scripts/capture-web-screenshots.sh` (`pnpm build`, `vite preview`, Playwright spec `tests/screenshots/capture.spec.ts`) |
+| Capture command | `bash scripts/capture-web-screenshots.sh` after `pnpm install` and `pnpm exec playwright install chromium`; needs `pngquant` and network access for Google Fonts. It runs `pnpm build`, serves `vite preview`, runs `tests/screenshots/capture.spec.ts` and replaces the gallery only when every capture passes |
 | Browser | Playwright 1.65.1, Chromium 159.0.8154.6, macOS arm64 host |
 | Viewports | Desktop 1440x900 @1x; mobile 390x844 @2x with touch |
-| Determinism | App language EN, locale en-IE, timezone Europe/Prague, light scheme, reduced motion, fixed clock, animations and caret disabled; repeat runs are byte-identical on the same host |
+| Determinism | App language EN, locale en-IE, timezone Europe/Prague, light scheme, reduced motion, fixed clock, animations and caret disabled; a capture fails on page or console errors or missing web fonts; repeat runs are byte-identical on the same host |
 | Optimiser | pngquant 3.0.3 |
 | Captured | 2026-11-20 ([`provenance.json`](docs/screenshots/web/provenance.json)) |
 

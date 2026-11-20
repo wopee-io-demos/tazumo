@@ -6,12 +6,12 @@
 The repository SHALL provide one command that builds the web app, serves the production bundle and captures desktop and mobile PNGs of the catalogue, a category filter, search results and a cart containing items.
 
 #### Scenario: Regenerate the web gallery
-- **WHEN** a maintainer runs `bash scripts/capture-web-screenshots.sh` on a clean checkout
-- **THEN** the PNGs in `docs/screenshots/web/` are rewritten from the served build and `provenance.json` records the SUT commit, browser version, viewports and capture time
+- **WHEN** a maintainer runs `bash scripts/capture-web-screenshots.sh` after `pnpm install` and `pnpm exec playwright install chromium`
+- **THEN** the PNGs in `docs/screenshots/web/` are replaced from the served build and `provenance.json` records the SUT commit, capture commit, browser version, viewports and capture time
 
-#### Scenario: App does not render
-- **WHEN** the catalogue heading, expected product count or cart subtotal is not visible
-- **THEN** the capture fails and no screenshot for that state is written
+#### Scenario: App does not render correctly
+- **WHEN** the catalogue heading, expected product count or cart subtotal is not visible, the page logs an error, or the web fonts did not load
+- **THEN** the capture fails and the committed gallery and its provenance are left unchanged
 
 ### Requirement: Screenshots are deterministic
 Captures SHALL use a fixed app language (EN), browser locale, timezone, colour scheme, clock and reduced motion, with animations and the caret disabled.
@@ -30,6 +30,6 @@ The README gallery SHALL embed the committed PNGs and state the SUT commit, fixt
 ### Requirement: Committed images stay small
 Each committed PNG SHALL be optimised and stay under about 300 KB.
 
-#### Scenario: Optimiser available
-- **WHEN** `pngquant` is installed
-- **THEN** the capture script quantises every PNG and records the optimiser version in `provenance.json`
+#### Scenario: Optimise and enforce the size limit
+- **WHEN** the capture script runs
+- **THEN** it quantises every PNG with `pngquant`, records the optimiser version in `provenance.json`, and fails without touching the gallery if `pngquant` is missing or any PNG exceeds 300 KB
