@@ -6,7 +6,7 @@ test('browse category and search merchants',async({page})=>{
   await expect(page.getByRole('heading',{name:'Sourdough loaf'})).toBeVisible();
   await expect(page.getByRole('heading',{name:'Margherita pizza'})).toHaveCount(0);
   await page.getByRole('button',{name:'✨ Everything'}).click();
-  await page.getByRole('textbox',{name:'Search products and shops'}).fill('Piazza');
+  await page.getByRole('textbox',{name:'What are you looking for?'}).fill('Piazza');
   await expect(page.getByRole('heading',{name:'Margherita pizza'})).toBeVisible();
   await expect(page.getByRole('heading',{name:'Sourdough loaf'})).toHaveCount(0);
 });
