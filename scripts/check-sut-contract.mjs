@@ -5,6 +5,8 @@ import {resolve} from 'node:path';
 const read=p=>readFileSync(resolve(p),'utf8');
 const contract=JSON.parse(read('contracts/sut.json'));
 assert.equal(contract.schemaVersion,1);
+const packageScripts=JSON.parse(read('package.json')).scripts;
+assert.ok(packageScripts['dev:sut']?.includes('--port 4173 --strictPort'),'Dev SUT script must serve contract local URL on port 4173');
 assert.match(contract.version,/^0\.1\.[0-9]+$/);
 assert.equal(contract.status,'synthetic-only');
 assert.equal(contract.native.iosBundleId,'io.wopee.demos.tazumo');

@@ -5,7 +5,7 @@ Version: `0.1.0`. Source of truth: [contract](../contracts/sut.json). Tracking: 
 Use Tazumo web, Android and iOS as the common application for Wopee demos. Its catalogue is synthetic, checkout is **disabled**, and order tracking is **not operational**. No dummy order should ever be reported as a real purchase.
 
 ## Test contract
-- Web: run `pnpm dev:web` or the GHCR package when it becomes published. `TAZUMO_BASE_URL` must resolve to a verified Tazumo instance; no public deployment is assumed.
+- Web: run `pnpm dev:sut` (pins `http://127.0.0.1:4173`) or the GHCR package when it becomes published. `TAZUMO_BASE_URL` must resolve to a verified Tazumo instance; no public deployment is assumed.
 - Mobile: `io.wopee.demos.tazumo` for both Android package and iOS bundle ID; install matching debug APK or Simulator .app from the actual CI artifacts. Keep English locale for stable native identifiers and localized assertion values.
 - Use `sut-*` test IDs as the stable automation API; keep user-visible accessibility labels localized. Product keys come from `packages/core/src/index.ts`, not rendered card order.
 - Because no backend fixture reset exists, isolate browser contexts and clear native app state between independent tests. Demo tests can use local, deterministic fixture prices and sample products, not merchant availability claims.
@@ -22,3 +22,7 @@ Downstream repos `mobile-agent`, `mobile-demo`, `web-demo`, `web-demo-pw-cli` mu
 ## Native Appium selector contract
 
 React Native `testID` is mapped differently across platforms. With Appium XCUITest, use **`accessibility id`** for iOS `testID` (usually the accessibility identifier/name). With Appium UiAutomator2, use **`id`** for Android `testID` (the view's `resource-id`). Android `accessibility id` targets the user-facing `accessibilityLabel` (content-desc), which is localized and **is not** the `sut-*` selector. `native.locatorStrategies` formalizes this requirement; consumers must verify locator attributes from a real Appium UI tree on both platforms. Do not replace localized accessible labels with synthetic IDs just to make tests pass.
+
+### Stable local web SUT
+
+From the Tazumo monorepo run `pnpm install && pnpm dev:sut`. This intentionally uses port 4173, matching the shared SUT contract and the Playwright E2E server config. `pnpm dev:web` is for general Vite development and may use a different default port. Hosted Wopee agents cannot reach a developer's `127.0.0.1`, so they require a separately deployed and accessible Tazumo instance.
