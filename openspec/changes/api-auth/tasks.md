@@ -39,4 +39,17 @@
 - [x] Current-head CI green on PR #66 head c1c5f69: [API integration](https://github.com/wopee-io-demos/tazumo/actions/runs/44818849484) (81/81), [Quality checks](https://github.com/wopee-io-demos/tazumo/actions/runs/44818849402), [Dependency audit](https://github.com/wopee-io-demos/tazumo/actions/runs/44818849429), [Test evidence](https://github.com/wopee-io-demos/tazumo/actions/runs/44818849465).
 - [x] Merged as 3f95fbd02ad09e1526252e931dd8eb5b2104ac08; recorded on #56.
 
+
+## Slice 3 (GDPR erasure and export)
+
+- [x] Self-service and admin/support erasure in one transaction: keyed-hash subject, grants deleted, audit event without personal data. Idempotent, blocked by an `admin` grant. Evidence: `test/privacy.test.ts`, which runs as `tazumo_api`.
+- [x] Tokens issued before the erasure are rejected; later tokens re-provision an unlinked customer. Evidence: same suite, using a deterministic `iat` with no sleeps.
+- [x] `GET /v1/me/export` through a `SECURITY DEFINER` audit function; it returns only the caller's data.
+- [x] Negative tests: customer and staff get 403, double erasure has no new effect, old tokens get 401, an admin target gets 409, unknown user 404, malformed ID 400, `erased:` subjects are rejected, and no erased subject remains in `users` or `audit_events`.
+- [x] Mutation checks: removing the erased-token check, the blockers, or the policy denial each makes a test fail.
+- [x] Migration `0004` and contract `0.5.0-draft`; ADR-0017 erasure section updated.
+- [ ] Current-head CI green (record run URLs).
+- [ ] Independent review findings resolved and recorded in the PR.
+- [ ] Merge and record the merge SHA on #56.
+
 Not implemented: provider wiring (pending ADR-0017), a shared rate-limit store, courier scopes, payments, orders.

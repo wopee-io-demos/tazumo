@@ -75,6 +75,30 @@ Two fixed-window limiters (`src/rate-limit.ts`) are attached by the same contrac
 - A pre-existing `tazumo_api` role with LOGIN, SUPERUSER, BYPASSRLS, CREATEROLE, CREATEDB or REPLICATION, or with any role membership, aborts the migration. The migration needs CREATEROLE unless the role already exists. Use one cluster per environment, or restrict CONNECT per database.
 - Migration `0003` also adds `audit_events.details jsonb`.
 
+## Slice 3: GDPR erasure and export
+
+- **Endpoints:**
+  - `POST /v1/me/erasure`: self-service.
+  - `POST /v1/admin/users/{userId}/erasure`: admin or support; others get 403.
+  - `GET /v1/me/export`.
+- **Erasure transaction:**
+  - lock the user row (`FOR UPDATE`); if `erased_at` is already set, return it (idempotent);
+  - check blockers (today: an `admin` grant, giving 409 `erasure_blocked` with `details.blockers`);
+  - set `subject = 'erased:' || HMAC(AUTH_LOG_SALT, 'erasure', issuer, subject)` and `erased_at = now()`;
+  - delete all grants;
+  - insert audit `user:erase` with `details.initiator`.
+  - A CHECK keeps `erased_at` and the `erased:` prefix consistent, and tokens whose `sub` starts with `erased:` are rejected.
+- **Authentication after erasure:** `resolvePrincipal` first looks up the hashed subject. If it was erased at or after the token's `iat` (rounded up to the second), the token gets 401 `invalid_token`. Later tokens re-provision a new, unlinked user.
+- **Export:**
+  - identity, grants and audit events;
+  - audit rows come from the `SECURITY DEFINER` function `export_audit_events(uuid)` (pinned `search_path`, EXECUTE only for `tazumo_api`), so the runtime role keeps INSERT-only access to `audit_events`;
+  - the function trusts its argument; the API passes only the caller's ID.
+- **Privileges (migration `0004`):**
+  - `tazumo_api` gets UPDATE on `users(subject, erased_at)` only;
+  - row-level security now lets it delete `customer`, `courier`, `merchant_staff` and `support` grants, but still not `admin`.
+- **Provider side:** deleting the account at the identity provider stays an operator step until ADR-0017 is decided.
+- **Integration points for other packages:** order and commerce data must add erasure blockers or pseudonymisation steps when they are wired into the API.
+
 ## Next slices
 - Accept or amend ADR-0017 (OIDC provider), then run the Keycloak spike it proposes.
 - Use a shared rate-limit store for multi-instance deployments.

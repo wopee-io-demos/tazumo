@@ -179,7 +179,8 @@ describe('admin role grants, running as the least-privilege tazumo_api role', ()
       `DELETE FROM audit_events`,
       `TRUNCATE audit_events`,
       `SELECT * FROM audit_events`,
-      `UPDATE users SET subject = 'x'`,
+      `UPDATE users SET issuer = 'x'`,
+      `UPDATE users SET created_at = now()`,
       `INSERT INTO products (id, slug, merchant_id, category_code, name, price_minor, currency) VALUES (gen_random_uuid(), 'x', '${merchantA}', 'food', 'X', 1, 'EUR')`,
       `UPDATE merchants SET accepting_orders = true`,
       `SELECT * FROM schema_migrations`

@@ -2,27 +2,13 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type pg from 'pg';
 import { can } from '../auth/policy.ts';
 import { routeSchema, toFastifyPath } from '../contract.ts';
+import { inTransaction } from '../db-tx.ts';
 import { apiError } from '../errors.ts';
 
 type GrantRequest = { Params: { userId: string; role: 'merchant_staff' | 'support' }; Querystring: { merchantId?: string } };
 type Outcome = { status: number; code?: string; message?: string; changed?: boolean };
 
 const rolePath = '/v1/admin/users/{userId}/roles/{role}';
-
-async function inTransaction<T>(pool: pg.Pool, work: (client: pg.PoolClient) => Promise<T>): Promise<T> {
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-    const result = await work(client);
-    await client.query('COMMIT');
-    client.release();
-    return result;
-  } catch (error) {
-    await client.query('ROLLBACK').catch(() => {});
-    client.release(error as Error);
-    throw error;
-  }
-}
 
 export async function adminRoutes(app: FastifyInstance, { pool }: { pool: pg.Pool }) {
   function precheck(request: FastifyRequest<GrantRequest>, reply: FastifyReply) {

@@ -54,3 +54,11 @@ test('only admins manage roles, and never their own', () => {
   assert.deepEqual(can(admin, 'role:manage', { type: 'user', id: 'u-admin' }), { allowed: false, status: 403 });
   assert.deepEqual(can(support, 'role:manage', { type: 'user', id: 'u-support' }), { allowed: false, status: 403 });
 });
+
+test('erasure: self, support and admin may erase; others get 403', () => {
+  assert.deepEqual(can(customer, 'user:erase', { type: 'user', id: 'u-customer' }), { allowed: true, audit: true });
+  assert.deepEqual(can(support, 'user:erase', { type: 'user', id: 'u-customer' }), { allowed: true, audit: true });
+  assert.deepEqual(can(admin, 'user:erase', { type: 'user', id: 'u-customer' }), { allowed: true, audit: true });
+  assert.deepEqual(can(customer, 'user:erase', { type: 'user', id: 'u-staff' }), { allowed: false, status: 403 });
+  assert.deepEqual(can(staffA, 'user:erase', { type: 'user', id: 'u-customer' }), { allowed: false, status: 403 });
+});
