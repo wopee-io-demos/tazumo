@@ -36,9 +36,17 @@ The commerce package SHALL compute lines, subtotal, delivery fee, small-order su
 - WHEN a market configuration sets `pricesIncludeVat: false`
 - THEN VAT per rate is added to the net total
 
-#### Scenario: CZK whole crowns
-- WHEN a CZK total is not a whole crown
-- THEN the payable amount is rounded half up to whole crowns, the difference is a separate rounding component, and whole-crown amounts display without halers
+#### Scenario: CZK cash payments round to whole crowns
+- WHEN a CZK order is paid in cash and the total is not a whole crown
+- THEN the payable amount is rounded half up to whole crowns, the difference is a separate rounding component outside the VAT base, and whole-crown amounts display without halers
+
+#### Scenario: Card payments are not rounded
+- WHEN no payment method or `card` is given, in any market
+- THEN the payable amount equals the exact total and there is no rounding component
+
+#### Scenario: Standard-rate drinks
+- WHEN a food or grocery line such as a soft drink names `vatRateId: 'standard'`
+- THEN the market's standard rate applies in SK, CZ, DE and AT
 
 #### Scenario: Synthetic fees
 - WHEN any breakdown is produced

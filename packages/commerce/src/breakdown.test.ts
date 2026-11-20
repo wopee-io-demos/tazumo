@@ -88,8 +88,8 @@ test('AT applies 13 % to flowers and the 4.9 % rate only when a line opts in', (
   assert.equal(plain.lines[0].vatBasisPoints, 1000);
 });
 
-test('CZK: half-haler VAT rounds half up and the payable total is whole crowns', () => {
-  const b = priceBreakdown(markets.CZ, { deliveryDistanceMeters: 3000, lines: [line('svickova', czk(12950), { vatCategory: 'food' })] });
+test('CZK cash: half-haler VAT rounds half up and the payable total is whole crowns', () => {
+  const b = priceBreakdown(markets.CZ, { deliveryDistanceMeters: 3000, paymentMethod: 'cash', lines: [line('svickova', czk(12950), { vatCategory: 'food' })] });
   assert.equal(b.deliveryFee.amountMinor, 3900 + 2000);
   assert.equal(b.smallOrderSurcharge.amountMinor, 7900);
   assert.deepEqual(
@@ -105,7 +105,7 @@ test('CZK: half-haler VAT rounds half up and the payable total is whole crowns',
   assert.equal(b.payableMinor % 100, 0);
   assert.equal(payableFromComponents(b), b.payableMinor);
   const rounding = b.components.find((c) => c.kind === 'rounding');
-  assert.match(rounding?.explanation ?? '', /nearest 1\sKč: \+0,50\sKč, not subject to VAT/);
+  assert.match(rounding?.explanation ?? '', /^Cash payment rounded to the nearest 1\sKč: \+0,50\sKč, not part of the VAT base$/);
   assert.match(b.components.at(-1)?.explanation ?? '', /^Amount to pay 268\sKč$/);
 });
 
@@ -116,17 +116,28 @@ test('VAT contained in inclusive prices rounds half up on exact ties', () => {
   assert.deepEqual([cz.vat[0].netMinor, cz.vat[0].vatMinor], [312, 38]);
 });
 
-test('CZK rounds down below half a crown', () => {
-  const b = priceBreakdown(markets.CZ, { deliveryDistanceMeters: 3000, lines: [line('svickova', czk(12949), { vatCategory: 'food' })] });
+test('CZK cash rounds down below half a crown', () => {
+  const b = priceBreakdown(markets.CZ, { deliveryDistanceMeters: 3000, paymentMethod: 'cash', lines: [line('svickova', czk(12949), { vatCategory: 'food' })] });
   assert.equal(b.totalMinor, 26749);
   assert.equal(b.payableMinor, 26700);
   assert.equal(b.roundingMinor, -49);
   assert.equal(payableFromComponents(b), 26700);
 });
 
+test('card payments are never rounded, also in CZK', () => {
+  const b = priceBreakdown(markets.CZ, { deliveryDistanceMeters: 3000, lines: [line('svickova', czk(12950), { vatCategory: 'food' })] });
+  assert.equal(b.paymentMethod, 'card');
+  assert.deepEqual([b.totalMinor, b.roundingMinor, b.payableMinor], [26750, 0, 26750]);
+  assert.ok(!b.components.some((c) => c.kind === 'rounding'));
+  assert.equal(b.vat.reduce((s, g) => s + g.grossMinor, 0), b.payableMinor);
+  rejects('invalid_payment_method', () =>
+    priceBreakdown(markets.CZ, { deliveryDistanceMeters: 0, paymentMethod: 'cheque' as never, lines: [line('x', czk(100))] })
+  );
+});
+
 test('EUR markets never round the payable amount', () => {
   for (const code of ['SK', 'DE', 'AT'] as const) {
-    const b = priceBreakdown(markets[code], { deliveryDistanceMeters: 0, lines: [line('x', eur(1001))] });
+    const b = priceBreakdown(markets[code], { deliveryDistanceMeters: 0, paymentMethod: 'cash', lines: [line('x', eur(1001))] });
     assert.equal(b.payableMinor, b.totalMinor);
     assert.ok(!b.components.some((c) => c.kind === 'rounding'));
   }
@@ -155,6 +166,25 @@ test('VAT-exclusive markets add VAT per rate with half-up rounding', () => {
 test('VAT is rounded once per rate, not per line', () => {
   const b = priceBreakdown(noFees(markets.SK), { deliveryDistanceMeters: 0, lines: [line('a', eur(3)), line('b', eur(3))] });
   assert.deepEqual([b.vat.length, b.vat[0].grossMinor, b.vat[0].netMinor, b.vat[0].vatMinor], [1, 6, 5, 1]);
+});
+
+test('VAT groups with equal rates are ordered by rate id', () => {
+  const base = noFees(markets.DE);
+  const market: MarketConfig = {
+    ...base,
+    vat: {
+      ...base.vat,
+      rates: { ...base.vat.rates, Zeta: { id: 'Zeta', basisPoints: 700, label: 'Same rate', sourceIds: ['de-ustg-12'] } },
+      categoryOverrides: { ...base.vat.categoryOverrides, groceries: ['Zeta'] }
+    }
+  };
+  const groups = (first: string, second: string) =>
+    priceBreakdown(market, {
+      deliveryDistanceMeters: 0,
+      lines: [line('a', eur(100), { vatCategory: 'groceries', vatRateId: first }), line('b', eur(100), { vatCategory: 'groceries', vatRateId: second })]
+    }).vat.map((g) => g.rateId);
+  assert.deepEqual(groups('reduced', 'Zeta'), ['Zeta', 'reduced']);
+  assert.deepEqual(groups('Zeta', 'reduced'), ['Zeta', 'reduced']);
 });
 
 test('delivery distance bands are inclusive at the upper bound', () => {
@@ -190,7 +220,27 @@ test('a line may only opt into the rates its category allows', () => {
   assert.equal(at({ vatCategory: 'flowers', vatRateId: 'reduced13' })().lines[0].vatBasisPoints, 1300);
   const sk = priceBreakdown(markets.SK, { deliveryDistanceMeters: 0, lines: [line('chips', eur(199), { vatCategory: 'groceries', vatRateId: 'standard' })] });
   assert.equal(sk.lines[0].vatBasisPoints, 2300);
-  rejects('unknown_vat_rate', () => priceBreakdown(markets.DE, { deliveryDistanceMeters: 0, lines: [line('x', eur(100), { vatCategory: 'food', vatRateId: 'standard' })] }));
+  rejects('unknown_vat_rate', () => priceBreakdown(markets.DE, { deliveryDistanceMeters: 0, lines: [line('x', eur(100), { vatCategory: 'flowers', vatRateId: 'standard' })] }));
+  rejects('unknown_vat_rate', () => priceBreakdown(markets.DE, { deliveryDistanceMeters: 0, lines: [line('x', eur(100), { vatRateId: 'reduced' })] }));
+});
+
+test('soft drinks and alcohol can opt into the standard rate in every market', () => {
+  const drink = (code: 'SK' | 'CZ' | 'DE' | 'AT', vatCategory: 'food' | 'groceries') => {
+    const market = markets[code];
+    return priceBreakdown(market, {
+      deliveryDistanceMeters: 0,
+      lines: [line('cola', { currency: market.currency, minorUnits: market.currency === 'CZK' ? 3900 : 199 }, { vatCategory, vatRateId: 'standard' })]
+    }).lines[0].vatBasisPoints;
+  };
+  assert.deepEqual(
+    (['SK', 'CZ', 'DE', 'AT'] as const).map((c) => [drink(c, 'food'), drink(c, 'groceries')]),
+    [
+      [2300, 2300],
+      [2100, 2100],
+      [1900, 1900],
+      [2000, 2000]
+    ]
+  );
 });
 
 const rejects = (code: string, fn: () => unknown) =>
@@ -238,6 +288,12 @@ test('non-object input is rejected with typed errors', () => {
   rejects('invalid_line', de({ deliveryDistanceMeters: 0, lines: [null] }));
   rejects('invalid_line', de({ deliveryDistanceMeters: 0, lines: [line('x', eur(100), { vatRateId: null as never })] }));
   rejects('invalid_amount', de({ deliveryDistanceMeters: 0, lines: [line('x', null as never)] }));
+  const sparse: OrderLineInput[] = [line('a', eur(100))];
+  sparse.length = 2;
+  rejects('invalid_line', de({ deliveryDistanceMeters: 0, lines: sparse }));
+  const negativeZero = priceBreakdown(markets.DE, { deliveryDistanceMeters: 0, lines: [line('free', eur(-0)), line('x', eur(1000))] });
+  assert.ok(Object.is(negativeZero.lines[0].unitPriceMinor, 0));
+  assert.ok(Object.is(negativeZero.lines[0].amountMinor, 0));
 });
 
 test('amounts beyond the safe integer range are rejected instead of losing precision', () => {
@@ -266,6 +322,9 @@ test('an inconsistent market configuration is rejected', () => {
   }
   const badOverride: MarketConfig = { ...markets.DE, vat: { ...markets.DE.vat, categoryOverrides: { ...markets.DE.vat.categoryOverrides, food: ['zero'] } } };
   rejects('invalid_market_config', () => priceBreakdown(badOverride, { deliveryDistanceMeters: 0, lines: [line('x', eur(100))] }));
+  for (const bad of [null, { ...markets.DE, vat: undefined }, { ...markets.DE, vat: { ...markets.DE.vat, rates: null } }, { ...markets.DE, rounding: { cashIncrementMinor: 1, wholeUnitDisplay: 'no' } }]) {
+    rejects('invalid_market_config', () => priceBreakdown(bad as unknown as MarketConfig, { deliveryDistanceMeters: 0, lines: [line('x', eur(100))] }));
+  }
   const { gifts: _omitted, ...partial } = markets.DE.vat.categoryOverrides;
   for (const categoryOverrides of [undefined, partial, { ...markets.DE.vat.categoryOverrides, gifts: 'standard' }]) {
     const cfg = { ...markets.DE, vat: { ...markets.DE.vat, categoryOverrides } } as unknown as MarketConfig;

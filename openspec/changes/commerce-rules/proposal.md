@@ -5,7 +5,7 @@ Issue [#11](https://github.com/wopee-io-demos/tazumo/issues/11), acceptance item
 
 ## What changes
 - New pure TypeScript package `@tazumo/commerce` (no I/O, no UI, no dependencies).
-- Market configuration for SK, CZ, DE and AT: currency, locale, VAT rates by category with cited sources, VAT-inclusive display, CZK whole-crown payable rounding.
+- Market configuration for SK, CZ, DE and AT: currency, locale, VAT rates by category with cited sources, VAT-inclusive display, CZK whole-crown rounding for cash payments only.
 - `priceBreakdown(market, order)`: lines, subtotal, synthetic delivery fee (base plus distance band), synthetic small-order surcharge, VAT per rate, total, rounding and payable amount, each with an explanation.
 - Typed `CommerceRuleError` codes for invalid input.
 - ADR-0018 records the design, VAT sources with retrieval dates and the classification assumptions to re-verify.

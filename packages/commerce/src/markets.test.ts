@@ -10,7 +10,7 @@ test('every launch market is internally consistent', () => {
 
 test('market currency, locale and display rules', () => {
   assert.deepEqual(
-    marketCodes.map((c) => [c, markets[c].currency, markets[c].locale, markets[c].pricesIncludeVat, markets[c].rounding.payableIncrementMinor]),
+    marketCodes.map((c) => [c, markets[c].currency, markets[c].locale, markets[c].pricesIncludeVat, markets[c].rounding.cashIncrementMinor]),
     [
       ['SK', 'EUR', 'sk-SK', true, 1],
       ['CZ', 'CZK', 'cs-CZ', true, 100],

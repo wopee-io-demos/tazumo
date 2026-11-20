@@ -14,7 +14,11 @@ export type OrderLineInput = {
   vatRateId?: string;
 };
 
-export type OrderInput = { lines: readonly OrderLineInput[]; deliveryDistanceMeters: number };
+export const paymentMethods = ['card', 'cash'] as const;
+export type PaymentMethod = (typeof paymentMethods)[number];
+
+/** `paymentMethod` defaults to `card`, which is never rounded; only `cash` uses the market's cash rounding. */
+export type OrderInput = { lines: readonly OrderLineInput[]; deliveryDistanceMeters: number; paymentMethod?: PaymentMethod };
 
 export type BreakdownLine = {
   id: string;
@@ -51,6 +55,7 @@ export type PriceBreakdown = {
   market: string;
   currency: string;
   pricesIncludeVat: boolean;
+  paymentMethod: PaymentMethod;
   lines: BreakdownLine[];
   subtotalMinor: number;
   deliveryFee: { amountMinor: number; baseMinor: number; bandFeeMinor: number; bandUpToMeters: number; distanceMeters: number; synthetic: true };
@@ -160,20 +165,26 @@ export function priceBreakdown(market: MarketConfig, order: OrderInput): PriceBr
   const byRate = new Map<string, bigint>();
   const add = (rateId: string, amount: bigint) => byRate.set(rateId, (byRate.get(rateId) ?? 0n) + amount);
 
-  const lines: BreakdownLine[] = order.lines.map((line) => {
+  const paymentMethod = order.paymentMethod ?? 'card';
+  if (!(paymentMethods as readonly string[]).includes(paymentMethod)) {
+    throw new CommerceRuleError('invalid_payment_method', `Unknown payment method "${String(paymentMethod)}"`, { supported: paymentMethods });
+  }
+  const lines: BreakdownLine[] = Array.from({ length: order.lines.length }, (_, i) => {
+    const line = order.lines[i];
     const { rateId } = validateLine(market, line, seen);
-    const amount = BigInt(line.quantity) * BigInt(line.unitPrice.minorUnits);
+    const unitPriceMinor = line.unitPrice.minorUnits + 0;
+    const amount = BigInt(line.quantity) * BigInt(unitPriceMinor);
     add(rateId, amount);
     const amountMinor = toSafeNumber(amount, `line ${line.id}`);
     const bp = market.vat.rates[rateId].basisPoints;
     return {
       id: line.id,
       quantity: line.quantity,
-      unitPriceMinor: line.unitPrice.minorUnits,
+      unitPriceMinor,
       amountMinor,
       vatRateId: rateId,
       vatBasisPoints: bp,
-      explanation: `${line.quantity} × ${fmt(line.unitPrice.minorUnits)} = ${fmt(amountMinor)}, VAT ${formatPercent(bp)} (${line.vatCategory})`
+      explanation: `${line.quantity} × ${fmt(unitPriceMinor)} = ${fmt(amountMinor)}, VAT ${formatPercent(bp)} (${line.vatCategory})`
     };
   });
   const subtotalMinor = toSafeNumber(
@@ -201,13 +212,14 @@ export function priceBreakdown(market: MarketConfig, order: OrderInput): PriceBr
   add(market.vat.feeRateId, BigInt(deliveryMinor) + BigInt(surchargeMinor));
   const vat = [...byRate.entries()]
     .filter(([, amount]) => amount > 0n)
-    .sort(([a], [b]) => market.vat.rates[b].basisPoints - market.vat.rates[a].basisPoints || a.localeCompare(b))
+    .sort(([a], [b]) => market.vat.rates[b].basisPoints - market.vat.rates[a].basisPoints || (a < b ? -1 : a > b ? 1 : 0))
     .map(([rateId, amount]) => vatGroup(market, rateId, amount));
 
   const totalMinor = market.pricesIncludeVat
     ? toSafeNumber(BigInt(subtotalMinor) + BigInt(deliveryMinor) + BigInt(surchargeMinor), 'total')
     : toSafeNumber(vat.reduce((sum, g) => sum + BigInt(g.grossMinor), 0n), 'total');
-  const payableMinor = roundToIncrement(totalMinor, market.rounding.payableIncrementMinor);
+  const increment = paymentMethod === 'cash' ? market.rounding.cashIncrementMinor : 1;
+  const payableMinor = roundToIncrement(totalMinor, increment);
   const roundingMinor = payableMinor - totalMinor;
 
   const feeVat = `taxed at the ${market.vat.feeRateId} rate as a platform service`;
@@ -246,7 +258,7 @@ export function priceBreakdown(market: MarketConfig, order: OrderInput): PriceBr
       amountMinor: roundingMinor,
       addsToPayable: true,
       synthetic: false,
-      explanation: `Rounded to the nearest ${fmt(market.rounding.payableIncrementMinor)}: ${roundingMinor > 0 ? '+' : ''}${fmt(roundingMinor)}, not subject to VAT`
+      explanation: `Cash payment rounded to the nearest ${fmt(increment)}: ${roundingMinor > 0 ? '+' : ''}${fmt(roundingMinor)}, not part of the VAT base`
     });
   }
   components.push({ kind: 'payable', amountMinor: payableMinor, addsToPayable: false, synthetic: false, explanation: `Amount to pay ${fmt(payableMinor)}` });
@@ -255,6 +267,7 @@ export function priceBreakdown(market: MarketConfig, order: OrderInput): PriceBr
     market: market.code,
     currency: market.currency,
     pricesIncludeVat: market.pricesIncludeVat,
+    paymentMethod,
     lines,
     subtotalMinor,
     deliveryFee: { amountMinor: deliveryMinor, baseMinor, bandFeeMinor: band.feeMinor, bandUpToMeters: band.upToMeters, distanceMeters: distance, synthetic: true },

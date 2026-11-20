@@ -33,7 +33,8 @@ export type MarketConfig = {
     categoryOverrides: Readonly<Record<VatCategory, readonly string[]>>;
     feeRateId: string;
   };
-  rounding: { payableIncrementMinor: number; wholeUnitDisplay: boolean };
+  /** `cashIncrementMinor` applies only to cash payments; card and online payments are never rounded. */
+  rounding: { cashIncrementMinor: number; wholeUnitDisplay: boolean };
   deliveryFee: { synthetic: true; baseMinor: number; bands: readonly DeliveryBand[] };
   smallOrderSurcharge: { synthetic: true; thresholdMinor: number; capMinor: number };
 };
@@ -106,7 +107,7 @@ const euroFees = {
   smallOrderSurcharge: { synthetic: true, thresholdMinor: 1000, capMinor: 300 }
 } as const;
 
-const euroRounding = { payableIncrementMinor: 1, wholeUnitDisplay: false } as const;
+const euroRounding = { cashIncrementMinor: 1, wholeUnitDisplay: false } as const;
 
 export const markets: Readonly<Record<MarketCode, MarketConfig>> = {
   SK: {
@@ -142,10 +143,10 @@ export const markets: Readonly<Record<MarketCode, MarketConfig>> = {
         reduced: rate('reduced', 1200, 'Reduced rate: food and catering services', [EU, 'cz-gfr-2024'])
       },
       categoryDefaults: { food: 'reduced', groceries: 'reduced', flowers: 'standard', gifts: 'standard', electronics: 'standard' },
-      categoryOverrides: noOverrides,
+      categoryOverrides: { ...noOverrides, food: ['standard'], groceries: ['standard'] },
       feeRateId: 'standard'
     },
-    rounding: { payableIncrementMinor: 100, wholeUnitDisplay: true },
+    rounding: { cashIncrementMinor: 100, wholeUnitDisplay: true },
     deliveryFee: {
       synthetic: true,
       baseMinor: 3900,
@@ -170,7 +171,7 @@ export const markets: Readonly<Record<MarketCode, MarketConfig>> = {
         reduced: rate('reduced', 700, 'Ermäßigter Satz: Anlage 2 goods (food, cut flowers), restaurant food', [EU, 'de-ustg-12', 'de-ustg-anlage-2'])
       },
       categoryDefaults: { food: 'reduced', groceries: 'reduced', flowers: 'reduced', gifts: 'standard', electronics: 'standard' },
-      categoryOverrides: noOverrides,
+      categoryOverrides: { ...noOverrides, food: ['standard'], groceries: ['standard'] },
       feeRateId: 'standard'
     },
     rounding: euroRounding,
@@ -191,7 +192,7 @@ export const markets: Readonly<Record<MarketCode, MarketConfig>> = {
         basicFood: rate('basicFood', 490, 'Ermäßigter Satz: Anlage 3 basic foods (since 1 July 2026)', ['at-ustg-10', 'at-usp-4-9'])
       },
       categoryDefaults: { food: 'reduced', groceries: 'reduced', flowers: 'reduced13', gifts: 'standard', electronics: 'standard' },
-      categoryOverrides: { ...noOverrides, groceries: ['basicFood'] },
+      categoryOverrides: { ...noOverrides, food: ['standard'], groceries: ['basicFood', 'standard'] },
       feeRateId: 'standard'
     },
     rounding: euroRounding,
@@ -209,10 +210,22 @@ export function getMarket(code: string): MarketConfig {
 
 const isMinor = (value: unknown): value is number => Number.isSafeInteger(value) && (value as number) >= 0;
 
+const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
+
 export function assertValidMarket(market: MarketConfig): void {
+  if (!isObject(market) || !isObject(market.vat) || !isObject(market.vat.rates) || !isObject(market.vat.categoryDefaults)) {
+    throw new CommerceRuleError('invalid_market_config', 'Market configuration needs vat.rates and vat.categoryDefaults objects');
+  }
+  if (!isObject(market.rounding) || !isObject(market.deliveryFee) || !Array.isArray(market.deliveryFee.bands) || !isObject(market.smallOrderSurcharge)) {
+    throw new CommerceRuleError('invalid_market_config', 'Market configuration needs rounding, deliveryFee.bands and smallOrderSurcharge');
+  }
   const problems: string[] = [];
-  if (!/^[A-Z]{3}$/.test(market.currency)) problems.push('currency must be an ISO 4217 code');
+  if (typeof market.currency !== 'string' || !/^[A-Z]{3}$/.test(market.currency)) problems.push('currency must be an ISO 4217 code');
   for (const [id, r] of Object.entries(market.vat.rates)) {
+    if (!isObject(r)) {
+      problems.push(`rate ${id} must be an object`);
+      continue;
+    }
     if (r.id !== id) problems.push(`rate key ${id} does not match its id`);
     if (!Number.isSafeInteger(r.basisPoints) || r.basisPoints < 0 || r.basisPoints > 10000) problems.push(`rate ${id} out of range`);
   }
@@ -229,6 +242,7 @@ export function assertValidMarket(market: MarketConfig): void {
     }
   }
   if (typeof market.pricesIncludeVat !== 'boolean') problems.push('pricesIncludeVat must be a boolean');
+  if (typeof market.rounding.wholeUnitDisplay !== 'boolean') problems.push('wholeUnitDisplay must be a boolean');
   try {
     const digits = new Intl.NumberFormat(market.locale, { style: 'currency', currency: market.currency }).resolvedOptions().maximumFractionDigits;
     if (digits !== 2) problems.push('only currencies with two minor digits are supported');
@@ -236,7 +250,7 @@ export function assertValidMarket(market: MarketConfig): void {
     problems.push('locale or currency is not supported by Intl');
   }
   if (!Object.hasOwn(market.vat.rates, market.vat.feeRateId)) problems.push('fee rate is not defined');
-  const increment = market.rounding.payableIncrementMinor;
+  const increment = market.rounding.cashIncrementMinor;
   if (!Number.isSafeInteger(increment) || increment < 1) problems.push('rounding increment must be a positive integer');
   if (!isMinor(market.deliveryFee.baseMinor)) problems.push('delivery base fee must be non-negative minor units');
   const { bands } = market.deliveryFee;

@@ -18,12 +18,14 @@ export { divideRoundHalfUp, formatMinor, roundToIncrement, type Money } from './
 export {
   MAX_LINE_QUANTITY,
   MAX_LINES,
+  paymentMethods,
   priceBreakdown,
   type BreakdownComponent,
   type BreakdownLine,
   type ComponentKind,
   type OrderInput,
   type OrderLineInput,
+  type PaymentMethod,
   type PriceBreakdown,
   type VatGroup
 } from './breakdown.ts';
