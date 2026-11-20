@@ -23,6 +23,7 @@ jobs:
         with:
           node-version: '22'
       - run: pnpm install --no-frozen-lockfile
+      - run: python3 scripts/check-agent-policy.py
       - run: node scripts/check-repo-policy.mjs
       - run: node scripts/validate-openapi.mjs
       - run: pnpm typecheck
