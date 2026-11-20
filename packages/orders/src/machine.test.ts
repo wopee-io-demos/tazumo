@@ -1,0 +1,338 @@
+import { describe, it, mock } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync, readdirSync } from 'node:fs';
+import {
+  applyCommand,
+  createOrder,
+  customerTimeline,
+  replay,
+  type AcceptanceDecision,
+  type Actor,
+  type Command,
+  type CommandType,
+  type OrderEvent,
+  type OrderStatus,
+  type Principal,
+} from './index.ts';
+
+const ORDER = '0b6f1d5e-3a7c-4c51-9d0e-2f6a8b1c4d01';
+const OTHER_ORDER = '0b6f1d5e-3a7c-4c51-9d0e-2f6a8b1c4d02';
+const MERCHANT = '6a1f2b3c-4d5e-4f60-8a7b-9c0d1e2f3a01';
+const OTHER_MERCHANT = '6a1f2b3c-4d5e-4f60-8a7b-9c0d1e2f3a02';
+const COURIER_ID = 'c0c0c0c0-1111-4222-8333-444455556666';
+
+const user = (userId: string, ...grants: Principal['grants']): Actor => ({ kind: 'user', principal: { userId, grants } });
+const customer = user('u-customer', { role: 'customer', merchantId: null });
+const otherCustomer = user('u-other', { role: 'customer', merchantId: null });
+const staff = user('u-staff', { role: 'customer', merchantId: null }, { role: 'merchant_staff', merchantId: MERCHANT });
+const otherStaff = user('u-staff-b', { role: 'merchant_staff', merchantId: OTHER_MERCHANT });
+const courier = user(COURIER_ID, { role: 'courier', merchantId: null });
+const otherCourier = user('c0c0c0c0-1111-4222-8333-444455557777', { role: 'courier', merchantId: null });
+const support = user('u-support', { role: 'support', merchantId: null });
+const admin = user('u-admin', { role: 'admin', merchantId: null });
+const system = (source: 'payment' | 'acceptance' | 'dispatch' | 'operations'): Actor => ({ kind: 'system', source });
+
+let ids = 0;
+const options = { newId: () => `00000000-0000-4000-8000-${String(++ids).padStart(12, '0')}` };
+const minute = (n: number) => new Date(Date.UTC(2026, 10, 20, 12, n)).toISOString();
+
+const acceptance = (state: AcceptanceDecision['state'], extra: Partial<AcceptanceDecision> = {}): AcceptanceDecision => ({
+  orderId: ORDER,
+  merchantId: MERCHANT,
+  state,
+  receivedAt: minute(2),
+  deadline: minute(12),
+  decidedAt: minute(3),
+  ...(state === 'declined' ? { declineReason: 'too_busy' } : {}),
+  ...(state === 'auto_declined' ? { declineReason: 'window_expired', decidedAt: minute(12) } : {}),
+  ...extra,
+});
+
+const happySteps: [Command, Actor][] = [
+  [{ type: 'request_payment' }, system('payment')],
+  [{ type: 'payment_authorized', paymentReference: 'pi_test_123' }, system('payment')],
+  [{ type: 'merchant_accept', acceptance: acceptance('accepted') }, staff],
+  [{ type: 'start_preparing' }, staff],
+  [{ type: 'mark_ready' }, staff],
+  [{ type: 'assign_courier', courierUserId: COURIER_ID }, system('dispatch')],
+  [{ type: 'pick_up' }, courier],
+  [{ type: 'deliver' }, courier],
+];
+
+function created(): OrderEvent[] {
+  const r = createOrder({ orderId: ORDER, merchantId: MERCHANT, total: { currency: 'EUR', minorUnits: 2380 } }, customer, minute(0), 'create-key-1', options);
+  assert.ok(r.ok, JSON.stringify(r));
+  return [r.value.event];
+}
+
+function run(events: OrderEvent[], steps: [Command, Actor][], start = events.length): OrderEvent[] {
+  const log = [...events];
+  steps.forEach(([command, actor], i) => {
+    const r = applyCommand(log, command, actor, minute(start + i), `key-${start + i}-${command.type}`, options);
+    assert.ok(r.ok, `${command.type}: ${JSON.stringify(r)}`);
+    log.push(r.value.event);
+  });
+  return log;
+}
+
+type Situation = 'created' | 'payment_pending' | 'confirmed' | 'confirmed_accepted' | 'preparing' | 'ready_for_pickup' | 'courier_assigned' | 'picked_up' | 'delivered' | 'cancelled' | 'failed';
+function reach(situation: Situation): OrderEvent[] {
+  const order: Situation[] = ['created', 'payment_pending', 'confirmed', 'confirmed_accepted', 'preparing', 'ready_for_pickup', 'courier_assigned', 'picked_up', 'delivered'];
+  if (situation === 'cancelled') return run(created(), [[{ type: 'cancel' }, customer]]);
+  if (situation === 'failed') return run(created(), [[{ type: 'fail', reason: 'internal_error' }, system('operations')]]);
+  return run(created(), happySteps.slice(0, order.indexOf(situation)));
+}
+
+describe('order lifecycle', () => {
+  it('runs the happy path from created to delivered with sequenced, attributed events', () => {
+    const log = run(created(), happySteps);
+    assert.deepEqual(log.map((e) => e.sequence), [1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    assert.deepEqual(log.map((e) => e.status), ['created', 'payment_pending', 'confirmed', 'confirmed', 'preparing', 'ready_for_pickup', 'courier_assigned', 'picked_up', 'delivered']);
+    assert.ok(log.every((e, i) => i === 0 || e.occurredAt >= log[i - 1].occurredAt));
+    assert.deepEqual(log[3].actor, { kind: 'user', userId: 'u-staff', role: 'merchant_staff' });
+    assert.deepEqual(log[2].actor, { kind: 'system', source: 'payment' });
+    const state = replay(log);
+    assert.ok(state.ok);
+    assert.equal(state.value.status, 'delivered');
+    assert.equal(state.value.courierUserId, COURIER_ID);
+    assert.equal(state.value.paymentReference, 'pi_test_123');
+    assert.deepEqual(state.value.total, { currency: 'EUR', minorUnits: 2380 });
+  });
+
+  it('returns the original event for a repeated command with the same idempotency key', () => {
+    const log = reach('payment_pending');
+    const command: Command = { type: 'payment_authorized', paymentReference: 'pi_test_123' };
+    const first = applyCommand(log, command, system('payment'), minute(5), 'webhook-evt-0001', options);
+    assert.ok(first.ok);
+    const withFirst = [...log, first.value.event];
+    const again = applyCommand(withFirst, command, system('payment'), minute(9), 'webhook-evt-0001', options);
+    assert.ok(again.ok);
+    assert.equal(again.value.replayed, true);
+    assert.equal(again.value.event, first.value.event);
+    assert.equal(again.value.state.sequence, withFirst.length);
+  });
+
+  it('rejects a reused idempotency key with another command, payload or actor', () => {
+    const log = run(reach('payment_pending'), [[{ type: 'payment_authorized', paymentReference: 'pi_a' }, system('payment')]]);
+    const key = log.at(-1)!.idempotencyKey;
+    for (const [command, actor] of [
+      [{ type: 'payment_authorized', paymentReference: 'pi_b' }, system('payment')],
+      [{ type: 'payment_authorized', paymentReference: 'pi_a' }, system('operations')],
+      [{ type: 'fail', reason: 'internal_error' }, system('operations')],
+    ] as [Command, Actor][]) {
+      const r = applyCommand(log, command, actor, minute(30), key, options);
+      assert.equal(r.ok ? 'ok' : r.error, 'idempotency_conflict');
+    }
+  });
+
+  const allowedFrom: Record<CommandType, Situation[]> = {
+    request_payment: ['created'],
+    payment_authorized: ['payment_pending'],
+    payment_failed: ['payment_pending'],
+    merchant_accept: ['confirmed'],
+    merchant_decline: ['confirmed'],
+    auto_decline: ['confirmed'],
+    start_preparing: ['confirmed_accepted'],
+    mark_ready: ['preparing'],
+    assign_courier: ['ready_for_pickup'],
+    pick_up: ['courier_assigned'],
+    deliver: ['picked_up'],
+    cancel: ['created', 'payment_pending', 'confirmed', 'confirmed_accepted', 'preparing', 'ready_for_pickup', 'courier_assigned', 'picked_up'],
+    fail: ['created', 'payment_pending', 'confirmed', 'confirmed_accepted', 'preparing', 'ready_for_pickup', 'courier_assigned', 'picked_up'],
+  };
+  const valid: Record<CommandType, [Command, Actor]> = {
+    request_payment: [{ type: 'request_payment' }, system('payment')],
+    payment_authorized: [{ type: 'payment_authorized', paymentReference: 'pi_x' }, system('payment')],
+    payment_failed: [{ type: 'payment_failed', reason: 'card_declined' }, system('payment')],
+    merchant_accept: [{ type: 'merchant_accept', acceptance: acceptance('accepted') }, staff],
+    merchant_decline: [{ type: 'merchant_decline', acceptance: acceptance('declined') }, staff],
+    auto_decline: [{ type: 'auto_decline', acceptance: acceptance('auto_declined') }, system('acceptance')],
+    start_preparing: [{ type: 'start_preparing' }, staff],
+    mark_ready: [{ type: 'mark_ready' }, staff],
+    assign_courier: [{ type: 'assign_courier', courierUserId: COURIER_ID }, support],
+    pick_up: [{ type: 'pick_up' }, courier],
+    deliver: [{ type: 'deliver' }, courier],
+    cancel: [{ type: 'cancel', reason: 'merchant_unreachable' }, support],
+    fail: [{ type: 'fail', reason: 'internal_error' }, system('operations')],
+  };
+  const situations: Situation[] = ['created', 'payment_pending', 'confirmed', 'confirmed_accepted', 'preparing', 'ready_for_pickup', 'courier_assigned', 'picked_up', 'delivered', 'cancelled', 'failed'];
+
+  for (const [type, from] of Object.entries(allowedFrom) as [CommandType, Situation[]][]) {
+    it(`allows ${type} only from ${from.join(', ')}`, () => {
+      for (const situation of situations) {
+        const log = reach(situation);
+        const [command, actor] = valid[type];
+        const r = applyCommand(log, command, actor, minute(40), `matrix-${type}-${situation}`, options);
+        if (from.includes(situation)) assert.ok(r.ok, `${type} from ${situation}: ${JSON.stringify(r)}`);
+        else {
+          const courierAbsent = (type === 'pick_up' || type === 'deliver') && !['courier_assigned', 'picked_up', 'delivered'].includes(situation);
+          assert.equal(r.ok ? 'ok' : r.error, courierAbsent ? 'forbidden' : 'illegal_transition', `${type} from ${situation}`);
+        }
+      }
+    });
+  }
+
+  it('refuses the wrong actor with forbidden and no event', () => {
+    const cases: [Situation, Command, Actor][] = [
+      ['confirmed', valid.merchant_accept[0], customer],
+      ['confirmed', valid.merchant_accept[0], otherStaff],
+      ['confirmed', valid.merchant_accept[0], system('acceptance')],
+      ['confirmed', valid.auto_decline[0], staff],
+      ['created', valid.request_payment[0], system('operations')],
+      ['payment_pending', valid.payment_authorized[0], customer],
+      ['ready_for_pickup', valid.assign_courier[0], staff],
+      ['ready_for_pickup', valid.assign_courier[0], courier],
+      ['courier_assigned', valid.pick_up[0], otherCourier],
+      ['courier_assigned', valid.pick_up[0], user(COURIER_ID, { role: 'customer', merchantId: null })],
+      ['picked_up', valid.deliver[0], support],
+      ['created', { type: 'cancel' }, otherCustomer],
+      ['created', { type: 'cancel', reason: 'x' }, staff],
+      ['created', valid.fail[0], support],
+      ['created', valid.fail[0], { kind: 'user', principal: null } as unknown as Actor],
+    ];
+    for (const [situation, command, actor] of cases) {
+      const log = reach(situation);
+      const r = applyCommand(log, command, actor, minute(40), 'forbidden-case', options);
+      assert.equal(r.ok ? 'ok' : r.error, 'forbidden', `${command.type} by ${JSON.stringify(actor)}`);
+    }
+  });
+
+  it('lets the customer cancel only before confirmation, and admins act like support', () => {
+    assert.ok(applyCommand(reach('payment_pending'), { type: 'cancel' }, customer, minute(40), 'cancel-own-1', options).ok);
+    const late = applyCommand(reach('preparing'), { type: 'cancel' }, customer, minute(40), 'cancel-own-2', options);
+    assert.equal(late.ok ? 'ok' : late.error, 'illegal_transition');
+    const byAdmin = applyCommand(reach('preparing'), { type: 'cancel', reason: 'merchant_unreachable' }, admin, minute(40), 'cancel-admin', options);
+    assert.ok(byAdmin.ok);
+    assert.deepEqual(byAdmin.value.event.actor, { kind: 'user', userId: 'u-admin', role: 'admin' });
+  });
+
+  it('requires a reason code for system failures, payment failures and support cancellations', () => {
+    const cases: [Situation, Command, Actor][] = [
+      ['created', { type: 'fail' } as Command, system('operations')],
+      ['payment_pending', { type: 'payment_failed', reason: '' }, system('payment')],
+      ['preparing', { type: 'cancel' }, support],
+      ['preparing', { type: 'cancel', reason: 'Customer called, said John Smith at 5 Main St' }, support],
+      ['confirmed', { type: 'merchant_decline', acceptance: acceptance('declined', { declineReason: 'whatever' }) }, staff],
+    ];
+    for (const [situation, command, actor] of cases) {
+      const r = applyCommand(reach(situation), command, actor, minute(40), 'reason-case', options);
+      assert.equal(r.ok ? 'ok' : r.error, 'reason_required', JSON.stringify(command));
+    }
+  });
+
+  it('refuses a decline after the merchant accepted', () => {
+    const r = applyCommand(reach('confirmed_accepted'), valid.merchant_decline[0], staff, minute(40), 'late-decline', options);
+    assert.equal(r.ok ? 'ok' : r.error, 'illegal_transition');
+    const auto = applyCommand(reach('confirmed_accepted'), valid.auto_decline[0], system('acceptance'), minute(40), 'late-auto', options);
+    assert.equal(auto.ok ? 'ok' : auto.error, 'illegal_transition');
+  });
+
+  it('only consumes a decided acceptance for this order and merchant', () => {
+    for (const bad of [
+      acceptance('pending', { decidedAt: undefined }),
+      acceptance('declined'),
+      acceptance('accepted', { orderId: OTHER_ORDER }),
+      acceptance('accepted', { merchantId: OTHER_MERCHANT }),
+      acceptance('accepted', { decidedAt: 'yesterday' }),
+    ]) {
+      const r = applyCommand(reach('confirmed'), { type: 'merchant_accept', acceptance: bad }, staff, minute(40), 'acceptance-case', options);
+      assert.equal(r.ok ? 'ok' : r.error, 'acceptance_mismatch', JSON.stringify(bad));
+    }
+    const declined = applyCommand(reach('confirmed'), valid.merchant_decline[0], staff, minute(40), 'decline-ok', options);
+    assert.ok(declined.ok);
+    assert.equal(declined.value.event.reason, 'too_busy');
+    const auto = applyCommand(reach('confirmed'), valid.auto_decline[0], system('acceptance'), minute(40), 'auto-decline-ok', options);
+    assert.ok(auto.ok);
+    assert.deepEqual([auto.value.state.status, auto.value.event.reason], ['cancelled', 'window_expired']);
+  });
+
+  it('validates inputs, keys and instants', () => {
+    const total = { currency: 'EUR', minorUnits: 100 };
+    const bad: [Parameters<typeof createOrder>, string][] = [
+      [[{ orderId: 'nope', merchantId: MERCHANT, total }, customer, minute(0), 'create-key-1'], 'invalid_input'],
+      [[{ orderId: ORDER, merchantId: MERCHANT, total: { currency: 'eur', minorUnits: 100 } }, customer, minute(0), 'create-key-1'], 'invalid_input'],
+      [[{ orderId: ORDER, merchantId: MERCHANT, total: { currency: 'EUR', minorUnits: -1 } }, customer, minute(0), 'create-key-1'], 'invalid_input'],
+      [[{ orderId: ORDER, merchantId: MERCHANT, total: { currency: 'EUR', minorUnits: 1.5 } }, customer, minute(0), 'create-key-1'], 'invalid_input'],
+      [[{ orderId: ORDER, merchantId: MERCHANT, total }, customer, minute(0), 'short'], 'invalid_idempotency_key'],
+      [[{ orderId: ORDER, merchantId: MERCHANT, total }, customer, '2026-02-30T10:00:00Z', 'create-key-1'], 'invalid_instant'],
+      [[{ orderId: ORDER, merchantId: MERCHANT, total }, customer, 'now', 'create-key-1'], 'invalid_instant'],
+      [[{ orderId: ORDER, merchantId: MERCHANT, total }, user('u-x', { role: 'merchant_staff', merchantId: MERCHANT }), minute(0), 'create-key-1'], 'forbidden'],
+      [[{ orderId: ORDER, merchantId: MERCHANT, total }, system('payment'), minute(0), 'create-key-1'], 'forbidden'],
+    ];
+    for (const [args, error] of bad) {
+      const r = createOrder(...args);
+      assert.equal(r.ok ? 'ok' : r.error, error, JSON.stringify(args));
+    }
+    const log = created();
+    const early = applyCommand([...log], { type: 'request_payment' }, system('payment'), '2026-11-20T11:00:00Z', 'early-key-1', options);
+    assert.equal(early.ok ? 'ok' : early.error, 'invalid_instant');
+    const unknown = applyCommand(log, { type: 'teleport' } as unknown as Command, system('payment'), minute(1), 'unknown-key', options);
+    assert.equal(unknown.ok ? 'ok' : unknown.error, 'invalid_input');
+    const proto = applyCommand(log, { type: 'toString' } as unknown as Command, system('payment'), minute(1), 'proto-key-1', options);
+    assert.equal(proto.ok ? 'ok' : proto.error, 'invalid_input');
+    const noCourier = applyCommand(reach('ready_for_pickup'), { type: 'assign_courier', courierUserId: 'bob' }, support, minute(40), 'courier-key', options);
+    assert.equal(noCourier.ok ? 'ok' : noCourier.error, 'invalid_input');
+  });
+
+  it('rejects histories with gaps, duplicates, time going backwards or tampering', () => {
+    const log = reach('preparing');
+    const tamper = (i: number, patch: Partial<OrderEvent>) => log.map((e, j) => (j === i ? { ...e, ...patch } : e));
+    const cases: OrderEvent[][] = [
+      [],
+      log.slice(1),
+      [log[0], log[2]],
+      [...log, log.at(-1)!],
+      tamper(3, { occurredAt: minute(0).replace('12:00', '11:00') }),
+      tamper(3, { occurredAt: '2026-11-20T12:03:00+01:00' }),
+      tamper(2, { status: 'preparing' }),
+      tamper(4, { type: 'toString' as OrderEvent['type'] }),
+      tamper(2, { orderId: OTHER_ORDER }),
+      tamper(2, { idempotencyKey: log[1].idempotencyKey }),
+      tamper(0, { data: { customerUserId: 'u-customer' } }),
+    ];
+    for (const events of cases) {
+      const r = replay(events);
+      assert.equal(r.ok ? 'ok' : r.error, 'invalid_history', JSON.stringify(events.map((e) => [e.sequence, e.type, e.status])));
+    }
+    const corrupt = applyCommand(tamper(2, { status: 'delivered' }), { type: 'mark_ready' }, staff, minute(40), 'corrupt-key', options);
+    assert.equal(corrupt.ok ? 'ok' : corrupt.error, 'invalid_history');
+  });
+
+  it('never advances an order with time', () => {
+    const log = reach('courier_assigned');
+    mock.timers.enable({ apis: ['Date'], now: Date.UTC(2026, 10, 20, 12, 30) });
+    try {
+      const before = replay(log);
+      mock.timers.tick(24 * 60 * 60 * 1000);
+      const after = replay(log);
+      assert.deepEqual(after, before);
+      assert.ok(after.ok);
+      assert.equal(after.value.status, 'courier_assigned');
+      assert.deepEqual(customerTimeline(log), customerTimeline(log));
+    } finally {
+      mock.timers.reset();
+    }
+    const dir = new URL('.', import.meta.url);
+    for (const file of readdirSync(dir).filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'))) {
+      const source = readFileSync(new URL(file, dir), 'utf8');
+      assert.doesNotMatch(source, /Date\.now|new Date\(\)|setTimeout|setInterval|performance\.now|\beta\b|duration/i, file);
+    }
+  });
+
+  it('exposes only genuine events to the customer', () => {
+    const log = run(reach('preparing'), [[{ type: 'cancel', reason: 'merchant_unreachable' }, support]]);
+    const timeline = customerTimeline(log);
+    assert.ok(timeline.ok);
+    assert.equal(timeline.value.status, 'cancelled');
+    assert.equal(timeline.value.lastUpdatedAt, log.at(-1)!.occurredAt);
+    assert.equal(timeline.value.entries.length, log.length);
+    assert.deepEqual(timeline.value.entries.at(-1), { sequence: log.length, type: 'cancelled', status: 'cancelled', occurredAt: log.at(-1)!.occurredAt, reason: 'merchant_unreachable' });
+    const text = JSON.stringify(timeline.value);
+    for (const hidden of ['u-staff', 'u-support', 'pi_test_123', 'key-', 'fingerprint', 'actor']) assert.ok(!text.includes(hidden), hidden);
+    const assigned = customerTimeline(reach('courier_assigned'));
+    assert.ok(assigned.ok);
+    assert.ok(!JSON.stringify(assigned.value).includes(COURIER_ID));
+    assert.deepEqual(assigned.value.entries.map((e) => e.status as OrderStatus).at(-1), 'courier_assigned');
+    assert.equal(customerTimeline([]).ok, false);
+  });
+});
