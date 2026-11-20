@@ -1,6 +1,6 @@
 # @tazumo/api
 
-Read-only catalogue API over PostgreSQL. Serves synthetic fixture data from `@tazumo/core`; not deployed, no auth, orders or payments. Decisions: [ADR-0005](../../docs/adr/0005-modular-marketplace-backend.md), [ADR-0009](../../docs/adr/0009-api-framework-and-migrations.md). Spec and local setup: [OpenSpec `api-catalogue-service`](../../openspec/changes/api-catalogue-service/design.md).
+Catalogue API over PostgreSQL with bearer-token identity. Serves synthetic fixture data from `@tazumo/core`; not deployed, no orders or payments. Decisions: [ADR-0005](../../docs/adr/0005-modular-marketplace-backend.md), [ADR-0009](../../docs/adr/0009-api-framework-and-migrations.md), [ADR-0016](../../docs/adr/0016-api-authentication.md). Spec and local setup: [OpenSpec `api-catalogue-service`](../../openspec/changes/api-catalogue-service/design.md).
 
 | Script | Purpose |
 | --- | --- |
@@ -10,3 +10,5 @@ Read-only catalogue API over PostgreSQL. Serves synthetic fixture data from `@ta
 | `test` | Integration tests; needs `DATABASE_URL` for a disposable database |
 
 Environment: `DATABASE_URL` (required), `HOST`, `PORT`, `LOG_LEVEL`.
+
+Auth (all three or none; without them `/v1/me` and other protected routes return 503): `AUTH_ISSUER`, `AUTH_AUDIENCE`, `AUTH_JWKS_URL` (https, or http on loopback only). Optional `AUTH_LOG_SALT` keys the hashed principal tag in logs; without it the tag changes per process. Roles other than `customer` are granted in the database (`user_roles`) until an admin API exists. Design: [OpenSpec `api-auth`](../../openspec/changes/api-auth/design.md).

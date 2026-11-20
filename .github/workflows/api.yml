@@ -75,7 +75,9 @@ jobs:
           merchant_id=$(node -e 'const m=JSON.parse(process.argv[1]).find(x=>x.slug==="piazza-local");if(!m)process.exit(1);console.log(m.id)' "$merchants")
           curl -sf "$base/v1/merchants/$merchant_id/products" | grep -q '"slug":"pizza"'
           test "$(curl -s -o /dev/null -w '%{http_code}' "$base/v1/merchants")" = 400
+          test "$(curl -s -o /dev/null -w '%{http_code}' "$base/v1/me")" = 503
           kill "$srv"
+          pnpm db:rollback
           pnpm db:rollback
       - name: Server log
         if: always()
