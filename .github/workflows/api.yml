@@ -1,0 +1,83 @@
+name: API integration
+on:
+  pull_request:
+    paths:
+      - 'apps/api/**'
+      - 'packages/core/**'
+      - 'contracts/openapi.json'
+      - 'scripts/validate-openapi.mjs'
+      - 'package.json'
+      - 'pnpm-workspace.yaml'
+      - '.github/workflows/api.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'apps/api/**'
+      - 'packages/core/**'
+      - 'contracts/openapi.json'
+      - 'scripts/validate-openapi.mjs'
+      - 'package.json'
+      - 'pnpm-workspace.yaml'
+      - '.github/workflows/api.yml'
+permissions:
+  contents: read
+concurrency:
+  group: api-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  api:
+    runs-on: ${{ vars.RUNNER_MODE == 'hosted' && 'ubuntu-latest' || fromJSON('["self-hosted","linux","x64","demos"]') }}
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: tazumo
+          POSTGRES_PASSWORD: tazumo-ci-only
+          POSTGRES_DB: tazumo_test
+        ports:
+          - 5432/tcp
+        options: >-
+          --health-cmd "pg_isready -U tazumo -d tazumo_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Point DATABASE_URL at the postgres service
+        run: echo "DATABASE_URL=postgres://tazumo:tazumo-ci-only@127.0.0.1:${{ job.services.postgres.ports['5432'] }}/tazumo_test" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.11.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: pnpm install --no-frozen-lockfile
+      - run: node scripts/validate-openapi.mjs
+      - run: pnpm --filter @tazumo/api typecheck
+      - run: pnpm --filter @tazumo/api test
+      - name: Migrate, seed and smoke-test the running service
+        working-directory: apps/api
+        run: |
+          pnpm db:migrate
+          pnpm db:seed
+          PORT=$((20000 + RANDOM % 10000))
+          base="http://127.0.0.1:$PORT"
+          PORT=$PORT node --experimental-strip-types src/server.ts > server.log 2>&1 &
+          srv=$!
+          for _ in $(seq 1 30); do
+            kill -0 "$srv" || { echo "server exited"; exit 1; }
+            curl -sf "$base/health" && break
+            sleep 1
+          done
+          curl -sf "$base/health"
+          merchants=$(curl -sf "$base/v1/merchants?marketCode=demo-eu")
+          merchant_id=$(node -e 'const m=JSON.parse(process.argv[1]).find(x=>x.slug==="piazza-local");if(!m)process.exit(1);console.log(m.id)' "$merchants")
+          curl -sf "$base/v1/merchants/$merchant_id/products" | grep -q '"slug":"pizza"'
+          test "$(curl -s -o /dev/null -w '%{http_code}' "$base/v1/merchants")" = 400
+          test "$(curl -s -o /dev/null -w '%{http_code}' "$base/v1/me")" = 503
+          kill "$srv"
+          node --experimental-strip-types src/migrate.ts down all
+      - name: Server log
+        if: always()
+        run: cat apps/api/server.log 2>/dev/null || true

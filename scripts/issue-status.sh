@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # GitHub Issue status coordination via GitHub CLI. Requires gh auth login and Issues write permission.
 set -euo pipefail
-usage(){ echo "Usage: bash scripts/issue-status.sh bootstrap | board | claim ISSUE | move ISSUE STATUS | handoff ISSUE FILE [ready|blocked]" >&2; exit 2; }
+usage(){ echo "Usage: bash scripts/issue-status.sh bootstrap | board | audit | claim ISSUE | move ISSUE STATUS | handoff ISSUE FILE [ready|blocked]" >&2; exit 2; }
 [[ $# -ge 1 ]] || usage
 command -v gh >/dev/null || { echo "Install GitHub CLI and authenticate with gh auth login" >&2; exit 2; }
 repo="$(gh repo view --json nameWithOwner --jq .nameWithOwner)"
@@ -21,6 +21,10 @@ case "$1" in
    colors=(BFD4F2 0E8A16 1D76DB A371F7 D93F0B 6F7781)
    for i in "${!names[@]}"; do gh label create "status:${names[$i]}" --repo "$repo" --color "${colors[$i]}" --description "Issue workflow state: ${names[$i]}" --force; done
    echo "Status labels initialized for $repo"
+   ;;
+ audit)
+   [[ $# == 1 ]] || usage
+   gh issue list --repo "$repo" --state all --limit 1000 --json number,title,state,labels,assignees,updatedAt,url,body | python3 scripts/audit_issue_board.py --repo "$repo"
    ;;
  board)
    for s in "${states[@]}"; do echo;echo "### status:$s";gh issue list --repo "$repo" --state all --label "status:$s" --limit 100 --json number,title,state,assignees,url --template '{{range .}}#{{.number}} {{.title}} [{{.state}}] {{.url}}{{"\n"}}{{end}}' || true;done

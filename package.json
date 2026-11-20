@@ -7,13 +7,17 @@
     "dev:mobile": "pnpm --filter @tazumo/mobile start",
     "build": "pnpm --filter @tazumo/web build",
     "typecheck": "pnpm -r typecheck",
-    "test": "pnpm --filter @tazumo/core test",
+    "test": "pnpm --filter @tazumo/core test && pnpm test:contract",
+    "test:contract": "node --experimental-strip-types --test tests/contract/*.test.mts",
     "test:e2e": "playwright test",
     "bundle:mobile": "pnpm --filter @tazumo/mobile exec expo export --platform ios && pnpm --filter @tazumo/mobile exec expo export --platform android",
     "dev:sut": "pnpm --filter @tazumo/web dev --host 127.0.0.1 --port 4173 --strictPort"
   },
   "devDependencies": {
-    "@playwright/test": "^1.56.0"
+    "@axe-core/playwright": "4.14.0",
+    "@playwright/test": "^1.56.0",
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
@@ -21,7 +25,8 @@
     ],
     "overrides": {
       "postcss": "^8.5.18",
-      "image-size": "^2.0.3"
+      "image-size": "^2.0.3",
+      "axe-core": "4.14.1"
     }
   }
 }

@@ -1,0 +1,41 @@
+import { realpathSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { runner } from 'node-pg-migrate';
+import { loadConfig } from './config.ts';
+
+export const migrationsDir = fileURLToPath(new URL('../migrations', import.meta.url));
+
+export type MigrateOptions = {
+  databaseUrl: string;
+  direction: 'up' | 'down';
+  count?: number;
+  schema?: string;
+  log?: (message: string) => void;
+};
+
+export async function migrate({ databaseUrl, direction, count, schema = 'public', log = () => {} }: MigrateOptions) {
+  return runner({
+    databaseUrl,
+    dir: migrationsDir,
+    direction,
+    count: count ?? (direction === 'up' ? Infinity : 1),
+    schema,
+    createSchema: schema !== 'public',
+    migrationsTable: 'schema_migrations',
+    checkOrder: true,
+    singleTransaction: true,
+    log
+  });
+}
+
+if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const direction = process.argv[2];
+  if (direction !== 'up' && direction !== 'down') {
+    console.error('Usage: migrate.ts up|down');
+    process.exit(2);
+  }
+  const { databaseUrl } = loadConfig();
+  const count = process.argv[3] === 'all' ? Infinity : undefined;
+  const applied = await migrate({ databaseUrl, direction, count, log: (message) => console.log(message) });
+  console.log(`${direction}: ${applied.length} migration(s) applied`);
+}

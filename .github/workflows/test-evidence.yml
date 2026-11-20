@@ -1,0 +1,53 @@
+name: Test evidence
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: evidence-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  evidence:
+    runs-on: ${{ vars.RUNNER_MODE == 'hosted' && 'ubuntu-latest' || fromJSON('["self-hosted","linux","x64","demos"]') }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.11.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: pnpm install --no-frozen-lockfile
+      - name: Contract tests (fixtures against contracts/openapi.json)
+        run: pnpm test:contract
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Playwright E2E, accessibility and failure scenarios
+        run: pnpm test:e2e
+      - name: Evidence summary
+        if: always()
+        run: |
+          {
+            echo "### Test evidence for ${GITHUB_SHA}"
+            echo "Browser evidence: Playwright Chromium against the Vite dev server. Fixture data only; no native device evidence."
+            echo "Artifacts: \`playwright-report\` (HTML report with axe JSON and screenshots per test) and \`playwright-test-results\` (screenshots, traces on failure)."
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          if-no-files-found: warn
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-test-results
+          path: test-results/
+          if-no-files-found: warn
+          retention-days: 14

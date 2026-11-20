@@ -5,6 +5,10 @@ This is the durable onboarding entry point for a new agent, maintainer or a resu
 ## Project purpose
 Canonical SUT, a React/Vite web app plus Expo iOS/Android app in a pnpm TypeScript monorepo. Shared @tazumo/core catalogue/cart data and @tazumo/brand tokens. Source of truth for SUT identifiers and fixture version is contracts/sut.json in PR #33 until merged. Draft PR #30 publishes org testing artifacts. Screenshot work is Issue #37. Never claim checkout, payments, merchants, real tracking or native device screenshots are live without evidence.
 
+## Organization-wide onboarding
+
+Start with [DEMO-PROGRAM](DEMO-PROGRAM.md) to understand all five repositories, SUT dependencies, cross-repo PR order and live work. Use `bash scripts/issue-status.sh audit` to flag status and ownership contradictions; it does not mutate issues. Several repositories already have `status:*` labels configured, so check live labels rather than assuming bootstrap is required.
+
 ## Fast navigation
 1. [Issue lifecycle, claiming and handoffs](ISSUE-WORKFLOW.md).
 2. [Current Issues](https://github.com/wopee-io-demos/tazumo/issues?q=is%3Aissue+is%3Aopen) and [Pull Requests](https://github.com/wopee-io-demos/tazumo/pulls).
