@@ -10,8 +10,8 @@ All values come from `@tazumo/brand`. Do not hard-code colours, spacing or shado
 | --- | --- | --- |
 | Page and card colours | `themes[palette][mode].background`, `.surface`, `.tint` | `tint` is the soft brand area (hero, image wells, empty states). |
 | Body copy | `.text` on `background`, `surface` or `tint` | Secondary copy uses `.textMuted`, never a lighter grey. |
-| Buttons | `.primary` fill with `.onPrimary` label | Accent fills use `.onAccent` labels. |
-| Focus ring | `.focus`, 2-3px outline with offset | Never use `accent` as the focus indicator; on light themes it fails 3:1. |
+| Buttons | `.primary` fill with `.onPrimary` label | `accent` is a decorative or highlight fill: text on it is `.onAccent`. A control that has only an accent fill and no text label also needs a `.border` outline, because on light themes accent can be under 3:1 against white. |
+| Focus ring | `.focus`, 2-3px outline **with a 2px offset, always** | The ring is tested against `background`, `surface` and `tint`. Without the offset it can disappear on a `primary` button, because in light themes `focus` equals `primary`. Never use `accent` as the focus indicator: coral, emerald and midnight accents are under 3:1 on white. |
 | Input and control borders | `.border` | Meets 3:1 against every background role. |
 | Errors and confirmations | `.danger`, `.success` | Always pair with text or an icon; never colour alone. |
 | Spacing, radius | `spacing.*`, `radius.*` | 4px grid; `pill` for chips and counters. |
@@ -26,7 +26,9 @@ Dark mode follows the system setting by default and is not a separate brand.
 ## 2. Mascot and app icon
 
 - The fox is optional decoration. Every screen must make sense with `mascot: 'none'`. Never put information only in the mascot, and give it an empty `alt` (web) or `accessibilityElementsHidden` (mobile) when it is purely decorative.
-- Use the mark (`assets/brand/fox-mark.svg`) at 24px and up. Below that, use the app name as text.
+- Use the mark (`assets/brand/fox-mark.svg`) at 32px and up, because the eyes become too small below that. At smaller sizes, use the app name as text.
+- On a coloured background, use the cream-outlined version from `assets/brand/app-icon/`. The outline is tested at 3:1 or more against every palette's `primary`; the bare fox orange is not.
+- With `mascot: 'none'` there is no app-icon variant yet. A wordmark icon is a follow-up ([#47](https://github.com/wopee-io-demos/tazumo/issues/47)).
 - Do not recolour the fox to follow the palette. The fox keeps its own orange, cream and ink, so palette changes never touch the mascot.
 - The app-icon background is the palette's `primary`. Regenerate it with `pnpm --filter @tazumo/brand export:icons <palette>`.
 - Do not add the fox to error, payment or legal messages. Usefulness comes before decoration.

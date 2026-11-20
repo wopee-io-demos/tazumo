@@ -54,3 +54,16 @@ test('css variables are derived from semantic roles', () => {
   assert.equal(vars['--tz-color-on-primary'], brand.themes.coral.dark.onPrimary);
   assert.equal(Object.keys(vars).length, Object.keys(brand.themes.coral.dark).length);
 });
+
+test('fox artwork uses only the fox colours and stays visible on every palette icon background', async () => {
+  const { readFileSync } = await import('node:fs');
+  for (const file of ['fox-mark.svg', 'fox-mascot.svg']) {
+    const source = readFileSync(new URL(`../../../assets/brand/${file}`, import.meta.url), 'utf8');
+    const used = new Set((source.match(/#[0-9A-F]{6}/gi) ?? []).map(c => c.toUpperCase()));
+    const allowed = new Set([...Object.values(brand.foxColors), '#FFFFFF']);
+    for (const colour of used) assert.ok(allowed.has(colour), `${file} uses ${colour}`);
+  }
+  for (const name of brand.paletteNames) {
+    assert.ok(brand.meetsContrast(brand.foxColors.cream, brand.palettes[name].primary, 'ui'), `fox outline on ${name} icon background`);
+  }
+});

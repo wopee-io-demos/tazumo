@@ -12,7 +12,7 @@ Issue: [#13](https://github.com/wopee-io-demos/tazumo/issues/13) (related [#6](h
 2. Add semantic themes: `themes[palette][light|dark]` with 13 roles (`background`, `surface`, `tint`, `text`, `textMuted`, `primary`, `onPrimary`, `accent`, `onAccent`, `focus`, `border`, `danger`, `success`). Light themes reuse the legacy colours, so wiring them in changes no existing brand colour.
 3. Declare approved foreground/background combinations once in `contrastPairings`. A unit test computes the WCAG 2.2 contrast ratio for every pairing in every palette and mode (4.5:1 text, 3:1 large text and UI) and fails if any colour role has no pairing.
 4. Add platform-neutral numeric scales (`spacing`, `radius`, `typography`, `elevation` with CSS and React Native shapes, `touchTarget`, `zIndex`) and a `toCssVariables` helper.
-5. Model brand selection as `BrandConfig { name, palette, mascot }` resolved by `createBrand`. `mascot` may be `none`. The fox keeps its own colours, and the app-icon background is generated from the selected palette's `primary`.
+5. Model brand selection as `BrandConfig { name, palette, mascot }` resolved by `createBrand`. `mascot` may be `none`. The fox keeps its own colours (`foxColors`). The app-icon background is generated from the selected palette's `primary`, and a cream outline keeps the fox at 3:1 or more against every palette (tested).
 6. App icons are generated from hand-written SVG by a script that uses the repository's existing Playwright Chromium, so no new image dependency is added.
 
 ## Alternatives considered

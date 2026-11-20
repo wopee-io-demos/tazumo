@@ -27,7 +27,7 @@ export function meetsContrast(foreground: string, background: string, use: Contr
   return contrastRatio(foreground, background) >= minimumContrast[use];
 }
 
-/** WCAG large text: at least 18pt (24px) regular, or 14pt (about 18.66px) bold. */
+/** WCAG large text: at least 18pt (24px) regular, or 14pt (56/3 px) bold. */
 export function isLargeText(fontSizePx: number, fontWeight: number): boolean {
-  return fontSizePx >= 24 || (fontWeight >= 700 && fontSizePx >= 18.66);
+  return fontSizePx >= 24 || (fontWeight >= 700 && fontSizePx >= 56 / 3);
 }

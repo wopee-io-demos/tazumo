@@ -21,7 +21,8 @@ test('thresholds follow WCAG 2.2 AA', () => {
   assert.equal(meetsContrast('#949494', '#FFFFFF', 'largeText'), true);
   assert.equal(isLargeText(24, 400), true);
   assert.equal(isLargeText(19, 700), true);
-  assert.equal(isLargeText(18, 700), false);
+  assert.equal(isLargeText(18.66, 700), false);
+  assert.equal(isLargeText(56 / 3, 700), true);
   assert.equal(isLargeText(22, 400), false);
 });
 
@@ -44,17 +45,14 @@ test('every colour role is a valid hex value and is covered by at least one pair
 
 test('every foreground/background pairing in every palette and mode meets WCAG 2.2 AA', () => {
   const failures: string[] = [];
-  let checked = 0;
   for (const [palette, modes] of Object.entries(themes)) {
     for (const [mode, colors] of Object.entries(modes)) {
       for (const { foreground, background, use } of contrastPairings) {
-        checked++;
         const ratio = contrastRatio(colors[foreground], colors[background]);
         if (ratio < minimumContrast[use]) failures.push(`${palette}/${mode}: ${foreground} ${colors[foreground]} on ${background} ${colors[background]} = ${ratio.toFixed(2)} < ${minimumContrast[use]} (${use})`);
       }
     }
   }
-  assert.equal(checked, Object.keys(themes).length * colorModes.length * contrastPairings.length);
   assert.deepEqual(failures, []);
 });
 

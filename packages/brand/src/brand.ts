@@ -3,7 +3,11 @@ import { themes, type ColorMode, type ThemeColors } from './themes.ts';
 
 export const brandName = 'Tazumo';
 
-export type MascotId = 'fox' | 'none';
+export const mascot = 'fox' as const;
+export type MascotId = typeof mascot | 'none';
+
+/** The fox keeps its own colours in every palette. */
+export const foxColors = { fur: '#E8641B', shade: '#D2561A', cream: '#FFF3E3', ink: '#2A1A14' } as const;
 
 export interface MascotDefinition {
   id: MascotId;
@@ -25,7 +29,7 @@ export interface BrandConfig {
   mascot: MascotId;
 }
 
-export const defaultBrandConfig: Readonly<BrandConfig> = Object.freeze({ name: brandName, palette: preferredPalette, mascot: 'fox' });
+export const defaultBrandConfig: Readonly<BrandConfig> = Object.freeze({ name: brandName, palette: preferredPalette, mascot });
 
 export interface ResolvedBrand extends BrandConfig {
   mascotDefinition: MascotDefinition;
