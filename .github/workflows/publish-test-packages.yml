@@ -7,6 +7,7 @@ on:
       - 'packages/**'
       - 'scripts/build-test-kit.mjs'
       - 'scripts/test-test-kit.mjs'
+      - 'scripts/smoke-consume-test-kit.mjs'
       - 'package.json'
       - 'pnpm-workspace.yaml'
       - '.dockerignore'
@@ -62,6 +63,8 @@ jobs:
         run: |
           node --experimental-strip-types scripts/build-test-kit.mjs
           node --experimental-strip-types --test scripts/test-test-kit.mjs
+      - name: Smoke-test installed npm tarball in a clean consumer project
+        run: node scripts/smoke-consume-test-kit.mjs
       - name: Review npm package contents
         working-directory: packages/test-kit
         run: npm pack --dry-run --json
