@@ -14,9 +14,9 @@
     "@tazumo/core": "workspace:*",
     "@tazumo/brand": "workspace:*",
     "expo": "~53.0.0",
-    "react": "19.0.0",
-    "react-native": "0.79.2",
-    "react-native-safe-area-context": "5.4.0"
+    "react": "19.0.9",
+    "react-native": "0.79.7",
+    "react-native-safe-area-context": "5.4.1"
   },
   "devDependencies": {
     "@types/react": "^19.0.0",
