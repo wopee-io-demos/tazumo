@@ -19,7 +19,7 @@ The repository SHALL define one shopping flow (search `Margherita`, add `Margher
 - **THEN** the job passes and uploads `tazumo-flow-android.mp4`, `report.json` and `ui.json`.
 
 #### Scenario: Element missing
-- **WHEN** a step's label is not found within 20 seconds, a locator matches two controls in different places, or a final text is missing
+- **WHEN** a step's label is not found within 20 seconds, a locator matches more than one control, a step uses an action or locator the mobile-agent mobilecli backend does not support, a final text is missing, or the run outgrows the 180 s screen recording
 - **THEN** the executor exits non-zero, the job fails, and the report and UI dump are still uploaded.
 
 ### Requirement: Videos are silent and kept out of git

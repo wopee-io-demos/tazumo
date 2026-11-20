@@ -15,12 +15,15 @@ mobilecli devices
 adb shell settings put system screen_off_timeout 600000
 adb shell monkey -p "$app" -c android.intent.category.LAUNCHER 1 >/dev/null
 sleep 8
-adb shell screenrecord --bit-rate 8000000 /sdcard/tazumo-flow.mp4 &
+adb shell screenrecord --time-limit 180 --bit-rate 8000000 /sdcard/tazumo-flow.mp4 &
 recorder=$!
 sleep 2
 status=0
+started=$SECONDS
 DEMO_EXPECT_TEXT='Margherita pizza × 1|Subtotal €11.90|Checkout is disabled until payment and delivery integrations are ready.' \
   node "$here/run-case.mjs" "$here/flow-search-add-cart.json" android "$out" || status=$?
+node -e 'process.exit(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).outcome==="passed"?0:1)' "$out/report.json" || status=1
+if (( SECONDS - started > 170 )); then echo "The flow took longer than the 180 s screenrecord limit allows" >&2; status=1; fi
 sleep 2.5
 adb shell pkill -INT screenrecord || true
 wait "$recorder" || true
