@@ -3,8 +3,12 @@ import { isRecord, validateSelection } from './validate.ts';
 
 const MAX_SAFE = BigInt(Number.MAX_SAFE_INTEGER);
 
+/** Mirrors `MAX_LINE_QUANTITY` in `@tazumo/commerce`, so a line priced here is not rejected at the quote. */
+export const MAX_LINE_QUANTITY = 999;
+
 const fail = (code: PricingErrorCode, path: OptionsError['path'], message: string): PriceResult => ({
   ok: false,
+  stage: 'pricing',
   errors: [{ code, path, message }]
 });
 
@@ -24,10 +28,10 @@ export function priceSelection(def: ProductOptions, basePrice: Money, selection:
   if (base.currency !== def.currency) {
     errors.push({ code: 'currency_mismatch', path: ['basePrice', 'currency'], message: `Base price currency must be ${def.currency}` });
   }
-  if (!Number.isSafeInteger(quantity) || quantity < 1) {
-    errors.push({ code: 'invalid_quantity', path: ['quantity'], message: 'Quantity must be a positive safe integer' });
+  if (!Number.isInteger(quantity) || quantity < 1 || quantity > MAX_LINE_QUANTITY) {
+    errors.push({ code: 'invalid_quantity', path: ['quantity'], message: `Quantity must be an integer from 1 to ${MAX_LINE_QUANTITY}` });
   }
-  if (errors.length) return { ok: false, errors };
+  if (errors.length) return { ok: false, stage: 'pricing', errors };
 
   const breakdown: BreakdownEntry[] = [];
   let unit = BigInt(base.minorUnits as number);
@@ -39,6 +43,7 @@ export function priceSelection(def: ProductOptions, basePrice: Money, selection:
     }
   }
   if (unit < 0n) return fail('negative_unit_price', ['unitPrice'], 'Option deltas must not take the unit price below zero');
+  if (unit > MAX_SAFE) return fail('amount_overflow', ['unitPrice'], 'Unit price exceeds the safe integer range');
   const line = unit * BigInt(quantity);
   if (line > MAX_SAFE) return fail('amount_overflow', ['lineTotal'], 'Line total exceeds the safe integer range');
 

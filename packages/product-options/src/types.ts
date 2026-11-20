@@ -4,7 +4,7 @@ export type Option = {
   id: string;
   labelKey: string;
   priceDeltaMinor: number;
-  /** Resolved by the caller at quote time, for example from `@tazumo/merchant-ops` `isAvailableAt`. */
+  /** Resolved by the caller per quote, for example from `@tazumo/merchant-ops` `isAvailableAt`; not a stored attribute. */
   available: boolean;
   isDefault?: boolean;
 };
@@ -47,7 +47,8 @@ export type DefinitionErrorCode =
   | 'invalid_price_delta'
   | 'invalid_availability'
   | 'invalid_default'
-  | 'too_many_defaults';
+  | 'too_many_defaults'
+  | 'defaults_below_min';
 
 export type SelectionErrorCode =
   | 'invalid_selection'
@@ -68,7 +69,10 @@ export type OptionsError<C extends ErrorCode = ErrorCode> = { code: C; path: Pat
 
 export type ResolvedSelection = Record<string, string[]>;
 
-export type Failure = { ok: false; errors: OptionsError[] };
+/** `definition` is a catalogue fault (server side); `selection` and `pricing` reject the request's input or the resulting amount. */
+export type FailureStage = 'definition' | 'selection' | 'pricing';
+
+export type Failure = { ok: false; stage: FailureStage; errors: OptionsError[] };
 
 export type SelectionResult = { ok: true; selection: ResolvedSelection } | Failure;
 

@@ -16,6 +16,7 @@ const LABEL_KEY = /^\S+$/;
 export const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 const isId = (value: unknown): value is string => typeof value === 'string' && ID.test(value);
+const shown = (id: string): string => (ID.test(id) ? id : `${id.slice(0, 32).replace(/[^\x20-\x7e]/g, '?')}${id.length > 32 ? '…' : ''}`);
 const isCount = (value: unknown): value is number => Number.isSafeInteger(value) && (value as number) >= 0;
 
 type Add<C extends DefinitionErrorCode | SelectionErrorCode> = (code: C, path: Path, message: string) => void;
@@ -62,7 +63,7 @@ function validateGroup(group: unknown, path: Path, groupIds: Set<string>, option
   if (!maxOk) add('invalid_bound', [...path, 'max'], 'max must be a positive integer');
   if (minOk && maxOk) {
     if (min > max) add('min_exceeds_max', [...path, 'min'], 'min must not exceed max');
-    if (options && max > options.length) add('max_exceeds_options', [...path, 'max'], 'max must not exceed the number of options');
+    if (options && options.length > 0 && max > options.length) add('max_exceeds_options', [...path, 'max'], 'max must not exceed the number of options');
     if (group.selection === 'single' && max !== 1) add('single_max_not_one', [...path, 'max'], 'A single-choice group must have max 1');
     if (typeof group.required === 'boolean' && group.required !== min >= 1) add('required_min_mismatch', [...path, 'required'], 'required must be true exactly when min is at least 1');
   }
@@ -72,6 +73,7 @@ function validateGroup(group: unknown, path: Path, groupIds: Set<string>, option
     if (validateOption(option, [...path, 'options', o], optionIds, add)) defaults += 1;
   });
   if (maxOk && defaults > max) add('too_many_defaults', [...path, 'options'], 'More options are marked default than max allows');
+  if (minOk && defaults > 0 && defaults < min) add('defaults_below_min', [...path, 'options'], 'Defaults must reach min when any are set');
 }
 
 function validateOption(option: unknown, path: Path, optionIds: Set<string>, add: Add<DefinitionErrorCode>): boolean {
@@ -95,8 +97,8 @@ function validateOption(option: unknown, path: Path, optionIds: Set<string>, add
  */
 export function validateSelection(def: ProductOptions, selection: unknown = {}): SelectionResult {
   const definitionErrors = validateOptionGroups(def);
-  if (definitionErrors.length) return { ok: false, errors: definitionErrors };
-  if (!isRecord(selection)) return { ok: false, errors: [{ code: 'invalid_selection', path: ['selection'], message: 'selection must be an object' }] };
+  if (definitionErrors.length) return { ok: false, stage: 'definition', errors: definitionErrors };
+  if (!isRecord(selection)) return { ok: false, stage: 'selection', errors: [{ code: 'invalid_selection', path: ['selection'], message: 'selection must be an object' }] };
 
   const [errors, add] = collector<SelectionErrorCode>();
   const ownerOf = new Map<string, string>();
@@ -106,7 +108,7 @@ export function validateSelection(def: ProductOptions, selection: unknown = {}):
     for (const option of group.options) ownerOf.set(option.id, group.id);
   }
   for (const key of Object.keys(selection)) {
-    if (!groupIds.has(key)) add('unknown_group', ['selection', key], `Group "${key}" is not offered for ${def.productId}`);
+    if (!groupIds.has(key)) add('unknown_group', ['selection', key], `Group "${shown(key)}" is not offered for ${def.productId}`);
   }
 
   const resolved: ResolvedSelection = {};
@@ -116,7 +118,7 @@ export function validateSelection(def: ProductOptions, selection: unknown = {}):
       : defaultChoice(group, add);
     if (chosen) resolved[group.id] = group.options.filter((option) => chosen.has(option.id)).map((option) => option.id);
   }
-  return errors.length ? { ok: false, errors } : { ok: true, selection: resolved };
+  return errors.length ? { ok: false, stage: 'selection', errors } : { ok: true, selection: resolved };
 }
 
 function defaultChoice(group: OptionGroup, add: Add<SelectionErrorCode>): Set<string> | null {
@@ -139,6 +141,10 @@ function explicitChoice(group: OptionGroup, value: unknown, ownerOf: Map<string,
     add('invalid_selection', path, 'A group selection must be an array of option IDs');
     return null;
   }
+  if (value.length > group.options.length) {
+    add('too_many_options', path, `Group "${group.id}" allows at most ${group.max} options`);
+    return null;
+  }
   const chosen = new Set<string>();
   let failed = false;
   const reject: Add<SelectionErrorCode> = (code, at, message) => {
@@ -148,10 +154,10 @@ function explicitChoice(group: OptionGroup, value: unknown, ownerOf: Map<string,
   value.forEach((id: unknown, i) => {
     const at = [...path, i];
     if (typeof id !== 'string') return reject('invalid_selection', at, 'Option IDs must be strings');
-    if (chosen.has(id)) return reject('duplicate_option', at, `Option "${id}" is selected twice`);
+    if (chosen.has(id)) return reject('duplicate_option', at, `Option "${shown(id)}" is selected twice`);
     chosen.add(id);
     const owner = ownerOf.get(id);
-    if (owner === undefined) return reject('unknown_option', at, `Option "${id}" does not exist`);
+    if (owner === undefined) return reject('unknown_option', at, `Option "${shown(id)}" does not exist`);
     if (owner !== group.id) return reject('option_wrong_group', at, `Option "${id}" belongs to group "${owner}"`);
     if (!group.options.find((option) => option.id === id)!.available) return reject('option_unavailable', at, `Option "${id}" is not available`);
   });

@@ -24,6 +24,10 @@ The package SHALL validate a selection against a definition, apply available def
 - **WHEN** a required single-choice group with an available default is left out of the selection
 - **THEN** the default is selected
 
+#### Scenario: Unavailable default of an optional group
+- **WHEN** an optional group is left out of the selection and its only default is unavailable
+- **THEN** the group resolves to no options
+
 #### Scenario: Invalid choices
 - **WHEN** a selection names an unknown group, an unknown option, an option from another group, the same option twice, too few or too many options, an unavailable option, or leaves out a required group with no available default
 - **THEN** it is rejected with `unknown_group`, `unknown_option`, `option_wrong_group`, `duplicate_option`, `too_few_options`, `too_many_options`, `option_unavailable` or `missing_required_group` and the path of the group or option
@@ -36,7 +40,7 @@ The package SHALL price a valid selection in integer minor units and return the 
 - **THEN** the unit price is the base price plus all deltas and the line total is the unit price times the quantity
 
 #### Scenario: Invalid amounts
-- **WHEN** the base price is not a non-negative safe integer, its currency differs from the definition, the quantity is not a positive safe integer, the unit price falls below zero or the line total leaves the safe integer range
+- **WHEN** the base price is not a non-negative safe integer, its currency differs from the definition, the quantity is not an integer from 1 to 999, the unit price falls below zero or the unit price or line total leaves the safe integer range
 - **THEN** pricing fails with `invalid_base_price`, `currency_mismatch`, `invalid_quantity`, `negative_unit_price` or `amount_overflow`
 
 ### Requirement: Canonical cart line key

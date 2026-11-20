@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { products } from '@tazumo/core';
-import { priceSelection, syntheticOptionsFor, syntheticProductOptions, validateOptionGroups } from './index.ts';
+import { priceSelection, validateOptionGroups } from './index.ts';
+import { syntheticOptionsFor, syntheticProductOptions } from './fixtures.ts';
 
 test('synthetic fixtures are valid, marked synthetic and use existing product IDs only', () => {
   assert.ok(syntheticProductOptions.length >= 2);

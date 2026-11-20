@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { lineKey, priceSelection, syntheticOptionsFor } from './index.ts';
+import { MAX_LINE_QUANTITY, lineKey, priceSelection } from './index.ts';
+import { syntheticOptionsFor } from './fixtures.ts';
 import type { Money, PricedSelection, ProductOptions } from './index.ts';
 
 const pizza = syntheticOptionsFor('pizza')!;
@@ -10,11 +11,12 @@ const priced = (...args: Parameters<typeof priceSelection>): PricedSelection => 
   assert.ok(result.ok, JSON.stringify(result));
   return result;
 };
-const errors = (...args: Parameters<typeof priceSelection>) => {
+const failure = (...args: Parameters<typeof priceSelection>) => {
   const result = priceSelection(...args);
   assert.equal(result.ok, false);
-  return result.ok ? [] : result.errors.map(({ code, path }) => ({ code, path }));
+  return result.ok ? { stage: undefined, errors: [] } : { stage: result.stage, errors: result.errors.map(({ code, path }) => ({ code, path })) };
 };
+const errors = (...args: Parameters<typeof priceSelection>) => failure(...args).errors;
 
 test('a required single group with a default prices with no explicit selection', () => {
   const result = priced(pizza, eur(1190), undefined, 1);
@@ -66,14 +68,19 @@ test('rejects a base price in another currency', () => {
 });
 
 test('rejects quantities that are not positive safe integers', () => {
-  for (const quantity of [0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1, Number.NaN]) {
+  for (const quantity of [0, -1, 1.5, MAX_LINE_QUANTITY + 1, Number.MAX_SAFE_INTEGER + 1, Number.NaN]) {
     assert.deepEqual(errors(pizza, eur(1190), {}, quantity), [{ code: 'invalid_quantity', path: ['quantity'] }]);
   }
 });
 
-test('rejects a line total beyond the safe integer range', () => {
+test('accepts the commerce maximum line quantity', () => {
+  assert.equal(MAX_LINE_QUANTITY, 999);
+  assert.deepEqual(priced(pizza, eur(1190), {}, MAX_LINE_QUANTITY).lineTotal, eur(1190 * 999));
+});
+
+test('rejects a unit price or line total beyond the safe integer range', () => {
   assert.deepEqual(errors(pizza, eur(Number.MAX_SAFE_INTEGER), {}, 2), [{ code: 'amount_overflow', path: ['lineTotal'] }]);
-  assert.deepEqual(errors(pizza, eur(Number.MAX_SAFE_INTEGER), { size: ['large'] }, 1), [{ code: 'amount_overflow', path: ['lineTotal'] }]);
+  assert.deepEqual(errors(pizza, eur(Number.MAX_SAFE_INTEGER), { size: ['large'] }, 1), [{ code: 'amount_overflow', path: ['unitPrice'] }]);
   assert.deepEqual(priced(pizza, eur(Number.MAX_SAFE_INTEGER - 350), { size: ['large'] }, 1).unitPrice, eur(Number.MAX_SAFE_INTEGER));
 });
 
@@ -90,12 +97,14 @@ test('large deltas are summed exactly and checked for range', () => {
     }]
   };
   assert.deepEqual(priced(huge, eur(5), { edition: ['signed', 'discount'] }, 1).unitPrice, eur(5));
-  assert.deepEqual(errors(huge, eur(5), { edition: ['signed'] }, 1), [{ code: 'amount_overflow', path: ['lineTotal'] }]);
+  assert.deepEqual(errors(huge, eur(5), { edition: ['signed'] }, 1), [{ code: 'amount_overflow', path: ['unitPrice'] }]);
 });
 
-test('selection and definition errors stop pricing', () => {
-  assert.deepEqual(errors(pizza, eur(1190), { extras: ['truffle'] }, 1), [{ code: 'option_unavailable', path: ['selection', 'extras', 0] }]);
-  assert.deepEqual(errors({ ...pizza, currency: 'euro' }, eur(1190), {}, 1), [{ code: 'invalid_currency', path: ['currency'] }]);
+test('failures name the stage, so a catalogue fault is distinguishable from bad input', () => {
+  assert.deepEqual(failure({ ...pizza, currency: 'euro' }, eur(1190), {}, 1), { stage: 'definition', errors: [{ code: 'invalid_currency', path: ['currency'] }] });
+  assert.deepEqual(failure(pizza, eur(1190), { extras: ['truffle'] }, 0), { stage: 'selection', errors: [{ code: 'option_unavailable', path: ['selection', 'extras', 0] }] });
+  assert.equal(failure(pizza, eur(1190), {}, 0).stage, 'pricing');
+  assert.equal(failure(pizza, eur(199), { size: ['small'] }, 1).stage, 'pricing');
 });
 
 test('the resolved selection gives the same cart key whatever order the client sent', () => {

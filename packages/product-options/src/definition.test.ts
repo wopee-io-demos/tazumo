@@ -45,10 +45,7 @@ test('rejects malformed group fields with addressed paths', () => {
   assert.deepEqual(errors(def(group({ selection: 'any' }))), [{ code: 'invalid_selection_mode', path: at('selection') }]);
   assert.deepEqual(errors(def(group({ required: 'yes' }))), [{ code: 'invalid_required', path: at('required') }]);
   assert.deepEqual(errors(def(group({ options: 'small' }))), [{ code: 'invalid_definition', path: at('options') }]);
-  assert.deepEqual(errors(def(group({ options: [] }))), [
-    { code: 'invalid_definition', path: at('options') },
-    { code: 'max_exceeds_options', path: at('max') }
-  ]);
+  assert.deepEqual(errors(def(group({ options: [] }))), [{ code: 'invalid_definition', path: at('options') }]);
 });
 
 test('rejects bounds that are not integers or are out of range', () => {
@@ -94,6 +91,13 @@ test('rejects more defaults than max allows', () => {
   const twoDefaults = [option('small', { isDefault: true }), option('large', { isDefault: true })];
   assert.deepEqual(errors(def(group({ options: twoDefaults }))), [{ code: 'too_many_defaults', path: ['groups', 0, 'options'] }]);
   assert.deepEqual(errors(def(group({ options: twoDefaults, max: 0 }))), [{ code: 'invalid_bound', path: ['groups', 0, 'max'] }]);
+});
+
+test('rejects defaults that set some but fewer than min choices', () => {
+  const options = [option('a', { isDefault: true }), option('b'), option('c')];
+  assert.deepEqual(errors(def(group({ selection: 'multiple', min: 2, max: 3, options }))), [{ code: 'defaults_below_min', path: ['groups', 0, 'options'] }]);
+  assert.deepEqual(errors(def(group({ selection: 'multiple', min: 2, max: 3, options: options.map((o) => ({ ...o, isDefault: true })) }))), []);
+  assert.deepEqual(errors(def(group({ selection: 'multiple', min: 2, max: 2, options: [option('a'), option('b')] }))), []);
 });
 
 test('every error carries a message', () => {
