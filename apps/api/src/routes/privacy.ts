@@ -8,7 +8,7 @@ import { apiError } from '../errors.ts';
 type Initiator = 'self' | 'admin' | 'support';
 type ErasureOutcome =
   | { status: 200; userId: string; erasedAt: string }
-  | { status: 404 | 409; code: string; message: string; details?: Record<string, unknown> };
+  | { status: 403 | 404 | 409; code: string; message: string; details?: Record<string, unknown> };
 type PrivacyOptions = { pool: pg.Pool; pseudonymizer: Pseudonymizer };
 
 async function eraseUser(
@@ -19,11 +19,19 @@ async function eraseUser(
   if (target.rowCount === 0) return { status: 404, code: 'user_not_found', message: 'User not found' };
   const { issuer, subject } = target.rows[0];
   const pseudonym = subject.startsWith('erased:') ? 'erased:' + '0'.repeat(64) : pseudonymizer.erasedSubject(issuer, subject);
-  const { rows } = await pool.query<{ outcome: string; erasedAt: Date | null; blockers: string[] | null }>(
-    `SELECT result_outcome AS outcome, result_erased_at AS "erasedAt", result_blockers AS blockers
-       FROM erase_user($1, $2, $3, $4, $5)`,
-    [targetId, pseudonym, actorId, initiator, requestId]
-  );
+  let rows: { outcome: string; erasedAt: Date | null; blockers: string[] | null }[];
+  try {
+    ({ rows } = await pool.query(
+      `SELECT result_outcome AS outcome, result_erased_at AS "erasedAt", result_blockers AS blockers
+         FROM erase_user($1, $2, $3, $4, $5)`,
+      [targetId, pseudonym, actorId, initiator, requestId]
+    ));
+  } catch (error) {
+    if ((error as Error).message === 'actor does not hold the initiator role') {
+      return { status: 403, code: 'forbidden', message: 'Not allowed to erase this user' };
+    }
+    throw error;
+  }
   const result = rows[0];
   switch (result.outcome) {
     case 'not_found':
@@ -94,8 +102,7 @@ export async function privacyRoutes(app: FastifyInstance, options: PrivacyOption
         [userId]
       );
       await client.query('COMMIT');
-      client.release();
-      return {
+      const result = {
         userId,
         issuer: user.rows[0].issuer,
         subject: user.rows[0].subject,
@@ -103,6 +110,8 @@ export async function privacyRoutes(app: FastifyInstance, options: PrivacyOption
         roles: roles.rows,
         auditEvents: audit.rows.map((row) => ({ ...row, occurredAt: row.occurredAt.toISOString() }))
       };
+      client.release();
+      return result;
     } catch (error) {
       await client.query('ROLLBACK').catch(() => {});
       client.release(error as Error);

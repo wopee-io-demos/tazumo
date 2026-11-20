@@ -68,6 +68,7 @@
   - `erase_user` checks that the actor holds the initiator role.
   - The export releases its connection on errors.
   - ADR-0016 states the remaining limits honestly.
+- [x] Third check on ac89634: all six items resolved. Its three nits are fixed: the export builds its result before releasing the connection, a revoked-initiator race now returns 403, and the ADR-0016 lead-in is corrected.
 - [ ] Current-head CI green (record run URLs).
 - [ ] Merge and record the merge SHA on #56.
 
