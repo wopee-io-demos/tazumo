@@ -1,3 +1,4 @@
+import { realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import type pg from 'pg';
 import { buildSeed } from './fixtures.ts';
@@ -54,7 +55,7 @@ export async function seed(pool: pg.Pool) {
   return { markets: data.markets.length, categories: data.categories.length, merchants: data.merchants.length, products: data.products.length };
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const pool = createPool({ databaseUrl: loadConfig().databaseUrl });
   try {
     console.log('Seeded synthetic fixtures:', await seed(pool));

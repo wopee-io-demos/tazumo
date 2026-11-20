@@ -63,12 +63,9 @@ test('a terminated idle database connection does not crash the service', async (
   const app = buildApp({ pool: db.pool });
   const admin = createPool({ databaseUrl: databaseUrl() });
   try {
-    assert.equal((await app.inject({ method: 'GET', url: '/v1/markets' })).statusCode, 200);
-    const { rows } = await admin.query(
-      `SELECT pg_terminate_backend(pid) AS terminated FROM pg_stat_activity
-        WHERE pid <> pg_backend_pid() AND state = 'idle' AND query ILIKE '%FROM markets%'`
-    );
-    assert.ok(rows.length >= 1, 'expected an idle pooled connection to terminate');
+    const { rows } = await db.pool.query('SELECT pg_backend_pid() AS pid');
+    const terminated = await admin.query('SELECT pg_terminate_backend($1) AS ok', [rows[0].pid]);
+    assert.equal(terminated.rows[0].ok, true);
     await new Promise((resolve) => setTimeout(resolve, 200));
     assert.equal((await app.inject({ method: 'GET', url: '/v1/markets' })).statusCode, 200);
   } finally {

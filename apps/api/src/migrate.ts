@@ -1,3 +1,4 @@
+import { realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { runner } from 'node-pg-migrate';
 import { loadConfig } from './config.ts';
@@ -27,7 +28,7 @@ export async function migrate({ databaseUrl, direction, count, schema = 'public'
   });
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const direction = process.argv[2];
   if (direction !== 'up' && direction !== 'down') {
     console.error('Usage: migrate.ts up|down');

@@ -104,13 +104,16 @@ describe('catalogue API against PostgreSQL', () => {
     const insert = `INSERT INTO merchants (id, slug, market_code, name, synthetic) VALUES ($1, $2, 'demo-eu', $3, $4)`;
     await db.pool.query(insert, ['00000000-0000-4000-8000-0000000000aa', 'stale-shop', 'Stale Shop', true]);
     await db.pool.query(insert, ['00000000-0000-4000-8000-0000000000bb', 'real-shop', 'Real Shop', false]);
-    await seed(db.pool);
-    const { rows } = await db.pool.query(`SELECT slug FROM merchants WHERE slug IN ('stale-shop', 'real-shop')`);
-    assert.deepEqual(rows, [{ slug: 'real-shop' }]);
-    const empty = await app.inject({ method: 'GET', url: '/v1/merchants/00000000-0000-4000-8000-0000000000bb/products' });
-    assert.equal(empty.statusCode, 200);
-    assert.deepEqual(empty.json(), []);
-    await db.pool.query(`DELETE FROM merchants WHERE slug = 'real-shop'`);
+    try {
+      await seed(db.pool);
+      const { rows } = await db.pool.query(`SELECT slug FROM merchants WHERE slug IN ('stale-shop', 'real-shop')`);
+      assert.deepEqual(rows, [{ slug: 'real-shop' }]);
+      const empty = await app.inject({ method: 'GET', url: '/v1/merchants/00000000-0000-4000-8000-0000000000bb/products' });
+      assert.equal(empty.statusCode, 200);
+      assert.deepEqual(empty.json(), []);
+    } finally {
+      await db.pool.query(`DELETE FROM merchants WHERE slug IN ('stale-shop', 'real-shop')`);
+    }
   });
 
   test('client-supplied request IDs are ignored', async () => {
