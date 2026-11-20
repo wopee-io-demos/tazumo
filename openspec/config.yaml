@@ -1,0 +1,12 @@
+schema: spec-driven
+context: |
+  Tazumo is an early multi-category local delivery marketplace built as a pnpm TypeScript monorepo.
+  Target platforms are responsive web, iOS and Android through React Native / Expo.
+  Brand name, palette and mascot are independent decisions. Name is provisional until legal clearance.
+  Use GitHub Issues for operational progress and ADRs for significant architecture trade-offs.
+rules:
+  proposal:
+    - Link the tracking GitHub Issue.
+  tasks:
+    - Do not mark tasks complete until verified.
+    - Link test/build evidence to issue or PR.
