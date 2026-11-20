@@ -7,7 +7,7 @@
     "dev:mobile": "pnpm --filter @tazumo/mobile start",
     "build": "pnpm --filter @tazumo/web build",
     "typecheck": "pnpm -r typecheck",
-    "test": "pnpm --filter @tazumo/core test",
+    "test": "pnpm --filter @tazumo/core --filter @tazumo/brand test",
     "test:e2e": "playwright test",
     "bundle:mobile": "pnpm --filter @tazumo/mobile exec expo export --platform ios && pnpm --filter @tazumo/mobile exec expo export --platform android"
   },
