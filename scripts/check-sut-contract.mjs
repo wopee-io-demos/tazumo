@@ -63,9 +63,14 @@ async function main(){
   assert.equal(contract.capabilities.realDeliveryTracking,false);
 
   const errors=checkRepo(repo);
-  const i=process.argv.indexOf('--base');
-  if(i>0){
-    const ref=process.argv[i+1];
+  const args=process.argv.slice(2);
+  let ref;
+  for(let i=0;i<args.length;i++){
+    if(args[i]==='--base'){ref=args[++i];if(!ref)throw new Error('--base needs a git ref')}
+    else if(args[i].startsWith('--base='))ref=args[i].slice('--base='.length);
+    else throw new Error(`unknown argument ${args[i]}`);
+  }
+  if(ref!==undefined){
     const base=baseContract(ref);
     const result=checkCompatibility(base,contract);
     errors.push(...result.errors);

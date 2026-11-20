@@ -135,3 +135,17 @@ test('removing an empty container or reordering platforms is classified correctl
   reordered.journeys[0].platforms.reverse();
   assert.equal(checkCompatibility(repo.contract,reordered).level,'none');
 });
+
+test('filling an empty container is an addition',()=>{
+  const base=clone(repo.contract),next=clone(repo.contract);
+  base.web.extraTemplates={};
+  next.web.extraTemplates={x:'[data-testid="sut-x-{productId}"]'};
+  const r=checkCompatibility(base,next);
+  assert.equal(r.level,'minor');
+  assert.deepEqual(r.removed,[]);
+});
+
+test('a prop-bound test ID only takes values passed to that component',()=>{
+  const errors=mutate('web','MerchantDetail.tsx','<NotFound lang={lang} routeKey={id} message={t(lang,\'merchantNotFound\')} testId="sut-merchant-not-found"/>','<p testId="sut-merchant-not-found"/>');
+  assert.ok(errors.some(e=>e.startsWith('web.selectors.merchantNotFound:')));
+});

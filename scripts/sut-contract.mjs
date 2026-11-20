@@ -28,32 +28,44 @@ const walk=(node,visit)=>{visit(node);ts.forEachChild(node,child=>walk(child,vis
 const attrName=attr=>attr.name.getText();
 
 /** Find every JSX test-ID attribute of the platform (data-testid on web, testID on native) and resolve its value.
- * Values may be string literals, template literals, a conditional or ?? of those, or a prop whose string values
- * are taken from JSX call sites in the same platform. Comments and other attributes are ignored. */
+ * Values may be string literals, template literals, a conditional or ?? of those, or a prop of the enclosing component
+ * whose string values are taken from JSX call sites of that component (<Component prop="sut-...">). Comments and other attributes are ignored. */
 export function idSites(sources,platform){
   const attribute=TEST_ID_ATTRIBUTE[platform],files=sources.map(parse),props=new Map(),sites=[];
   for(const file of files)walk(file,node=>{
-    if(ts.isJsxAttribute(node)&&node.initializer&&ts.isStringLiteral(node.initializer)&&attrName(node)!==attribute)
-      props.set(attrName(node),[...(props.get(attrName(node))??[]),node.initializer.text]);
+    if(ts.isJsxAttribute(node)&&node.initializer&&ts.isStringLiteral(node.initializer)&&attrName(node)!==attribute){
+      const key=`${node.parent.parent.tagName.getText()}.${attrName(node)}`;
+      props.set(key,[...(props.get(key)??[]),node.initializer.text]);
+    }
   });
+  const componentOf=node=>{
+    for(let n=node.parent;n;n=n.parent){
+      if(ts.isFunctionDeclaration(n)&&n.name)return n.name.text;
+      if(ts.isVariableDeclaration(n)&&ts.isIdentifier(n.name)&&n.initializer&&(ts.isArrowFunction(n.initializer)||ts.isFunctionExpression(n.initializer)))return n.name.text;
+    }
+    return '';
+  };
+  let component='';
+  const prop=name=>props.get(`${component}.${name}`);
   const resolve=expr=>{
     if(!expr)return [];
     if(ts.isStringLiteral(expr)||ts.isNoSubstitutionTemplateLiteral(expr))return [expr.text];
     if(ts.isParenthesizedExpression(expr))return resolve(expr.expression);
     if(ts.isConditionalExpression(expr))return [...resolve(expr.whenTrue),...resolve(expr.whenFalse)];
     if(ts.isBinaryExpression(expr)&&[ts.SyntaxKind.QuestionQuestionToken,ts.SyntaxKind.BarBarToken].includes(expr.operatorToken.kind))return [...resolve(expr.left),...resolve(expr.right)];
-    if(ts.isIdentifier(expr))return props.get(expr.text)??[];
+    if(ts.isIdentifier(expr))return prop(expr.text)??[];
     if(ts.isTemplateExpression(expr)){
       const [first,...rest]=expr.templateSpans;
       const tail=spans=>spans.map(s=>'{}'+s.literal.text).join('');
-      if(expr.head.text===''&&ts.isIdentifier(first.expression)&&props.has(first.expression.text))
-        return props.get(first.expression.text).map(p=>p+first.literal.text+tail(rest));
+      if(expr.head.text===''&&ts.isIdentifier(first.expression)&&prop(first.expression.text))
+        return prop(first.expression.text).map(p=>p+first.literal.text+tail(rest));
       return [expr.head.text+tail(expr.templateSpans)];
     }
     return [];
   };
   files.forEach((file,index)=>walk(file,node=>{
     if(!ts.isJsxAttribute(node)||attrName(node)!==attribute||!node.initializer)return;
+    component=componentOf(node);
     const values=resolve(ts.isJsxExpression(node.initializer)?node.initializer.expression:node.initializer).filter(v=>v.startsWith('sut-'));
     if(!values.length)return;
     const element=node.parent.parent;
@@ -199,6 +211,8 @@ export function checkCompatibility(base,next){
     else if(after.get(path)!==v)(prose(path)?edited:changed).push(path);
   }
   for(const path of after.keys())if(!before.has(path))(prose(path)?edited:added).push(path);
+  const filled=path=>['{}','[]'].includes(before.get(path))&&[...after.keys()].some(p=>p.startsWith(path+'.')||p.startsWith(path+'['));
+  for(let i=removed.length-1;i>=0;i--)if(filled(removed[i]))removed.splice(i,1);
   const level=removed.length||changed.length?'major':added.length?'minor':edited.length?'patch':'none';
   const a=parseVersion(base.version),b=parseVersion(next.version);
   if(!b)return {level,errors:[`version "${next.version}" is not MAJOR.MINOR.PATCH`],removed,changed,added};

@@ -62,11 +62,11 @@ The contract version is checked by `pnpm check:sut --base <ref>`. CI compares a 
 - **Patch**: only prose changes (journey step wording, `isolation`, `repo`).
 - **None**: an unchanged contract keeps its version.
 
-Reordering arrays of IDs or values (for example `platforms`) is not a change.
+Reordering arrays of IDs or values (for example `platforms`) is not a change. The push check runs after a merge and cannot block it; concurrent pull requests that each bump to the same version are caught only if branches must be up to date with `main` before merging. A force-push to `main` can make the previous commit unfetchable, which fails the push check.
 
 ## How the check works
 
-`pnpm check:sut` parses every `.ts`/`.tsx` file under `apps/web/src` and `apps/mobile/src` with the TypeScript compiler. It reads only the platform's test-ID attribute: `data-testid` on web, `testID` on native. Values can be string or template literals, conditionals, or a component prop whose string values come from JSX call sites (such as `testIdPrefix="sut-cart"`). Comments, other attributes and strings elsewhere do not count. The check fails when:
+`pnpm check:sut` parses every `.ts`/`.tsx` file under `apps/web/src` and `apps/mobile/src` with the TypeScript compiler. It reads only the platform's test-ID attribute: `data-testid` on web, `testID` on native. Values can be string or template literals, conditionals, or a prop of the enclosing component whose string values come from JSX call sites of that component (such as `<QuantityStepper testIdPrefix="sut-cart">`). Module constants are not resolved. Placeholder names in templates are not inferred from the code (`${p.id}` is just a placeholder), so a template with the wrong placeholder name is caught only at runtime: on web by the e2e coverage test, on native not yet. Comments, other attributes and strings elsewhere do not count. The check fails when:
 
 - a registered ID or template is not rendered by that platform's code;
 - a concrete ID matches a template only with a value outside that placeholder's fixture domain;
