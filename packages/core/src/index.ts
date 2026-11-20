@@ -24,3 +24,5 @@ export function formatPrice(cents:number,locale='en-IE',currency='EUR'):string{r
 
 export {languages,t,categoryLabel,formatLocalizedPrice} from './localization.ts';
 export type {Language,MessageKey} from './localization.ts';
+export {merchants,findMerchant,findProduct,merchantForProduct,productsForMerchant,filterMerchants,setQuantity,removeFromCart,cartLines} from './discovery.ts';
+export type {Merchant,CartLine} from './discovery.ts';
