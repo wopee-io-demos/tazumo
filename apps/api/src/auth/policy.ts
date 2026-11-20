@@ -10,7 +10,7 @@ export type Decision = { allowed: true; audit: boolean } | { allowed: false; sta
 
 const has = (principal: Principal, role: Role) => principal.grants.some((g) => g.role === role);
 export const isPrivileged = (principal: Principal) => has(principal, 'support') || has(principal, 'admin');
-const isStaff = (principal: Principal) => principal.grants.some((g) => g.role !== 'customer');
+const isStaff = (principal: Principal) => principal.grants.some((g) => ['merchant_staff', 'support', 'admin'].includes(g.role));
 
 function deny(principal: Principal, resourceExists: boolean): Decision {
   return { allowed: false, status: isStaff(principal) && resourceExists ? 403 : 404 };

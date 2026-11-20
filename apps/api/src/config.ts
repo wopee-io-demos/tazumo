@@ -23,12 +23,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
 const loopbackHosts = ['127.0.0.1', 'localhost', '[::1]'];
 
 function loadAuthConfig(env: NodeJS.ProcessEnv): AuthOptions | undefined {
-  const { AUTH_ISSUER: issuer, AUTH_AUDIENCE: audience, AUTH_JWKS_URL: jwksUrl, AUTH_LOG_SALT: logSalt } = env;
-  if (!issuer && !audience && !jwksUrl) return undefined;
+  const { AUTH_ISSUER: issuer, AUTH_AUDIENCE: audience, AUTH_JWKS_URL: jwksUrl, AUTH_LOG_SALT: logSalt, AUTH_TOKEN_TYPE: tokenType } = env;
+  if (!issuer && !audience && !jwksUrl && !logSalt && !tokenType) return undefined;
   if (!issuer || !audience || !jwksUrl) throw new Error('AUTH_ISSUER, AUTH_AUDIENCE and AUTH_JWKS_URL must be set together');
+  if (!logSalt || logSalt.length < 32) throw new Error('AUTH_LOG_SALT (at least 32 characters) is required when auth is configured');
   const url = new URL(jwksUrl);
   if (url.protocol !== 'https:' && !(url.protocol === 'http:' && loopbackHosts.includes(url.hostname))) {
     throw new Error('AUTH_JWKS_URL must use https (http is allowed only for loopback hosts)');
   }
-  return { issuer, audience, jwksUrl, ...(logSalt ? { logSalt } : {}) };
+  return { issuer, audience, jwksUrl, logSalt, ...(tokenType ? { tokenType } : {}) };
 }

@@ -14,7 +14,7 @@ declare module 'fastify' {
 
 export type AuthOptions = AuthConfig & { logSalt?: string };
 
-const bearer = /^Bearer ([A-Za-z0-9_-]+\.[A-Za-z0-9_-]*\.[A-Za-z0-9_-]*)$/;
+const bearer = /^Bearer ([A-Za-z0-9_-]+\.[A-Za-z0-9_-]*\.[A-Za-z0-9_-]*)$/i;
 const challenge = 'Bearer realm="tazumo"';
 
 export function createAuthenticate(pool: pg.Pool, options: AuthOptions | undefined) {
@@ -38,10 +38,11 @@ export function createAuthenticate(pool: pg.Pool, options: AuthOptions | undefin
       token = await verify(match[1]);
     } catch (error) {
       if (!(error instanceof AuthError)) throw error;
-      request.log.info({ authFailure: error.reason }, 'token rejected');
       if (error.status === 503) {
+        request.log.warn({ authFailure: error.reason, cause: error.causeName }, 'identity provider keys unavailable');
         return reply.code(503).send(apiError(request, 'auth_unavailable', 'Authentication is temporarily unavailable'));
       }
+      request.log.info({ authFailure: error.reason }, 'token rejected');
       reply.header('www-authenticate', `${challenge}, error="invalid_token"`);
       return reply.code(401).send(apiError(request, 'invalid_token', 'Token is not valid'));
     }

@@ -33,10 +33,10 @@ export async function startIdp(keys: SigningKey[]): Promise<TestIdp> {
   return idp;
 }
 
-export async function mint(key: SigningKey, claims: JWTPayload = {}) {
+export async function mint(key: SigningKey, claims: JWTPayload = {}, typ = 'JWT') {
   const now = Math.floor(Date.now() / 1000);
   return new SignJWT({ iss: issuer, aud: audience, sub: 'user-1', iat: now, exp: now + 300, ...claims })
-    .setProtectedHeader({ alg: key.alg, kid: key.kid, typ: 'JWT' })
+    .setProtectedHeader({ alg: key.alg, kid: key.kid, typ })
     .sign(key.privateKey);
 }
 

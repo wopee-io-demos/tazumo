@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import Fastify, { type FastifyError, type FastifyRequest, type FastifyServerOptions } from 'fastify';
 import type pg from 'pg';
 import { createAuthenticate, type AuthOptions } from './auth/plugin.ts';
-import { componentSchemas } from './contract.ts';
+import { componentSchemas, requiresBearer } from './contract.ts';
 import { apiError } from './errors.ts';
 import { catalogueRoutes } from './routes/catalogue.ts';
 import { healthRoutes } from './routes/health.ts';
@@ -33,6 +33,11 @@ export function buildApp({ pool, logger = false, auth }: AppOptions) {
   for (const schema of componentSchemas()) app.addSchema(schema);
   app.decorateRequest('principal', null);
 
+  const authenticate = createAuthenticate(pool, auth);
+  app.addHook('onRoute', (route) => {
+    if (requiresBearer(route.method, route.url)) route.onRequest = [authenticate, ...[route.onRequest ?? []].flat()];
+  });
+
   app.addHook('onSend', async (request, reply) => {
     reply.header('x-request-id', request.id);
     reply.header('x-content-type-options', 'nosniff');
@@ -58,6 +63,6 @@ export function buildApp({ pool, logger = false, auth }: AppOptions) {
 
   app.register(healthRoutes, { pool });
   app.register(catalogueRoutes, { pool });
-  app.register(identityRoutes, { pool, authenticate: createAuthenticate(pool, auth) });
+  app.register(identityRoutes, { pool });
   return app;
 }

@@ -29,6 +29,12 @@ test('merchant staff are scoped to their merchant', () => {
   assert.deepEqual(can(support, 'merchant_staff:list', merchant(merchantB)), { allowed: true, audit: true });
 });
 
+test('couriers are not staff for disclosure purposes', () => {
+  const courier = principal('u-courier', { role: 'courier', merchantId: null });
+  assert.deepEqual(can(courier, 'merchant_staff:list', merchant(merchantA)), { allowed: false, status: 404 });
+  assert.deepEqual(can(courier, 'user:read', { type: 'user', id: 'u-customer' }), { allowed: false, status: 404 });
+});
+
 test('unknown resources are 404 for everyone', () => {
   for (const p of [customer, staffA, support, admin]) {
     assert.deepEqual(can(p, 'merchant_staff:list', merchant(merchantB, false)), { allowed: false, status: 404 });

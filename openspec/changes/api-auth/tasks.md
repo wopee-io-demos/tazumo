@@ -8,7 +8,7 @@
 - [x] `GET /v1/me` and `GET /v1/merchants/{merchantId}/staff`, contract `0.3.0-draft`, with responses validated against the contract.
 - [x] Discovery stays anonymous with or without a bad token; logs carry a keyed principal tag only.
 - [ ] Current-head CI green (record run URLs).
-- [ ] Independent review findings resolved and recorded in the PR.
+- [x] Independent review on ea19bda: no blockers. All five should-fix items and most nits fixed: `sub` validation, contract-driven auth (with HEAD), last-good JWKS through outages, `typ` option, whole-suite log leak check, courier disclosure, SQL ownership test, rollback safety, case-insensitive scheme, required log salt, 1 h lifetime cap, `down all`. Evidence: 60/60 tests, plus mutation checks for the fallback and the HEAD route.
 - [ ] Merge and record the merge SHA on #56 and #5.
 
 Not implemented: provider choice, rate limits, admin grants API, courier scopes, payments, orders.

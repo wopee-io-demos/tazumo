@@ -29,6 +29,15 @@ export function componentSchemas(): JsonSchema[] {
 }
 
 export const toFastifyPath = (path: string) => path.replace(/\{(\w+)\}/g, ':$1');
+const toContractPath = (path: string) => path.replace(/:(\w+)/g, '{$1}');
+
+export function requiresBearer(methods: string | string[], fastifyPath: string): boolean {
+  return [methods].flat().some((method) => {
+    const verb = method.toLowerCase() === 'head' ? 'get' : method.toLowerCase();
+    const security = (contract.paths[toContractPath(fastifyPath)]?.[verb] as { security?: Record<string, unknown>[] } | undefined)?.security;
+    return security?.some((requirement) => 'BearerAuth' in requirement) ?? false;
+  });
+}
 
 function operation(method: string, path: string): Operation {
   const op = contract.paths[path]?.[method];

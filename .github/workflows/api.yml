@@ -77,8 +77,7 @@ jobs:
           test "$(curl -s -o /dev/null -w '%{http_code}' "$base/v1/merchants")" = 400
           test "$(curl -s -o /dev/null -w '%{http_code}' "$base/v1/me")" = 503
           kill "$srv"
-          pnpm db:rollback
-          pnpm db:rollback
+          node --experimental-strip-types src/migrate.ts down all
       - name: Server log
         if: always()
         run: cat apps/api/server.log 2>/dev/null || true

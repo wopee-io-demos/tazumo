@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { Writable } from 'node:stream';
 import { SignJWT } from 'jose';
 import { buildApp } from '../src/app.ts';
+import { contract, toFastifyPath } from '../src/contract.ts';
+import { listMerchantStaff } from '../src/routes/identity.ts';
 import { loadConfig } from '../src/config.ts';
 import { uuidV5 } from '../src/fixtures.ts';
 import { seed } from '../src/seed.ts';
@@ -40,9 +42,14 @@ describe('authentication and authorization', () => {
     await db.drop();
   });
 
-  const me = (headers: Record<string, string> = {}) => app.inject({ method: 'GET', url: '/v1/me', headers });
+  const sentTokens: string[] = [];
+  const remember = (headers: Record<string, string>) => {
+    if (headers.authorization) sentTokens.push(headers.authorization.replace(/^Bearer /, ''));
+    return headers;
+  };
+  const me = (headers: Record<string, string> = {}) => app.inject({ method: 'GET', url: '/v1/me', headers: remember(headers) });
   const staff = (merchantId: string, token?: string) =>
-    app.inject({ method: 'GET', url: `/v1/merchants/${merchantId}/staff`, headers: token ? bearer(token) : {} });
+    app.inject({ method: 'GET', url: `/v1/merchants/${merchantId}/staff`, headers: remember(token ? bearer(token) : {}) });
 
   test('discovery stays anonymous and ignores bad tokens', async () => {
     for (const headers of [{}, { authorization: 'Bearer not-a-token' }]) {
@@ -62,6 +69,34 @@ describe('authentication and authorization', () => {
     }
     assert.equal((await staff(merchantA)).statusCode, 401);
     assert.equal((await app.inject({ method: 'GET', url: '/v1/merchants/not-a-uuid/staff' })).statusCode, 401);
+    assert.equal((await app.inject({ method: 'HEAD', url: '/v1/me' })).statusCode, 401);
+    assert.equal((await me({ authorization: `bearer ${await mint(rsa, { sub: 'lowercase-scheme' })}` })).statusCode, 200);
+  });
+
+  test('every registered route the contract marks BearerAuth rejects anonymous calls', async () => {
+    const protectedOps = new Set(
+      Object.entries(contract.paths).flatMap(([path, ops]) =>
+        Object.entries(ops)
+          .filter(([, op]) => (op as { security?: Record<string, unknown>[] }).security?.some((s) => 'BearerAuth' in s))
+          .map(([method]) => `${method.toUpperCase()} ${toFastifyPath(path)}`)
+      )
+    );
+    const routes: string[] = [];
+    const probe = buildApp({ pool: db.pool, auth: { issuer, audience, jwksUrl: idp.url } });
+    probe.addHook('onRoute', (route) => {
+      for (const method of [route.method].flat()) if (protectedOps.has(`${method === 'HEAD' ? 'GET' : method} ${route.url}`)) routes.push(`${method} ${route.url}`);
+    });
+    await probe.ready();
+    try {
+      assert.ok(routes.length >= 4, `expected protected GET and HEAD routes, got ${routes.join(', ')}`);
+      for (const route of routes) {
+        const [method, url] = route.split(' ');
+        const res = await probe.inject({ method: method as 'GET' | 'HEAD', url: url.replace(':merchantId', merchantA) });
+        assert.equal(res.statusCode, 401, `${route} must require a bearer token`);
+      }
+    } finally {
+      await probe.close();
+    }
   });
 
   test('a valid RS256 or ES256 token creates the user once with the customer role', async () => {
@@ -88,8 +123,8 @@ describe('authentication and authorization', () => {
   });
 
   test('clock skew up to 60 seconds is tolerated', async () => {
-    const res = await me(bearer(await mint(rsa, { iat: now() - 600, exp: now() - 30 })));
-    assert.equal(res.statusCode, 200);
+    assert.equal((await me(bearer(await mint(rsa, { iat: now() - 600, exp: now() - 30 })))).statusCode, 200);
+    assert.equal((await me(bearer(await mint(rsa, { nbf: now() + 30 })))).statusCode, 200);
   });
 
   const invalid: Array<[string, () => Promise<string>]> = [
@@ -99,6 +134,10 @@ describe('authentication and authorization', () => {
     ['wrong issuer', () => mint(rsa, { iss: 'https://evil.test.invalid/' })],
     ['missing sub', () => mint(rsa, { sub: undefined })],
     ['missing exp', () => mint(rsa, { exp: undefined })],
+    ['empty sub', () => mint(rsa, { sub: '' })],
+    ['oversized sub', () => mint(rsa, { sub: 'x'.repeat(256) })],
+    ['numeric sub', () => mint(rsa, { sub: 123 as unknown as string })],
+    ['lifetime beyond one hour', () => mint(rsa, { exp: now() + 7200 })],
     ['RS384, outside the algorithm allowlist', async () => mint(rs384)],
     ['unknown kid', async () => mint(await signingKey('rsa-unpublished'))],
     ['alg none', async () => `${b64url({ alg: 'none', typ: 'JWT' })}.${b64url({ iss: issuer, aud: audience, sub: 'x', exp: now() + 300 })}.`],
@@ -153,6 +192,9 @@ describe('authentication and authorization', () => {
     assert.equal((await staff('00000000-0000-4000-8000-000000000000', tokens.staffA)).statusCode, 404);
     assert.equal((await staff('not-a-uuid', tokens.staffA)).statusCode, 400);
 
+    const customerPrincipal = { userId: ids.customer, grants: [{ role: 'customer' as const, merchantId: null }] };
+    assert.deepEqual(await listMerchantStaff(db.pool, merchantA, customerPrincipal), [], 'SQL ownership must hold without the policy');
+
     const supportRead = await staff(merchantA, tokens.support);
     assert.equal(supportRead.statusCode, 200);
     const audit = await db.pool.query(`SELECT actor_user_id, action, resource_type, resource_id, request_id FROM audit_events`);
@@ -170,14 +212,18 @@ describe('authentication and authorization', () => {
     await assert.rejects(db.pool.query(`TRUNCATE audit_events`), /append-only/);
   });
 
-  test('logs never contain tokens or raw subjects', async () => {
-    logLines.length = 0;
-    const token = await mint(rsa, { sub: 'secret-subject-42' });
-    assert.equal((await me(bearer(token))).statusCode, 200);
+  test('logs never contain tokens or raw subjects (runs last, covers the whole suite)', async () => {
+    assert.equal((await me(bearer(await mint(rsa, { sub: 'secret-subject-42' })))).statusCode, 200);
     const log = logLines.join('');
     assert.match(log, /"principal":"[0-9a-f]{16}"/);
-    assert.ok(!log.includes('secret-subject-42'), 'raw sub leaked');
-    assert.ok(!log.includes(token.split('.')[1]), 'token leaked');
+    assert.match(log, /"authFailure":"ERR_JWT_EXPIRED"/);
+    for (const subject of ['secret-subject-42', 'first-use', 'victim', 'attacker', 'tenant-customer', 'tenant-staff-a', 'tenant-support']) {
+      assert.ok(!log.includes(subject), `raw sub ${subject} leaked`);
+    }
+    assert.ok(sentTokens.length > 20);
+    for (const token of sentTokens) {
+      for (const segment of token.split('.').filter((s) => s.length > 16)) assert.ok(!log.includes(segment), 'token material leaked');
+    }
   });
 });
 
@@ -233,6 +279,7 @@ describe('JWKS rotation and availability', () => {
       const res = await app.inject({ method: 'GET', url: '/v1/me', headers: bearer(await mint(key)) });
       assert.equal(res.statusCode, 503);
       assert.equal(res.json().code, 'auth_unavailable');
+      assertMatchesContract('get', '/v1/me', 503, res.json());
       await idp.close();
       const refused = buildApp({ pool: db.pool, auth: { issuer, audience, jwksUrl: idp.url } });
       const res2 = await refused.inject({ method: 'GET', url: '/v1/me', headers: bearer(await mint(key)) });
@@ -240,6 +287,43 @@ describe('JWKS rotation and availability', () => {
       assert.equal(res2.statusCode, 503);
     } finally {
       await app.close();
+    }
+  });
+
+  test('last good keys keep serving through a bounded provider outage', async () => {
+    const key = await signingKey('outage');
+    const idp = await startIdp([key]);
+    const auth = { issuer, audience, jwksUrl: idp.url, jwksCacheMaxAgeMs: 50, jwksStaleMaxMs: 400, jwksRetryAfterFailureMs: 1_000 };
+    const app = buildApp({ pool: db.pool, auth });
+    const call = async (k: SigningKey) => (await app.inject({ method: 'GET', url: '/v1/me', headers: bearer(await mint(k)) })).statusCode;
+    try {
+      assert.equal(await call(key), 200);
+      idp.status = 500;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      assert.equal(await call(key), 200, 'cached keys must survive a refetch failure');
+      const fetches = idp.fetches;
+      assert.equal(await call(await signingKey('junk-during-outage')), 401, 'unknown kid stays 401 during an outage');
+      assert.equal(idp.fetches, fetches, 'no refetch storm right after a failure');
+      await new Promise((resolve) => setTimeout(resolve, 450));
+      assert.equal(await call(key), 503, 'stale keys expire after jwksStaleMaxMs');
+    } finally {
+      await app.close();
+      await idp.close();
+    }
+  });
+
+  test('a configured token type rejects other token types', async () => {
+    const key = await signingKey('typed');
+    const idp = await startIdp([key]);
+    const app = buildApp({ pool: db.pool, auth: { issuer, audience, jwksUrl: idp.url, tokenType: 'at+jwt' } });
+    try {
+      const idToken = await app.inject({ method: 'GET', url: '/v1/me', headers: bearer(await mint(key, { nonce: 'n' }, 'JWT')) });
+      assert.equal(idToken.statusCode, 401);
+      const accessToken = await app.inject({ method: 'GET', url: '/v1/me', headers: bearer(await mint(key, {}, 'at+jwt')) });
+      assert.equal(accessToken.statusCode, 200);
+    } finally {
+      await app.close();
+      await idp.close();
     }
   });
 
@@ -259,7 +343,9 @@ test('auth configuration is all-or-nothing and requires https outside loopback',
   const base = { DATABASE_URL: 'postgres://x@localhost/x' };
   assert.equal(loadConfig(base).auth, undefined);
   assert.throws(() => loadConfig({ ...base, AUTH_ISSUER: issuer }), /set together/);
-  const full = { ...base, AUTH_ISSUER: issuer, AUTH_AUDIENCE: audience };
+  assert.throws(() => loadConfig({ ...base, AUTH_ISSUER: issuer, AUTH_AUDIENCE: audience, AUTH_JWKS_URL: 'https://idp.example.com/jwks' }), /AUTH_LOG_SALT/);
+  const full = { ...base, AUTH_ISSUER: issuer, AUTH_AUDIENCE: audience, AUTH_LOG_SALT: 's'.repeat(32), AUTH_TOKEN_TYPE: 'at+jwt' };
+  assert.equal(loadConfig({ ...full, AUTH_JWKS_URL: 'https://idp.example.com/jwks' }).auth?.tokenType, 'at+jwt');
   assert.throws(() => loadConfig({ ...full, AUTH_JWKS_URL: 'http://idp.example.com/jwks' }), /https/);
   assert.equal(loadConfig({ ...full, AUTH_JWKS_URL: 'http://127.0.0.1:9/jwks' }).auth?.jwksUrl, 'http://127.0.0.1:9/jwks');
   assert.equal(loadConfig({ ...full, AUTH_JWKS_URL: 'https://idp.example.com/jwks' }).auth?.issuer, issuer);
