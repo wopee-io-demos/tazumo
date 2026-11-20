@@ -10,7 +10,7 @@
 - [x] Delivery zones (haversine, inclusive radius), inventory availability and `checkOrderable`. Evidence: `operations.test.ts`.
 - [x] Order acceptance window with accept, decline and system auto-decline. Evidence: `operations.test.ts`.
 - [x] Proposed migration and route plan in `design.md`.
-- [ ] Follow-up issue "Wire merchant-ops into apps/api" filed as `status:backlog`.
+- [x] Follow-up issue filed as `status:backlog`: #75 "Wire merchant-ops into apps/api (migration, routes, policy)".
 - [ ] Current-head CI green on the PR.
 - [ ] Review findings resolved and merge SHA recorded on #12.
 

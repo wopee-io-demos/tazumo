@@ -1,6 +1,6 @@
 # Design: merchant operations domain (slice 1)
 
-Decisions and alternatives are in ADR-0019. This slice ships only `packages/merchant-ops`; the migration and routes below are a proposal for the `apps/api` owner, tracked in the follow-up issue "Wire merchant-ops into apps/api".
+Decisions and alternatives are in ADR-0019. This slice ships only `packages/merchant-ops`; the migration and routes below are a proposal for the `apps/api` owner, tracked in follow-up issue #75.
 
 ## Package layout
 | Module | Exports |
