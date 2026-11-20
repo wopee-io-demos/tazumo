@@ -56,3 +56,7 @@ Do not wait passively for manual review. Request delegated independent review or
 
 ## Organization Agent Skills standard
 Follow https://agentskills.io/specification for reusable agent procedures. Skills are folders containing `SKILL.md` with valid YAML `name` and task-triggering `description`. Use kebab-case names matching the folder, concise progressive-disclosure instructions, and relative `references/`, `scripts/`, `assets/` when useful. Keep `AGENTS.md` for repo-wide policy; do not confuse it with a skill. Validate using `skills-ref validate <skill-folder>` where available, plus meaningful behavior/negative tests. Changes to reusable skills require linked Issues, OpenSpec and PRs; update the upstream `mobile-agent` skills first, then version and synchronize copies to `mobile-demo` with the lockfile. Never claim Wopee MCP or native device validation from mocked results.
+
+## Reusable Agent Skills
+
+Follow [docs/AGENT-SKILLS.md](docs/AGENT-SKILLS.md), based on https://agentskills.io/specification. This includes metadata-driven SKILL.md, progressive disclosure, source trust and versioned skill copies. Track adoption in issue #35. Use the same issue-linked, reviewed PR delivery gates described above.
