@@ -15,8 +15,10 @@ test('demo flow: search Margherita, add it, open the cart',async({page})=>{
   await add.scrollIntoViewIfNeeded();
   await pause(800);
   await add.click();
+  await pause(800);
+  await page.evaluate(()=>window.scrollTo({top:0,behavior:'smooth'}));
   const cart=page.getByRole('button',{name:'Cart, 1'});
-  await expect(cart).toBeVisible();
+  await expect(cart).toBeInViewport();
   await pause();
   await cart.click();
   const dialog=page.getByTestId('sut-cart-dialog');
