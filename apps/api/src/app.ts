@@ -3,14 +3,21 @@ import Fastify, { type FastifyError, type FastifyRequest, type FastifyServerOpti
 import type pg from 'pg';
 import { createAuthenticate, type AuthOptions } from './auth/plugin.ts';
 import { componentSchemas, requiresBearer } from './contract.ts';
+import { createRateLimits, type RateLimitOptions } from './rate-limit.ts';
 import { apiError } from './errors.ts';
 import { catalogueRoutes } from './routes/catalogue.ts';
 import { healthRoutes } from './routes/health.ts';
 import { identityRoutes } from './routes/identity.ts';
+import { adminRoutes } from './routes/admin.ts';
 
-export type AppOptions = { pool: pg.Pool; logger?: FastifyServerOptions['logger']; auth?: AuthOptions };
+export type AppOptions = {
+  pool: pg.Pool;
+  logger?: FastifyServerOptions['logger'];
+  auth?: AuthOptions;
+  rateLimits?: RateLimitOptions;
+};
 
-export function buildApp({ pool, logger = false, auth }: AppOptions) {
+export function buildApp({ pool, logger = false, auth, rateLimits }: AppOptions) {
   const loggerOptions = logger === true ? {} : logger;
   const app = Fastify({
     logger:
@@ -34,8 +41,11 @@ export function buildApp({ pool, logger = false, auth }: AppOptions) {
   app.decorateRequest('principal', null);
 
   const authenticate = createAuthenticate(pool, auth);
+  const limits = createRateLimits(rateLimits);
   app.addHook('onRoute', (route) => {
-    if (requiresBearer(route.method, route.url)) route.onRequest = [authenticate, ...[route.onRequest ?? []].flat()];
+    if (requiresBearer(route.method, route.url)) {
+      route.onRequest = [limits.byIp, authenticate, limits.byPrincipal, ...[route.onRequest ?? []].flat()];
+    }
   });
 
   app.addHook('onSend', async (request, reply) => {
@@ -64,5 +74,6 @@ export function buildApp({ pool, logger = false, auth }: AppOptions) {
   app.register(healthRoutes, { pool });
   app.register(catalogueRoutes, { pool });
   app.register(identityRoutes, { pool });
+  app.register(adminRoutes, { pool });
   return app;
 }

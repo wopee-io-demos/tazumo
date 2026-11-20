@@ -26,9 +26,47 @@ Decisions and alternatives are in ADR-0016. The target model is the "Authenticat
 ## Testing approach
 `test/idp.ts` generates RS256, ES256 and RS384 key pairs with WebCrypto and serves a mutable JWKS from an in-process HTTP server on 127.0.0.1. Tests mint tokens with `jose.SignJWT`, and hand-craft `alg: none`, HS256 and tampered tokens. No real provider and no real credentials are involved.
 
+## Slice 2
+
+### Rate limits
+Two fixed-window limiters (`src/rate-limit.ts`) are attached by the same contract-driven `onRoute` hook, in this order: per-IP limit, then `authenticate`, then per-principal limit.
+
+| Layer | Key | Default | Purpose |
+| --- | --- | --- | --- |
+| IP | `request.ip` | 300 requests / 60 s | Cuts off token floods and brute force before JWT verification and JWKS fetches |
+| Principal | user ID | 120 requests / 60 s | Fair use per authenticated caller |
+
+- **Over the limit:** 429 `rate_limited` with `Retry-After` (seconds until the window resets).
+- **State and memory:** state is in memory per instance, bounded at 100k keys per layer (expired windows are evicted first).
+- **Multi-instance:** a deployment with several instances needs a shared store (for example PostgreSQL or Redis) before limits are global.
+- **Proxies:** Fastify's `trustProxy` is off, so behind a proxy `request.ip` is the proxy address until `trustProxy` is configured for the deployment.
+- **Testing:** the limiter takes an injectable clock, so tests advance time without sleeping.
+
+### Admin role grants
+- **Endpoints:** `PUT` and `DELETE /v1/admin/users/{userId}/roles/{role}`.
+  - `role` is `merchant_staff` (requires `?merchantId=`) or `support` (forbids it).
+  - `admin` and `customer` are not grantable through the API.
+- **Policy:** `role:manage` allows admins only and denies an admin acting on their own user ID (no self-escalation, no self-demotion). The denial is always 403, because the endpoints themselves are not secret.
+- **Order of checks:**
+  1. Policy, which runs before any lookup, so non-admins learn nothing.
+  2. The `merchantId` rule (400).
+  3. In one transaction: user exists (404), merchant exists (404), then the insert or delete with `ON CONFLICT DO NOTHING` / `RETURNING`.
+  4. If a row changed, an audit event with `details: {role, merchantId}` is written in the same transaction.
+- **Responses:** PUT returns 201 (created) or 200 (already present). DELETE returns 204 either way.
+
+### Runtime database role
+- Migration `0003` creates the NOLOGIN role `tazumo_api` if it is missing (roles are cluster-wide). It grants per schema:
+  - USAGE on the schema;
+  - SELECT on catalogue tables;
+  - SELECT and INSERT on `users`;
+  - SELECT, INSERT and DELETE on `user_roles`;
+  - INSERT on `audit_events`.
+- Operators create a login role `IN ROLE tazumo_api` for the server. Migrations and seed keep using the owner.
+- Every future migration that adds a table must grant `tazumo_api` exactly what the runtime needs.
+- Migration `0003` also adds `audit_events.details jsonb`.
+
 ## Next slices
-- Choose the OIDC provider (ADR) and document its token lifetime settings.
-- Add an admin API for role grants, with audit.
-- Add per-principal and per-IP rate limits on authenticated routes.
+- Accept or amend ADR-0017 (OIDC provider), then run the Keycloak spike it proposes.
+- Use a shared rate-limit store for multi-instance deployments.
 - Define GDPR erasure by pseudonymizing `users` while keeping audit integrity.
 - Add courier assignment scopes and order ownership once orders exist.

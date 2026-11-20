@@ -45,3 +45,36 @@ Discovery endpoints SHALL stay anonymous and ignore any `Authorization` header. 
 #### Scenario: Bad token on a public route
 - WHEN `GET /v1/markets` is called with an invalid bearer token
 - THEN the response is 200.
+
+### Requirement: Rate limits on authenticated routes
+The service SHALL limit requests to authenticated routes per client IP before token verification and per principal after authentication, and SHALL answer requests over the limit with 429, a `Retry-After` header and an `ApiError` body.
+
+#### Scenario: Principal over its limit
+- WHEN a principal exceeds its per-window limit
+- THEN further requests get 429 with the seconds until the window resets, other principals are unaffected, and requests succeed again after the window.
+
+#### Scenario: Token flood from one address
+- WHEN one IP address exceeds its limit, even with invalid tokens
+- THEN further requests get 429 without contacting the JWKS endpoint or creating users.
+
+### Requirement: Admin role grants
+The service SHALL let only admins grant and revoke `merchant_staff` (scoped to a merchant) and `support` roles, idempotently, SHALL forbid changes to the caller's own grants, and SHALL write every effective change to the audit log in the same transaction.
+
+#### Scenario: Repeated grant
+- WHEN an admin grants the same role twice
+- THEN the first call returns 201, the second 200, and exactly one audit event exists.
+
+#### Scenario: Escalation attempt
+- WHEN a customer, merchant staff member or support user grants any role, or an admin changes their own grants
+- THEN the service responds 403 and nothing changes.
+
+#### Scenario: Unknown target
+- WHEN the user or merchant does not exist
+- THEN the service responds 404 and nothing changes.
+
+### Requirement: Least-privilege runtime role
+The service SHALL be runnable as a database role that can read the catalogue, manage users and grants, and only append to the audit log.
+
+#### Scenario: Tampering with the audit log
+- WHEN the runtime role tries to update, delete, truncate or read audit events, disable their triggers or drop the table
+- THEN the database refuses.
