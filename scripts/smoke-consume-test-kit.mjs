@@ -13,7 +13,7 @@ try{
  const packed=JSON.parse(result)[0];
  assert.ok(packed?.filename,'npm pack did not produce an archive');
  const files=packed.files.map(x=>x.path);
- assert.ok(files.includes('dist/index.mjs')&&files.includes('dist/index.d.ts')&&files.includes('dist/marketplace.json'));
+ assert.ok(files.includes('dist/index.mjs')&&files.includes('dist/index.d.ts')&&files.includes('dist/marketplace.json')&&files.includes('dist/sut.json'));
  assert.ok(files.every(f=>f==='package.json'||f.startsWith('dist/')),'Unexpected source or secret file in package: '+files.join(', '));
  const tarball=join(temp,packed.filename);
  await writeFile(join(temp,'package.json'),'{"private":true,"type":"module"}');
@@ -23,6 +23,8 @@ import {fixture} from '@wopee-io-demos/tazumo-test-kit';
 assert.equal(fixture.synthetic,true);
 assert.ok(fixture.products.length>0);
 assert.equal(fixture.brand.name,'Tazumo');
+assert.equal(fixture.sut.version,'0.1.0');
+assert.equal(fixture.sut.capabilities.realCheckout,false);
 console.log('Installed organization test kit passes consumer smoke test:',fixture.artifactVersion);`;
  const consumerPath=join(temp,'consumer.mjs');
  await writeFile(consumerPath,consumer);

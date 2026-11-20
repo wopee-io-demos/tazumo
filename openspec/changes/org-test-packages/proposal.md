@@ -20,3 +20,6 @@ Issue #29; ADR-0006.
 - [ ] Publish both package types with workflow on main.
 - [ ] Verify org Packages listings, visibility, repository read access and pull/install from an independent test repo.
 - [ ] Record artifact links and test results in #29.
+
+- [x] Include upstream canonical SUT v0.1.0 identifiers and capability boundaries in the organization test kit.
+- [ ] Verify npm consumer imports SUT contract JSON after package publication.

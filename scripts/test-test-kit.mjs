@@ -13,6 +13,9 @@ test('generated fixtures match typed source of truth',async()=>{
  const brand=await import('../packages/brand/src/index.ts');
  const artifact=(await import('../packages/test-kit/dist/index.mjs')).fixture;
  assert.equal(artifact.synthetic,true);
+ assert.equal(artifact.sut.version,'0.1.0');
+ assert.equal(artifact.sut.capabilities.realCheckout,false);
+ assert.equal(artifact.sut.native.androidPackage,'io.wopee.demos.tazumo');
  assert.equal(artifact.products.length,core.products.length);
  assert.equal(artifact.brand.name,brand.brandName);
  assert.equal(artifact.brand.palettes.coral.primary,brand.palettes.coral.primary);

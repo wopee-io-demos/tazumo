@@ -24,7 +24,7 @@ Use the `test-<workflow run number>` tag as the immutable test identifier, or `s
 
 Package: `@wopee-io-demos/tazumo-test-kit`, published as `0.0.<GitHub workflow run number>`, with dist-tag `test`.
 
-Contents are generated from the existing `@tazumo/core` fixture catalogue and `@tazumo/brand` tokens. The package includes ESM entry points, TypeScript declarations and `marketplace.json`; it deliberately contains no secret data, backend credentials, external transactions or real customer information.
+Contents are generated from the existing `@tazumo/core` fixture catalogue and `@tazumo/brand` tokens. The package includes ESM entry points, TypeScript declarations, `marketplace.json` and the versioned canonical `sut.json` selectors/fixture contract from `contracts/sut.json`;  it deliberately contains no secret data, backend credentials, external transactions or real customer information.
 
 To consume from another organization repository, grant that repository **read access under the package's Actions access settings**, then set:
 
@@ -43,7 +43,8 @@ For CI, use `actions/setup-node@v4` with `registry-url: https://npm.pkg.github.c
 
 ```js
 import {fixture} from '@wopee-io-demos/tazumo-test-kit';
-console.log(fixture.products.length,fixture.brand.palettes);
+console.log(fixture.products.length,fixture.brand.palettes,fixture.sut.version);
+// Also available as @wopee-io-demos/tazumo-test-kit/sut.json
 ```
 
 ## Publish procedure

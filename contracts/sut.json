@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "version": "0.1.0",
+  "app": "Tazumo",
+  "status": "synthetic-only",
+  "repo": "https://github.com/wopee-io-demos/tazumo",
+  "web": {
+    "baseUrlEnv": "TAZUMO_BASE_URL",
+    "localBaseUrl": "http://127.0.0.1:4173",
+    "selectors": {
+      "search": "[data-testid=\"sut-search\"]",
+      "cartOpen": "[data-testid=\"sut-cart-open\"]",
+      "cartDialog": "[data-testid=\"sut-cart-dialog\"]",
+      "productPizza": "[data-testid=\"sut-product-pizza\"]",
+      "addPizza": "[data-testid=\"sut-add-pizza\"]",
+      "language": "[data-testid=\"sut-language\"]",
+      "palette": "[data-testid=\"sut-palette\"]"
+    }
+  },
+  "native": {
+    "androidPackage": "io.wopee.demos.tazumo",
+    "iosBundleId": "io.wopee.demos.tazumo",
+    "requiredLocale": "en",
+    "selectors": {
+      "search": "sut-search",
+      "cartOpen": "sut-cart-open",
+      "cartSummary": "sut-cart-summary",
+      "productPizza": "sut-product-pizza",
+      "addPizza": "sut-add-pizza",
+      "languageEnglish": "sut-language-en",
+      "languageCzech": "sut-language-cs",
+      "categoryGroceries": "sut-category-groceries"
+    }
+  },
+  "fixtures": {
+    "synthetic": true,
+    "products": [
+      {
+        "id": "pizza",
+        "name": "Margherita pizza",
+        "merchant": "Piazza Local",
+        "priceMinor": 1190,
+        "currency": "EUR"
+      },
+      {
+        "id": "bread",
+        "name": "Sourdough loaf",
+        "priceMinor": 450,
+        "currency": "EUR"
+      }
+    ]
+  },
+  "journeys": [
+    {
+      "id": "discovery-search",
+      "steps": [
+        "open marketplace",
+        "search Piazza",
+        "assert Margherita pizza visible"
+      ]
+    },
+    {
+      "id": "cart-no-checkout",
+      "steps": [
+        "add pizza",
+        "open cart",
+        "assert Margherita pizza and subtotal",
+        "assert checkout disabled"
+      ]
+    },
+    {
+      "id": "category-filter",
+      "steps": [
+        "choose Groceries",
+        "assert Sourdough loaf visible"
+      ]
+    },
+    {
+      "id": "locale-maintenance",
+      "steps": [
+        "select Czech",
+        "assert localized headings",
+        "assert cart preserved"
+      ]
+    }
+  ],
+  "capabilities": {
+    "realCheckout": false,
+    "realDeliveryTracking": false,
+    "serverReset": false,
+    "cartPersistence": false
+  },
+  "isolation": "Create a fresh browser context or restart native app with cleared app data for each independent test. Do not require shared customer accounts."
+}
