@@ -36,3 +36,17 @@ For demo-specific changes, the four required acceptance dimensions are **Setup, 
 ### Self-hosted CI runners
 
 The organization may use dedicated Hetzner GitHub Actions runners. Keep workflows on approved runner labels and coordinate runner-label changes through an Issue/PR. Treat untrusted pull-request code as hostile: do not expose package-publication credentials or long-lived secrets to PR jobs, use least-privilege `GITHUB_TOKEN`, isolate ephemeral jobs, and publish only after trusted branch validation. Do not interpret a workflow that failed before runner assignment as a code-test result. Record runner type, environment and artifact provenance in the PR.
+
+## Autonomous review, merge, and cleanup
+
+**Do not stop at opening a PR or wait passively for a person to say "review" or "merge".** The implementation agent owns the complete issue-to-merge lifecycle, including follow-up fixes and issue updates.
+
+1. As soon as the implementation is complete, **spawn independent review subagents when the current execution environment supports them**. Give reviewers separate, focused scopes: (a) correctness and regressions, (b) security/privacy, secrets and dependencies, (c) architecture/OpenSpec/ADR and cross-repo contract compatibility, and (d) test evidence, accessibility and maintainability. The reviewers must inspect the actual diff and acceptance criteria; capture findings and their dispositions in the PR. When independent subagent execution is unavailable, perform the same separate review passes explicitly and label them "self-review", **not** independent human or agent approvals.
+2. Fix every blocking finding, run relevant positive/negative tests and request another review pass if changes affect previously reviewed behavior. Record the exact current head SHA, reproducible commands, links to CI runs, and remaining limitations in the issue and PR.
+3. **Merge proactively** once GitHub branch protection, actual required approvals, current-head quality/security checks and applicable acceptance criteria are satisfied. Do not request an extra go-ahead solely to merge an already authorized, verified PR. If GitHub requires an independent approval, request it through the supported review mechanism; never fabricate an approval or bypass a required policy.
+4. If CI is queued, unavailable, or failed (including runner-unassigned failures), keep the PR open, record a precise blocker issue, and continue other unblocked work. A self-review never replaces a mandatory GitHub approval or a passing required check.
+5. After a successful merge, verify the merged SHA and applicable `main` checks, update the originating Issue and OpenSpec with evidence, close only fully accepted work, and **delete the merged feature branch** where the connected tooling/permissions permit. For superseded branches, document the disposition and arrange safe deletion.
+6. For coordinated changes across Tazumo and its demo consumers, merge the upstream SUT contract first, verify its exact version, then merge consumer PRs once their compatibility tests pass. Avoid overlapping incompatible contract changes.
+7. Never self-approve a PR in GitHub, never disable protection/CI/secret-scanning to make a PR mergeable, and never publish to production or a registry as though test evidence existed when it does not.
+
+This is an **execution policy**, not a promise that any particular session can launch subagents, provision runners, or perform unattended background work. Use actual available automation and record any missing capability as a blocker.
