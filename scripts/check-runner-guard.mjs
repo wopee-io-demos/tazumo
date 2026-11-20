@@ -2,11 +2,13 @@ import {readFileSync,readdirSync,realpathSync} from 'node:fs';
 import {pathToFileURL} from 'node:url';
 import {parse} from 'yaml';
 import {Evaluator,Lexer,Parser,data} from '@actions/expressions';
+import {Binary,ContextAccess,Grouping,IndexAccess,Literal,Logical,Unary} from '@actions/expressions/ast';
 
 export const repository=process.env.GITHUB_REPOSITORY??'wopee-io-demos/tazumo';
 export const hosted='ubuntu-latest';
 export const unguardedExpression="vars.RUNNER_MODE == 'hosted' && 'ubuntu-latest' || fromJSON('[\"self-hosted\",\"linux\",\"x64\",\"demos\"]')";
-const hostedLabel=/^(ubuntu|windows|macos)-[\w.-]+$/;
+export const hostedLabels=new Set(['ubuntu-latest','ubuntu-24.04','ubuntu-22.04','ubuntu-24.04-arm','ubuntu-22.04-arm','macos-latest','macos-26','macos-15','macos-14','macos-13','windows-latest','windows-2025','windows-2022','windows-11-arm']);
+const isHosted=(label)=>typeof label==='string'&&hostedLabels.has(label);
 
 const pr=(headRepo)=>({event_name:'pull_request',repository,event:{pull_request:{number:1,head:{repo:headRepo&&{full_name:headRepo}}}}});
 export const events={
@@ -31,7 +33,7 @@ export function evaluate(expression,github,vars){
 }
 
 export const expected=(event,mode)=>mode==='RUNNER_MODE=hosted'||untrusted.has(event)?'hosted':'self-hosted';
-const classify=(runner)=>typeof runner==='string'&&hostedLabel.test(runner)?'hosted'
+const classify=(runner)=>isHosted(runner)?'hosted'
   :[runner].flat().map(String).includes('self-hosted')?'self-hosted':`unexpected ${JSON.stringify(runner)}`;
 
 export function matrix(expression,triggers=[...modelledTriggers]){
@@ -43,12 +45,35 @@ export function matrix(expression,triggers=[...modelledTriggers]){
   return rows;
 }
 
+const isEventName=(n)=>n instanceof IndexAccess&&n.expr instanceof ContextAccess&&n.expr.name.lexeme==='github'
+  &&n.index instanceof Literal&&n.index.literal.value==='event_name';
+const onlyEventName=(n)=>n instanceof Literal||isEventName(n)
+  ||(n instanceof Binary&&onlyEventName(n.left)&&onlyEventName(n.right))
+  ||(n instanceof Logical&&n.args.every(onlyEventName))
+  ||(n instanceof Unary&&onlyEventName(n.expr))
+  ||(n instanceof Grouping&&onlyEventName(n.group));
+
+function decide(n,context){
+  if(n instanceof Grouping)return decide(n.group,context);
+  if(n instanceof Unary&&n.operator.lexeme==='!'){const v=decide(n.expr,context);return v===undefined?undefined:!v;}
+  if(n instanceof Logical){
+    const values=n.args.map(a=>decide(a,context));
+    if(n.operator.lexeme==='&&')return values.includes(false)?false:values.includes(undefined)?undefined:true;
+    return values.includes(true)?true:values.includes(undefined)?undefined:false;
+  }
+  if(onlyEventName(n))return Boolean(JSON.parse(JSON.stringify(new Evaluator(n,context).evaluate(),data.replacer)));
+  return undefined;
+}
+
 function runsOnPullRequests(job){
   if(job.if===undefined)return true;
-  return prEvents.some(e=>{
-    try{return Boolean(evaluate(String(job.if),events[e].github,{}));}catch{return true;}
-  });
+  try{
+    const tree=new Parser(new Lexer(strip(String(job.if))).lex().tokens,['github','vars','env','inputs','needs','matrix','steps','job','runner','strategy','secrets'],[]).parse();
+    return prEvents.some(e=>decide(tree,JSON.parse(JSON.stringify({github:events[e].github}),data.reviver))!==false);
+  }catch{return true;}
 }
+
+const expressions=(value)=>[...JSON.stringify(value).matchAll(/\$\{\{(.*?)\}\}/g)].map(m=>m[1]);
 
 export function workflowJobs(dir=new URL('../.github/workflows/',import.meta.url)){
   const jobs=[];
@@ -60,7 +85,7 @@ export function workflowJobs(dir=new URL('../.github/workflows/',import.meta.url
       const scopes=[workflow.permissions,job.permissions];
       jobs.push({
         file,id,triggers,job,runsOn:job['runs-on'],
-        secrets:/\bsecrets\b(?!\s*\.\s*GITHUB_TOKEN\b)/.test(JSON.stringify({env:workflow.env,job})),
+        secrets:job.secrets!==undefined||expressions({env:workflow.env,job}).some(x=>/\bsecrets\b(?!\s*\.\s*GITHUB_TOKEN\b)/.test(x)),
         writes:scopes.some(p=>p==='write-all'||(p&&typeof p==='object'&&Object.values(p).includes('write')))
       });
     }
@@ -86,7 +111,7 @@ export function check(dir){
       const rows=matrix(runsOn,j.triggers);
       for(const r of rows)if(r.actual!==r.expected)failures.push(`${name}: ${r.event}, ${r.mode} -> ${r.actual}, expected ${r.expected}`);
       report.push({name,triggers:j.triggers,rows});
-    }else if(typeof runsOn==='string'&&hostedLabel.test(runsOn)){
+    }else if(isHosted(runsOn)){
       report.push({name,triggers:j.triggers,static:runsOn});
     }else if(!j.job.uses){
       failures.push(`${name}: runs-on ${JSON.stringify(runsOn)} is not a GitHub-hosted label or a guarded expression`);
