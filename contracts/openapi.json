@@ -513,7 +513,7 @@
           "slug": {
             "type": "string",
             "pattern": "^[a-z0-9-]{1,64}$",
-            "description": "Stable human-readable identifier, unique per resource type (for example the fixture product ID `pizza`)"
+            "description": "Stable human-readable identifier, unique among merchants (for example `piazza-local`)"
           },
           "marketCode": {
             "type": "string"
@@ -561,7 +561,7 @@
           "slug": {
             "type": "string",
             "pattern": "^[a-z0-9-]{1,64}$",
-            "description": "Stable human-readable identifier, unique per resource type (for example the fixture product ID `pizza`)"
+            "description": "Stable human-readable identifier, unique among products (for example the fixture product ID `pizza`)"
           },
           "merchantId": {
             "type": "string",

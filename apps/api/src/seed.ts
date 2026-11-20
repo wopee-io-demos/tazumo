@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import type pg from 'pg';
 import { buildSeed } from './fixtures.ts';
 import { loadConfig } from './config.ts';
@@ -8,6 +9,8 @@ export async function seed(pool: pg.Pool) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+    await client.query('DELETE FROM products WHERE synthetic AND NOT (id = ANY($1::uuid[]))', [data.products.map((p) => p.id)]);
+    await client.query('DELETE FROM merchants WHERE synthetic AND NOT (id = ANY($1::uuid[]))', [data.merchants.map((m) => m.id)]);
     for (const m of data.markets) {
       await client.query(
         `INSERT INTO markets (code, country_code, currency, locale) VALUES ($1, $2, $3, $4)
@@ -51,7 +54,7 @@ export async function seed(pool: pg.Pool) {
   return { markets: data.markets.length, categories: data.categories.length, merchants: data.merchants.length, products: data.products.length };
 }
 
-if (import.meta.main) {
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const pool = createPool({ databaseUrl: loadConfig().databaseUrl });
   try {
     console.log('Seeded synthetic fixtures:', await seed(pool));

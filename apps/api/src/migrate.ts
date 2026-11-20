@@ -27,7 +27,7 @@ export async function migrate({ databaseUrl, direction, count, schema = 'public'
   });
 }
 
-if (import.meta.main) {
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const direction = process.argv[2];
   if (direction !== 'up' && direction !== 'down') {
     console.error('Usage: migrate.ts up|down');

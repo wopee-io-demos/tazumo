@@ -42,9 +42,9 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
-    env:
-      DATABASE_URL: postgres://tazumo:tazumo-ci-only@127.0.0.1:${{ job.services.postgres.ports['5432'] }}/tazumo_test
     steps:
+      - name: Point DATABASE_URL at the postgres service
+        run: echo "DATABASE_URL=postgres://tazumo:tazumo-ci-only@127.0.0.1:${{ job.services.postgres.ports['5432'] }}/tazumo_test" >> "$GITHUB_ENV"
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
         with:
@@ -61,13 +61,22 @@ jobs:
         run: |
           pnpm db:migrate
           pnpm db:seed
-          PORT=3001 node --experimental-strip-types src/server.ts > server.log 2>&1 &
-          for i in $(seq 1 30); do curl -sf http://127.0.0.1:3001/health && break; sleep 1; done
-          curl -sf http://127.0.0.1:3001/health
-          curl -sf 'http://127.0.0.1:3001/v1/merchants?marketCode=demo' | grep -q '"slug":"piazza-local"'
-          test "$(curl -s -o /dev/null -w '%{http_code}' 'http://127.0.0.1:3001/v1/merchants')" = 400
+          PORT=$((20000 + RANDOM % 10000))
+          base="http://127.0.0.1:$PORT"
+          PORT=$PORT node --experimental-strip-types src/server.ts > server.log 2>&1 &
+          srv=$!
+          for _ in $(seq 1 30); do
+            kill -0 "$srv" || { echo "server exited"; exit 1; }
+            curl -sf "$base/health" && break
+            sleep 1
+          done
+          curl -sf "$base/health"
+          merchants=$(curl -sf "$base/v1/merchants?marketCode=demo-eu")
+          merchant_id=$(node -e 'const m=JSON.parse(process.argv[1]).find(x=>x.slug==="piazza-local");if(!m)process.exit(1);console.log(m.id)' "$merchants")
+          curl -sf "$base/v1/merchants/$merchant_id/products" | grep -q '"slug":"pizza"'
+          test "$(curl -s -o /dev/null -w '%{http_code}' "$base/v1/merchants")" = 400
+          kill "$srv"
           pnpm db:rollback
-          kill %1
       - name: Server log
         if: always()
         run: cat apps/api/server.log 2>/dev/null || true

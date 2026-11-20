@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { categories, products } from '@tazumo/core';
 
-export const fixtureNamespace = 'b9f0c6a4-5d2e-4f1a-9c3b-7e8d2a6f4c10';
+export const fixtureNamespace = '6f1c2b9e-4d1a-5c3e-9b7a-2d8e0f4a6c11';
 
 export function uuidV5(name: string, namespace: string = fixtureNamespace): string {
   const hash = createHash('sha1').update(Buffer.from(namespace.replaceAll('-', ''), 'hex')).update(name, 'utf8').digest();
@@ -28,14 +28,14 @@ export type ProductRow = {
   currency: string;
 };
 
-export const demoMarket: MarketRow = { code: 'demo', countryCode: 'IE', currency: 'EUR', locale: 'en-IE' };
+export const demoMarket: MarketRow = { code: 'demo-eu', countryCode: 'IE', currency: 'EUR', locale: 'en-IE' };
 
 export function buildSeed() {
   const categoryRows: CategoryRow[] = categories.map((name, index) => ({ code: slugify(name), name, sortOrder: index }));
   const merchantRows = new Map<string, MerchantRow>();
   const productRows: ProductRow[] = products.map((product) => {
     const merchantSlug = slugify(product.merchant);
-    const merchantId = uuidV5(`merchant:${merchantSlug}`);
+    const merchantId = uuidV5(`merchant:${product.merchant}`);
     if (!merchantRows.has(merchantSlug)) {
       merchantRows.set(merchantSlug, { id: merchantId, slug: merchantSlug, marketCode: demoMarket.code, name: product.merchant });
     }

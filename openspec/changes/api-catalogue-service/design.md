@@ -9,10 +9,10 @@
 - `merchants(id uuid, slug, market_code → markets, name, accepting_orders default false, delivery_eta_minutes null, synthetic default true)`.
 - `products(id uuid, slug, merchant_id → merchants, category_code → catalogue_categories, name, description, price_minor integer ≥ 0, currency char(3), available, synthetic)`.
 
-Merchant categories are derived from their products, not stored twice. Product currency is not yet constrained to the market currency at database level; the seed guarantees it and a trigger or composite key is a follow-up once merchants can be written through the API.
+Merchant categories are derived from their products, not stored twice. The seed removes synthetic rows that are no longer in the fixtures; non-synthetic rows are never touched. Product currency is not yet constrained to the market currency at database level; the seed guarantees it and a trigger or composite key is a follow-up once merchants can be written through the API.
 
 ## Identifiers
-Contract IDs remain UUIDs. Seeded IDs are UUIDv5 of `product:<fixture id>` / `merchant:<merchant slug>` under a fixed namespace, so they are identical on every machine and every reseed. The fixture IDs that tests and `contracts/sut.json` rely on (`pizza`, `bread`, ...) are returned as `slug`.
+Contract IDs remain UUIDs. Seeded IDs are UUIDv5 of `product:<fixture id>` / `merchant:<merchant slug>` under a fixed namespace, so they are identical on every machine and every reseed. The fixture IDs that the web/native test identifiers rely on (`sut-product-pizza`, ...) are returned as `slug`. The namespace, the `merchant:<merchant name>` key and market code `demo-eu` match the API-shaped fixture projection in PR #51, so contract tests and the API agree on IDs.
 
 ## Contract coupling
 `src/contract.ts` loads `contracts/openapi.json`, registers every component schema with Fastify and builds each route's parameter and response schemas from the contract operation. The serializer therefore drops undeclared fields. Server-side validation is stricter than the contract only where the contract documents it (`marketCode` pattern). Tests validate every response with Ajv (JSON Schema 2020-12, as OpenAPI 3.1 requires) against the exact contract response schema, and fail when a `/v1` route is not declared.

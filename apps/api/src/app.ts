@@ -9,18 +9,19 @@ import { healthRoutes } from './routes/health.ts';
 export type AppOptions = { pool: pg.Pool; logger?: FastifyServerOptions['logger'] };
 
 export function buildApp({ pool, logger = false }: AppOptions) {
+  const loggerOptions = logger === true ? {} : logger;
   const app = Fastify({
     logger:
-      logger && typeof logger === 'object'
+      loggerOptions && typeof loggerOptions === 'object'
         ? {
-            ...logger,
+            ...loggerOptions,
             redact: { paths: ['req.headers.authorization', 'req.headers.cookie'], censor: '[redacted]' },
             serializers: {
               req: (request: FastifyRequest) => ({ method: request.method, route: request.routeOptions?.url ?? 'unmatched' }),
               res: (reply: { statusCode: number }) => ({ statusCode: reply.statusCode })
             }
           }
-        : logger,
+        : false,
     genReqId: () => randomUUID(),
     requestIdHeader: false,
     bodyLimit: 16 * 1024,

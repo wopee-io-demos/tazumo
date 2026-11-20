@@ -24,7 +24,7 @@ The service SHALL seed markets, categories, merchants and products from the `@ta
 The service SHALL serve the read-only Discovery operations of `contracts/openapi.json` with bodies that validate against the contract, and SHALL NOT present synthetic merchants as accepting orders or promise delivery times.
 
 #### Scenario: List merchants in a market
-- WHEN a client requests `GET /v1/merchants?marketCode=demo`
+- WHEN a client requests `GET /v1/merchants?marketCode=demo-eu`
 - THEN the response validates against the contract and every merchant has `acceptingOrders: false`, `deliveryEtaMinutes: null` and `synthetic: true`.
 
 #### Scenario: Invalid input

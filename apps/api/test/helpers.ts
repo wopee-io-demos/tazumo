@@ -19,7 +19,13 @@ export async function createTestDb({ migrated = true } = {}): Promise<TestDb> {
   const schema = `test_${randomBytes(6).toString('hex')}`;
   const admin = createPool({ databaseUrl: url });
   await admin.query(`CREATE SCHEMA ${schema}`);
-  if (migrated) await migrate({ databaseUrl: url, direction: 'up', schema });
+  try {
+    if (migrated) await migrate({ databaseUrl: url, direction: 'up', schema });
+  } catch (error) {
+    await admin.query(`DROP SCHEMA ${schema} CASCADE`);
+    await admin.end();
+    throw error;
+  }
   const pool = createPool({ databaseUrl: url, schema });
   return {
     schema,

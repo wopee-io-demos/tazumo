@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { buildApp } from '../src/app.ts';
 import { createPool } from '../src/db.ts';
 import { seed } from '../src/seed.ts';
-import { createTestDb } from './helpers.ts';
+import { createTestDb, databaseUrl } from './helpers.ts';
 
 function capture() {
   const lines: string[] = [];
@@ -25,7 +25,7 @@ test('request logs omit query strings, client IPs and credentials', async () => 
     await seed(db.pool);
     const res = await app.inject({
       method: 'GET',
-      url: '/v1/merchants?marketCode=demo&email=jane.doe%40example.com',
+      url: '/v1/merchants?marketCode=demo-eu&email=jane.doe%40example.com',
       headers: { authorization: 'Bearer secret-token-123', cookie: 'session=abc123' },
       remoteAddress: '203.0.113.7'
     });
@@ -53,6 +53,26 @@ test('database failures return a generic 500 without internals', async () => {
     assert.ok(!res.body.includes('relation'));
     assert.ok(!lines.join('').includes('relation'), 'SQL error text must not reach logs');
   } finally {
+    await app.close();
+    await db.drop();
+  }
+});
+
+test('a terminated idle database connection does not crash the service', async () => {
+  const db = await createTestDb();
+  const app = buildApp({ pool: db.pool });
+  const admin = createPool({ databaseUrl: databaseUrl() });
+  try {
+    assert.equal((await app.inject({ method: 'GET', url: '/v1/markets' })).statusCode, 200);
+    const { rows } = await admin.query(
+      `SELECT pg_terminate_backend(pid) AS terminated FROM pg_stat_activity
+        WHERE pid <> pg_backend_pid() AND state = 'idle' AND query ILIKE '%FROM markets%'`
+    );
+    assert.ok(rows.length >= 1, 'expected an idle pooled connection to terminate');
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    assert.equal((await app.inject({ method: 'GET', url: '/v1/markets' })).statusCode, 200);
+  } finally {
+    await admin.end();
     await app.close();
     await db.drop();
   }
