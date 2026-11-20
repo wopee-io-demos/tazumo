@@ -129,6 +129,8 @@ function grantError(error: unknown) {
   if (!(error instanceof ApiError)) return 'The change could not be sent. Please try again.';
   if (grantMessages[error.code]) return grantMessages[error.code];
   if (error.status === 400) return grantMessages.invalid_request;
+  if (error.status === 403) return grantMessages.forbidden;
+  if (error.status === 404) return 'The user or merchant was not found.';
   if (error.status === 401) return 'Your session has expired. Sign out and sign in again.';
   if (error.status === 429) return 'Too many requests. Wait a moment and try again.';
   if (error.status === 503) return 'The back office is unavailable right now.';

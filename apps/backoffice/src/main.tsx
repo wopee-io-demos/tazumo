@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { brandName, palettes, preferredPalette } from '@tazumo/brand';
 import { ApiError, backOfficeRoles, createApi, hasRole, staffMerchantIds, type Api, type Me } from './api.ts';
@@ -42,6 +42,12 @@ function Shell({ auth, api, me, onSignOut }: { auth: AuthProvider; api: Api; me:
   const ownMerchants = staffMerchantIds(me);
   const merchants = useMerchants(api, true);
   const nameOf = (id: string) => merchants.data?.find((m) => m.id === id)?.name ?? id;
+  const main = useRef<HTMLElement>(null);
+  const first = useRef(true);
+  useEffect(() => {
+    if (first.current) first.current = false;
+    else main.current?.focus();
+  }, [route]);
 
   let page: React.ReactNode;
   if (route.name === 'staff') page = <StaffList api={api} merchantId={route.merchantId} merchantName={nameOf(route.merchantId)} />;
@@ -92,20 +98,32 @@ function Shell({ auth, api, me, onSignOut }: { auth: AuthProvider; api: Api; me:
           Sign out
         </button>
       </nav>
-      <main id="main">{page}</main>
+      <main id="main" tabIndex={-1} ref={main}>
+        {page}
+      </main>
     </>
   );
 }
 
 const NotForRole = () => (
-  <p role="alert" data-testid="sut-backoffice-not-for-role">
-    This page is not available for your role.
-  </p>
+  <section>
+    <h1>Not available</h1>
+    <p role="alert" data-testid="sut-backoffice-not-for-role">
+      This page is not available for your role.
+    </p>
+  </section>
 );
 
 function App({ auth, startup }: { auth: AuthProvider; startup: Promise<boolean> }) {
-  const api = useMemo(() => createApi(auth), [auth]);
   const [session, setSession] = useState<Session>({ status: 'starting' });
+  const api = useMemo(
+    () =>
+      createApi(auth, () => {
+        auth.signOut();
+        setSession({ status: 'signed-out', notice: 'Your session has expired. Please sign in again.' });
+      }),
+    [auth],
+  );
 
   useEffect(() => {
     let active = true;
@@ -126,13 +144,13 @@ function App({ auth, startup }: { auth: AuthProvider; startup: Promise<boolean> 
   let body: React.ReactNode;
   if (session.status === 'starting')
     body = (
-      <main id="main" className="center">
+      <main id="main" tabIndex={-1} className="center">
         <p role="status">Loading…</p>
       </main>
     );
   else if (session.status === 'unavailable')
     body = (
-      <main id="main" className="center">
+      <main id="main" tabIndex={-1} className="center">
         <h1>Back office unavailable</h1>
         <p role="alert" data-testid="sut-backoffice-unavailable">
           The back office is unavailable right now. No data is shown. Please try again later.
@@ -141,7 +159,7 @@ function App({ auth, startup }: { auth: AuthProvider; startup: Promise<boolean> 
     );
   else if (session.status === 'signed-out')
     body = (
-      <main id="main" className="center">
+      <main id="main" tabIndex={-1} className="center">
         <h1>Sign in to the back office</h1>
         {session.notice && (
           <p role="alert" data-testid="sut-backoffice-auth-error">
@@ -159,7 +177,7 @@ function App({ auth, startup }: { auth: AuthProvider; startup: Promise<boolean> 
     );
   else if (!session.me.roles.some((g) => backOfficeRoles.includes(g.role)))
     body = (
-      <main id="main" className="center">
+      <main id="main" tabIndex={-1} className="center">
         <h1 data-testid="sut-backoffice-no-access">No back-office access</h1>
         <p>Your account has no merchant staff, support or admin role.</p>
       </main>
@@ -169,7 +187,14 @@ function App({ auth, startup }: { auth: AuthProvider; startup: Promise<boolean> 
   const theme = palettes[preferredPalette];
   return (
     <div className="app" style={{ '--primary': theme.primary, '--tint': theme.background, '--ink': theme.ink } as React.CSSProperties}>
-      <a className="skip" href="#main">
+      <a
+        className="skip"
+        href="#main"
+        onClick={(event) => {
+          event.preventDefault();
+          document.getElementById('main')?.focus();
+        }}
+      >
         Skip to content
       </a>
       <header className="top">

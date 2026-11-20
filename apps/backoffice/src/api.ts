@@ -20,13 +20,14 @@ export type Api = (<T>(path: string, init?: RequestInit) => Promise<T>) & {
   status: (path: string, init?: RequestInit) => Promise<number>;
 };
 
-export function createApi(auth: AuthProvider): Api {
+export function createApi(auth: AuthProvider, onUnauthorized: () => void): Api {
   async function send(path: string, init: RequestInit) {
     const token = auth.accessToken();
     const response = await fetch(path, {
       ...init,
-      headers: { accept: 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) },
+      headers: { accept: 'application/json', ...init.headers, ...(token ? { authorization: `Bearer ${token}` } : {}) },
     });
+    if (response.status === 401 && path !== '/v1/me') onUnauthorized();
     const body = response.status === 204 ? undefined : await response.json().catch(() => ({}));
     if (!response.ok) throw new ApiError(response.status, body?.code ?? 'error', body?.message ?? response.statusText);
     return { status: response.status, body };

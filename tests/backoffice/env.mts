@@ -9,6 +9,7 @@ export const previewOrigins = [ports.preview, ports.previewNoAuth].map((p) => `h
 export const principals: Record<string, string[]> = {
   'bo-admin': ['admin'],
   'bo-support': ['support'],
+  'bo-short-session': ['support'],
   'bo-staff-a': ['merchant_staff'],
   'bo-customer': [],
   'bo-target': [],

@@ -12,6 +12,7 @@ export default defineConfig({
   reporter: [process.env.CI ? ['github'] : ['list'], ['html', { open: 'never', outputFolder: '../../playwright-report/backoffice' }]],
   use: { baseURL: `http://127.0.0.1:${ports.preview}`, trace: 'retain-on-failure', screenshot: 'on' },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  // Playwright starts these in order, so the third preview serves the build made by the second.
   webServer: [
     { command: 'node --experimental-strip-types tests/backoffice/stack.mts', url: `${issuer}/health`, cwd: '../..', timeout: 120_000 },
     {

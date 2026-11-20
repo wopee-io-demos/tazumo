@@ -31,6 +31,10 @@ The back office SHALL let admins grant and revoke only `merchant_staff` (for a c
 ### Requirement: Session handling
 The back office SHALL sign in with OIDC Authorization Code and PKCE, SHALL keep access tokens in memory only, and SHALL report the back office as unavailable when the API answers 503.
 
+#### Scenario: Expired session
+- WHEN the access token expires or the API answers 401
+- THEN the app returns to sign-in with a session-expired notice.
+
 #### Scenario: Token storage
 - WHEN a user has signed in
 - THEN `localStorage` and `sessionStorage` are empty.

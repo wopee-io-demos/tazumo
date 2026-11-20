@@ -77,7 +77,8 @@ const idp = createServer(async (req, res) => {
       grant && form.get('grant_type') === 'authorization_code' && form.get('client_id') === clientId &&
       form.get('redirect_uri') === grant.redirectUri && createHash('sha256').update(verifier).digest('base64url') === grant.challenge;
     if (!ok) return send(res, 400, { error: 'invalid_grant' });
-    return send(res, 200, { access_token: mint(grant.sub), token_type: 'Bearer', expires_in: 300 });
+    const expiresIn = grant.sub === 'bo-short-session' ? 1 : 300;
+    return send(res, 200, { access_token: mint(grant.sub), token_type: 'Bearer', expires_in: expiresIn });
   }
   return send(res, 404, 'not found', 'text/plain');
 });
@@ -99,7 +100,7 @@ for (const [sub, roles] of Object.entries(principals)) {
 }
 
 const auth = { issuer, audience, jwksUrl: `${issuer}/jwks.json`, logSalt: 'backoffice-e2e-log-salt-not-a-secret-0001', maxTokenLifetimeSeconds: 3600 };
-await new Promise<void>((resolve) => idp.listen(ports.idp, '127.0.0.1', resolve));
 await buildApp({ pool, auth }).listen({ host: '127.0.0.1', port: ports.api });
 await buildApp({ pool }).listen({ host: '127.0.0.1', port: ports.apiNoAuth });
+await new Promise<void>((resolve) => idp.listen(ports.idp, '127.0.0.1', resolve));
 console.log(`back-office test stack ready: idp ${issuer}, api :${ports.api}, api without auth :${ports.apiNoAuth}`);
