@@ -1,0 +1,84 @@
+# ADR-0020: CodeQL, gitleaks and Dependabot in CI, and a proposed required-checks ruleset
+
+Status: Proposed
+Date: 2026-11-20
+Tracking: issue #15, OpenSpec `security-scanning`, related to #69 (fork-PR runner guard) and #14 (lockfile and Expo SDK upgrade)
+
+## Context
+
+Tazumo is a public repository. `security.yml` already fails a PR on high or critical npm advisories. Nothing scans the code itself or the commits for leaked credentials, and nothing proposes dependency updates. `main` has no branch protection or ruleset, so every gate is a process rule, not a server-enforced one. Untrusted fork PRs must never reach the self-hosted pool or hold a write token (#69).
+
+## Decision
+
+### CodeQL: a read-only PR gate and a separate upload job
+
+`.github/workflows/codeql.yml` analyses `javascript-typescript` with `build-mode: none` and the default query suite.
+
+- **`CodeQL PR analysis`** runs on `pull_request` only. It holds `contents: read` and nothing else, runs `analyze` with `upload: never`, and fails when the SARIF output contains any result. Each finding is printed as an `::error` annotation.
+- **`CodeQL analysis and upload`** runs on push to `main`, weekly (Monday 05:27 UTC) and on dispatch. It is the only job that holds `security-events: write`, and it uploads results to code scanning.
+
+Alternatives considered:
+
+| Option | Why not |
+| --- | --- |
+| One job with `security-events: write` on every event (GitHub's starter workflow) | It gives PR jobs a write scope. The runner guard in #69 fails any `pull_request` job with write permissions, and the PR gate needs no upload to fail on a finding. |
+| Default setup (repository setting) | It is a repository setting, which is out of scope for agents, and it cannot coexist with an advanced workflow. |
+| `security-extended` suite | Lower-precision queries would make "fail on any result" noisy. This can be revisited once a baseline exists. |
+
+Cost: PRs get annotations in the job log, not code scanning PR alerts. Alerts on `main` still appear in the Security tab.
+
+### Secret scanning: the gitleaks binary, checksum-verified
+
+`.github/workflows/secret-scan.yml` downloads the gitleaks 8.30.1 linux x64 release archive, verifies its SHA-256 and scans with `gitleaks git --redact`. Nothing is uploaded, and no licence or secret is needed.
+
+- **Range:** a PR scans `base.sha..head.sha`. A push to `main` scans `before..after`, or the full history when `before` is missing. The weekly schedule and dispatch scan the full history.
+- **Allowlist:** `.github/gitleaks.toml` extends the default rules with two entries: the disposable CI Postgres password `tazumo-ci-only`, and fixture secrets that match `^tazumo-synthetic-[A-Za-z0-9-]{1,64}$` exactly. On a PR the allowlist is read from the base commit, so a PR cannot allowlist its own leak. A PR that changes the allowlist only takes effect after merge.
+- **Logs:** `--redact` keeps any hit out of the public logs.
+
+Alternatives considered:
+
+| Option | Why not |
+| --- | --- |
+| `gitleaks/gitleaks-action` | It requires a `GITLEAKS_LICENSE` secret for organisation repositories, and secrets are unavailable to fork PRs. |
+| Docker image pinned by digest | Equivalent, but slower to start and harder to read than a checksum line. |
+| TruffleHog action | Its default verification sends candidate secrets to provider APIs. Turning that off leaves a heavier tool than gitleaks for the same job. |
+| GitHub secret scanning and push protection | They are repository settings (out of scope for agents) and complementary. The owner should still enable them. |
+| Path allowlist for fixture files | It would also hide a real secret pasted into those files. |
+
+### Dependabot
+
+- **npm:** `/`, `/apps/*` and `/packages/*`, weekly on Monday, 5-day cooldown, at most 5 open PRs.
+  - `expo-sdk` groups the Expo and React family. Their minor and major updates are ignored, because Expo pins them per SDK (#14).
+  - `npm-minor-and-patch` groups everything else. Majors arrive one per PR.
+  - `npm-security` groups security updates.
+- **github-actions:** one weekly group, 5-day cooldown, at most 3 open PRs. Dependabot keeps SHA pins and their version comments current.
+
+### Runners and fork PRs
+
+Every new job runs on hosted `ubuntu-24.04`. The self-hosted pool does not serve public repositories and must never run fork code. Triggers are `pull_request`, `push`, `schedule` and `workflow_dispatch`. There is no `pull_request_target`, no `secrets.*` reference and no reusable workflow. Workflow-level permissions are `{}`, and every checkout uses `persist-credentials: false`.
+
+### Proposed required checks (not applied)
+
+Agents must not change rulesets. The repository owner applies the command in `docs/SECURITY.md#proposed-required-checks-ruleset`. It creates one ruleset on the default branch that blocks deletion and force-push, requires a PR merged by squash with resolved review threads, and requires these GitHub Actions (app 15368) checks:
+
+| Check | Workflow | Required | Reason |
+| --- | --- | --- | --- |
+| `check` | Quality checks | yes | Runs on every PR: typecheck, unit tests, web build, Expo bundles and E2E |
+| `evidence` | Test evidence | yes | Runs on every PR: contract, E2E and accessibility evidence |
+| `dependency-audit` | Dependency security review | yes | Runs on every PR: high and critical advisories |
+| `CodeQL PR analysis` | CodeQL | yes | Runs on every PR |
+| `Secret scan` | Secret scan | yes | Runs on every PR |
+| `iOS simulator build` | Native development builds | no | The hosted macOS queue is unreliable, and a queued required check blocks every merge |
+| `Android debug APK` | Native development builds | no | Path-filtered on PRs. A required check that never starts stays "Expected" and blocks unrelated PRs |
+| `api` | API integration | no | Path-filtered, same reason. The merge gate still checks it when it runs |
+| `CodeQL analysis and upload` | CodeQL | no | Never runs on PRs |
+
+- **Strict mode is off:** an up-to-date branch is not required, because forcing every open PR to rebase after each merge re-queues long jobs for parallel agents. A merge queue is the better tool if strict ordering becomes necessary.
+- **No approvals:** the required approval count is 0, because every agent pushes as the same GitHub identity and cannot approve its own PR. Independent approval and CODEOWNERS stay open on #15 until a second identity exists.
+
+## Consequences
+
+- PRs gain two new failing gates: CodeQL findings and secrets in the commit range. A finding in an existing file fails every PR until it is fixed or excluded through a reviewed CodeQL configuration.
+- The planted-secret test closes its throwaway PR without merging. The fake value stays reachable through that PR's `refs/pull/<n>/head`, so it must never resemble a live provider credential.
+- Required checks become server-enforced only after the owner runs the command. Until then they remain a documented process.
+- Renaming a required job breaks the ruleset. Rename jobs and the ruleset together.

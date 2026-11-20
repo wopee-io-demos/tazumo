@@ -1,0 +1,14 @@
+title = "Tazumo secret scan"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Disposable PostgreSQL password of the CI service container in api.yml"
+regexTarget = "match"
+regexes = ['''tazumo-ci-only''']
+
+[[allowlists]]
+description = "Synthetic fixture credentials, which must use the tazumo-synthetic- prefix"
+regexTarget = "secret"
+regexes = ['''^tazumo-synthetic-[A-Za-z0-9-]{1,64}$''']
