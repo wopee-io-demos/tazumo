@@ -9,6 +9,7 @@
 - [x] Discovery stays anonymous with or without a bad token; logs carry a keyed principal tag only.
 - [ ] Current-head CI green (record run URLs).
 - [x] Independent review on ea19bda: no blockers. All five should-fix items and most nits fixed: `sub` validation, contract-driven auth (with HEAD), last-good JWKS through outages, `typ` option, whole-suite log leak check, courier disclosure, SQL ownership test, rollback safety, case-insensitive scheme, required log salt, 1 h lifetime cap, `down all`. Evidence: 60/60 tests, plus mutation checks for the fallback and the HEAD route.
+- [x] Re-review on 38388dc: no blockers. Fixed: the outage test no longer depends on timing, the lifetime cap uses `exp - iat` (configurable through `AUTH_MAX_TOKEN_LIFETIME`), the fallback snapshot is taken on every fetch, revocation during an outage is documented, and every route is now either in the contract or on the `/health` allowlist. Left open by choice: a least-privilege DB role for the audit table (production gate), the error response descriptions, `docs/adr/README.md` (outside owned paths) and a CI smoke run with auth configured.
 - [ ] Merge and record the merge SHA on #56 and #5.
 
 Not implemented: provider choice, rate limits, admin grants API, courier scopes, payments, orders.

@@ -21,7 +21,7 @@ Decisions and alternatives are in ADR-0016. The target model is the "Authenticat
 | `merchant_staff:list` | `merchant_staff` of that merchant; support, admin | support, admin | unknown merchant 404; other merchants' staff 403; customers and couriers 404 |
 
 ## Configuration
-`AUTH_ISSUER`, `AUTH_AUDIENCE` and `AUTH_JWKS_URL` must be set together. The URL must use https unless the host is loopback. `AUTH_LOG_SALT` (32+ characters, required) keys the principal tag in logs. Optional `AUTH_TOKEN_TYPE` enforces `typ`. JWKS: 10 min cache, 30 s refetch cooldown, 5 s timeout. The last good key set is kept for up to 24 h through refetch failures, with no retry for 30 s after a failure. Token lifetime is capped at 1 h and `sub` must be a 1 to 255 character string.
+`AUTH_ISSUER`, `AUTH_AUDIENCE` and `AUTH_JWKS_URL` must be set together. The URL must use https unless the host is loopback. `AUTH_LOG_SALT` (32+ characters, required) keys the principal tag in logs. Optional `AUTH_TOKEN_TYPE` enforces `typ`. JWKS: 10 min cache, 30 s refetch cooldown, 5 s timeout. The last good key set is kept for up to 24 h through refetch failures, with no retry for 30 s after a failure. `iat` is required. Lifetime (`exp - iat`) is capped by `AUTH_MAX_TOKEN_LIFETIME` (default 3600 s). `sub` must be a string of 1 to 255 characters.
 
 ## Testing approach
 `test/idp.ts` generates RS256, ES256 and RS384 key pairs with WebCrypto and serves a mutable JWKS from an in-process HTTP server on 127.0.0.1. Tests mint tokens with `jose.SignJWT`, and hand-craft `alg: none`, HS256 and tampered tokens. No real provider and no real credentials are involved.

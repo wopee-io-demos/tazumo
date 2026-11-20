@@ -15,11 +15,11 @@ ADR-0005 requires authentication and owner/role authorization before any custome
 The API verifies `Authorization: Bearer` tokens with `jose` (`jwtVerify` with `createRemoteJWKSet`):
 
 - **Algorithms:** an explicit allowlist of `RS256` and `ES256`. `none`, HMAC and any algorithm outside the list are rejected, even when the JWKS key omits `alg`.
-- **Claims:** `iss` and `aud` must match the configuration. `exp` is required. `sub` must be a string of 1 to 255 characters. `nbf` is honoured. Clock tolerance is 60 s. Tokens whose `exp` is more than one hour away are rejected, which caps lifetime even if the provider is misconfigured.
+- **Claims:** `iss` and `aud` must match the configuration. `exp` is required. `sub` must be a string of 1 to 255 characters. `nbf` is honoured. Clock tolerance is 60 s. `iat` is required. Tokens whose lifetime (`exp - iat`) exceeds `AUTH_MAX_TOKEN_LIFETIME` (default 3600 s, at most 86400 s) are rejected, as are tokens issued in the future. This caps lifetime even if the provider is misconfigured.
 - **Token type:** optional `AUTH_TOKEN_TYPE` (for example `at+jwt`, RFC 9068) requires a matching `typ` header. `AUTH_AUDIENCE` must be the API's resource identifier, never an OIDC client ID. Otherwise ID tokens issued to that client would be accepted as access tokens.
 - **JWKS:**
   - **Cache and rotation:** keys are cached for 10 minutes. An unknown `kid` triggers a refetch, at most once per 30 s cooldown, so rotation works without a restart and junk `kid`s cannot hammer the provider. The fetch timeout is 5 s.
-  - **Provider outages:** if a refetch fails, the last good key set keeps verifying tokens for up to 24 h. For 30 s after a failure, requests use that set without retrying, so callers do not each wait on the timeout. During an outage, unknown `kid`s still return 401.
+  - **Provider outages:** if a refetch fails, the last successfully fetched key set (snapshotted on every fetch, so it includes the latest rotation) keeps verifying tokens for up to 24 h from that fetch. A key the provider removed just before an outage therefore stays trusted for that window; emergency revocation during an outage needs a restart or a lower stale limit. For 30 s after a failure, requests use that set without retrying, so callers do not each wait on the timeout. During an outage, unknown `kid`s still return 401.
 - **Enforcement from the contract:** an `onRoute` hook attaches authentication to every route whose contract operation declares `BearerAuth`, including the automatic HEAD route. A new protected operation cannot be served anonymously by forgetting a hook, and a test checks every such route.
 - **Failure mapping:** an invalid token returns 401 with `WWW-Authenticate: Bearer realm="tazumo", error="invalid_token"`, and a missing token returns 401 with a plain challenge. If the JWKS cannot be fetched or parsed, the response is 503, never a pass. If auth is not configured, protected routes return 503 (fail closed) and Discovery is unaffected.
 - **Configuration:** `AUTH_JWKS_URL` must use https, except on loopback hosts.
@@ -52,6 +52,6 @@ The `authorization` and `cookie` headers stay redacted (ADR-0009). A successful 
 ## Consequences
 
 - Any OIDC provider that publishes a JWKS and issues RS256 or ES256 access tokens with a configured audience works without code changes.
-- Tokens stay valid until `exp` even if the provider revokes the session. Lifetimes are capped at one hour here; 5 to 15 minutes is the provider configuration target. Revoking a role takes effect on the next request.
+- Tokens stay valid until `exp` even if the provider revokes the session. Lifetimes are capped by `AUTH_MAX_TOKEN_LIFETIME` (default one hour); 5 to 15 minutes is the provider configuration target. Revoking a role takes effect on the next request.
 - `audit_events` references `users` with `ON DELETE RESTRICT`. GDPR erasure must pseudonymize, not delete. A follow-up is needed before real users exist.
 - Not covered yet: rate limits, an admin API for grants, courier assignment scopes (which need orders), and the provider choice itself.

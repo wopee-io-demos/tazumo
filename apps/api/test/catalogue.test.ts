@@ -137,14 +137,15 @@ describe('catalogue API against PostgreSQL', () => {
     assert.equal(res.json().code, 'not_found');
   });
 
-  test('every implemented /v1 route is declared in the contract', async () => {
+  test('every route is declared in the contract or explicitly public', async () => {
     const declared = Object.entries(contract.paths).flatMap(([path, ops]) =>
       Object.keys(ops).map((method) => `${method.toUpperCase()} ${toFastifyPath(path)}`)
     );
+    const operationalRoutes = ['/health'];
     const routes: string[] = [];
     const probe = buildApp({ pool: db.pool });
     probe.addHook('onRoute', (route) => {
-      for (const method of [route.method].flat()) if (route.url.startsWith('/v1/') && method !== 'HEAD') routes.push(`${method} ${route.url}`);
+      for (const method of [route.method].flat()) if (method !== 'HEAD' && !operationalRoutes.includes(route.url)) routes.push(`${method} ${route.url}`);
     });
     await probe.ready();
     await probe.close();

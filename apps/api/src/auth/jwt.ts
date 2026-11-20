@@ -1,4 +1,4 @@
-import { createLocalJWKSet, createRemoteJWKSet, errors, jwtVerify, type JWTVerifyGetKey } from 'jose';
+import { createLocalJWKSet, createRemoteJWKSet, errors, jwksCache, jwtVerify, type JSONWebKeySet, type JWTVerifyGetKey } from 'jose';
 
 export type AuthConfig = {
   issuer: string;
@@ -28,7 +28,6 @@ export class AuthError extends Error {
 
 export const allowedAlgorithms = ['RS256', 'ES256'];
 export const clockToleranceSeconds = 60;
-const snapshotRefreshMs = 60_000;
 
 const isKeySourceFailure = (error: unknown) =>
   error instanceof errors.JWKSTimeout ||
@@ -37,10 +36,12 @@ const isKeySourceFailure = (error: unknown) =>
   error instanceof TypeError;
 
 export function resilientJwks(config: AuthConfig): JWTVerifyGetKey {
+  const fetched: { jwks?: JSONWebKeySet; uat?: number } = {};
   const remote = createRemoteJWKSet(new URL(config.jwksUrl), {
     cooldownDuration: config.jwksCooldownMs ?? 30_000,
     cacheMaxAge: config.jwksCacheMaxAgeMs ?? 600_000,
-    timeoutDuration: 5_000
+    timeoutDuration: 5_000,
+    [jwksCache]: fetched as Record<string, never>
   });
   const staleMaxMs = config.jwksStaleMaxMs ?? 24 * 3_600_000;
   const retryAfterFailureMs = config.jwksRetryAfterFailureMs ?? 30_000;
@@ -56,9 +57,8 @@ export function resilientJwks(config: AuthConfig): JWTVerifyGetKey {
     try {
       const key = await remote(header, token);
       failedAt = undefined;
-      if (!lastGood || Date.now() - lastGood.at > snapshotRefreshMs) {
-        const snapshot = remote.jwks();
-        if (snapshot) lastGood = { keys: createLocalJWKSet(snapshot), at: Date.now() };
+      if (fetched.jwks && fetched.uat !== undefined && fetched.uat !== lastGood?.at) {
+        lastGood = { keys: createLocalJWKSet(fetched.jwks), at: fetched.uat };
       }
       return key;
     } catch (error) {
@@ -83,7 +83,7 @@ export function createVerifier(config: AuthConfig) {
         audience: config.audience,
         algorithms: allowedAlgorithms,
         clockTolerance: clockToleranceSeconds,
-        requiredClaims: ['sub', 'exp'],
+        requiredClaims: ['sub', 'exp', 'iat'],
         ...(config.tokenType ? { typ: config.tokenType } : {})
       }));
     } catch (error) {
@@ -91,11 +91,10 @@ export function createVerifier(config: AuthConfig) {
       if (error instanceof errors.JOSEError) throw new AuthError(401, error.code);
       throw error;
     }
-    const { sub, exp } = payload;
+    const { sub, exp, iat } = payload;
     if (typeof sub !== 'string' || sub.length < 1 || sub.length > 255) throw new AuthError(401, 'invalid_sub');
-    if ((exp as number) - Date.now() / 1000 > maxLifetime + clockToleranceSeconds) {
-      throw new AuthError(401, 'lifetime_too_long');
-    }
+    if ((exp as number) - (iat as number) > maxLifetime) throw new AuthError(401, 'lifetime_too_long');
+    if ((iat as number) > Date.now() / 1000 + clockToleranceSeconds) throw new AuthError(401, 'issued_in_future');
     return { issuer: config.issuer, subject: sub };
   };
 }

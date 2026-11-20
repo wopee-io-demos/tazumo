@@ -138,6 +138,9 @@ describe('authentication and authorization', () => {
     ['oversized sub', () => mint(rsa, { sub: 'x'.repeat(256) })],
     ['numeric sub', () => mint(rsa, { sub: 123 as unknown as string })],
     ['lifetime beyond one hour', () => mint(rsa, { exp: now() + 7200 })],
+    ['long-lived token near its expiry', () => mint(rsa, { iat: now() - 7100, exp: now() + 100 })],
+    ['missing iat', () => mint(rsa, { iat: undefined })],
+    ['iat in the future', () => mint(rsa, { iat: now() + 600, exp: now() + 900 })],
     ['RS384, outside the algorithm allowlist', async () => mint(rs384)],
     ['unknown kid', async () => mint(await signingKey('rsa-unpublished'))],
     ['alg none', async () => `${b64url({ alg: 'none', typ: 'JWT' })}.${b64url({ iss: issuer, aud: audience, sub: 'x', exp: now() + 300 })}.`],
@@ -292,8 +295,9 @@ describe('JWKS rotation and availability', () => {
 
   test('last good keys keep serving through a bounded provider outage', async () => {
     const key = await signingKey('outage');
+    const junk = await signingKey('junk-during-outage');
     const idp = await startIdp([key]);
-    const auth = { issuer, audience, jwksUrl: idp.url, jwksCacheMaxAgeMs: 50, jwksStaleMaxMs: 400, jwksRetryAfterFailureMs: 1_000 };
+    const auth = { issuer, audience, jwksUrl: idp.url, jwksCacheMaxAgeMs: 50, jwksStaleMaxMs: 2_000, jwksRetryAfterFailureMs: 10_000 };
     const app = buildApp({ pool: db.pool, auth });
     const call = async (k: SigningKey) => (await app.inject({ method: 'GET', url: '/v1/me', headers: bearer(await mint(k)) })).statusCode;
     try {
@@ -302,10 +306,31 @@ describe('JWKS rotation and availability', () => {
       await new Promise((resolve) => setTimeout(resolve, 100));
       assert.equal(await call(key), 200, 'cached keys must survive a refetch failure');
       const fetches = idp.fetches;
-      assert.equal(await call(await signingKey('junk-during-outage')), 401, 'unknown kid stays 401 during an outage');
+      assert.equal(await call(junk), 401, 'unknown kid stays 401 during an outage');
       assert.equal(idp.fetches, fetches, 'no refetch storm right after a failure');
-      await new Promise((resolve) => setTimeout(resolve, 450));
+      await new Promise((resolve) => setTimeout(resolve, 2_100));
       assert.equal(await call(key), 503, 'stale keys expire after jwksStaleMaxMs');
+    } finally {
+      await app.close();
+      await idp.close();
+    }
+  });
+
+  test('the outage fallback includes keys learned from the latest rotation', async () => {
+    const oldKey = await signingKey('rotate-old');
+    const newKey = await signingKey('rotate-new');
+    const idp = await startIdp([oldKey]);
+    const auth = { issuer, audience, jwksUrl: idp.url, jwksCooldownMs: 0, jwksCacheMaxAgeMs: 50, jwksRetryAfterFailureMs: 10_000 };
+    const app = buildApp({ pool: db.pool, auth });
+    const call = async (k: SigningKey) => (await app.inject({ method: 'GET', url: '/v1/me', headers: bearer(await mint(k)) })).statusCode;
+    try {
+      assert.equal(await call(oldKey), 200);
+      idp.keys = [newKey];
+      assert.equal(await call(newKey), 200);
+      idp.status = 500;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      assert.equal(await call(newKey), 200, 'rotated key must be in the fallback set');
+      assert.equal(await call(oldKey), 401, 'retired key must not come back from the fallback set');
     } finally {
       await app.close();
       await idp.close();
@@ -346,6 +371,8 @@ test('auth configuration is all-or-nothing and requires https outside loopback',
   assert.throws(() => loadConfig({ ...base, AUTH_ISSUER: issuer, AUTH_AUDIENCE: audience, AUTH_JWKS_URL: 'https://idp.example.com/jwks' }), /AUTH_LOG_SALT/);
   const full = { ...base, AUTH_ISSUER: issuer, AUTH_AUDIENCE: audience, AUTH_LOG_SALT: 's'.repeat(32), AUTH_TOKEN_TYPE: 'at+jwt' };
   assert.equal(loadConfig({ ...full, AUTH_JWKS_URL: 'https://idp.example.com/jwks' }).auth?.tokenType, 'at+jwt');
+  assert.equal(loadConfig({ ...full, AUTH_JWKS_URL: 'https://idp.example.com/jwks', AUTH_MAX_TOKEN_LIFETIME: '86400' }).auth?.maxTokenLifetimeSeconds, 86400);
+  assert.throws(() => loadConfig({ ...full, AUTH_JWKS_URL: 'https://idp.example.com/jwks', AUTH_MAX_TOKEN_LIFETIME: '1e9' }), /AUTH_MAX_TOKEN_LIFETIME/);
   assert.throws(() => loadConfig({ ...full, AUTH_JWKS_URL: 'http://idp.example.com/jwks' }), /https/);
   assert.equal(loadConfig({ ...full, AUTH_JWKS_URL: 'http://127.0.0.1:9/jwks' }).auth?.jwksUrl, 'http://127.0.0.1:9/jwks');
   assert.equal(loadConfig({ ...full, AUTH_JWKS_URL: 'https://idp.example.com/jwks' }).auth?.issuer, issuer);
