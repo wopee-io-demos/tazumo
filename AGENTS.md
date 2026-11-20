@@ -12,3 +12,6 @@
 ## Multi-agent collaboration and fresh-context recovery
 
 Read [docs/START-HERE.md](docs/START-HERE.md) before any new work, then [docs/ISSUE-WORKFLOW.md](docs/ISSUE-WORKFLOW.md). Always select/claim a detailed ready Issue first, verify its assignee and competing PRs, publish a branch/PR linked to that issue, and record your latest pushed SHA, actual test/CI evidence, OpenSpec and ADR decisions and concrete handoff action in the Issue. A fresh agent must not need to read a private chat to resume. Never silently claim another agent's issue or edit their active branch. Use `status:*` issue labels after bootstrap, otherwise explicitly record the status in the Issue body; do not pretend labels are configured. Reviewer agents may review independently, but must not fabricate approvals or bypass failing gates. Merge verified PRs proactively, record merge SHA, then delete branches where permitted and close Issue only when accepted.
+
+## Mandatory shared engineering policy
+Read [docs/ENGINEERING-POLICY.md](docs/ENGINEERING-POLICY.md) for issue-first parallel agents, independent PR branches, OpenSpec/ADR, proactive review, genuine CI gates, merge and handoff. [Fresh-start entry](docs/START-HERE.md).
