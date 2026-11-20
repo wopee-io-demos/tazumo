@@ -5,7 +5,7 @@ Date: 2026-11-20
 
 ## Context
 
-The current web and Expo apps use fixtures in `@tazumo/core`. Source `foodora-new` contains a Supabase prototype and simulated order tracking. We require real pricing, identity, marketplace operations and order event provenance before enabling customer checkout.
+The current web and Expo apps use fixtures in `@tazumo/core`. An earlier internal prototype used Supabase and simulated order tracking. We require real pricing, identity, marketplace operations and order event provenance before enabling customer checkout.
 
 ## Proposed decision
 

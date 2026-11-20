@@ -9,7 +9,7 @@ permissions:
   contents: read
 jobs:
   dependency-audit:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_MODE == 'hosted' && 'ubuntu-latest' || fromJSON('["self-hosted","linux","x64","demos"]') }}
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4

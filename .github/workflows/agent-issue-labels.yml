@@ -1,0 +1,25 @@
+name: Initialize agent issue status labels
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/agent-issue-labels.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+jobs:
+  labels:
+    runs-on: ${{ vars.RUNNER_MODE == 'hosted' && 'ubuntu-latest' || fromJSON('["self-hosted","linux","x64","demos"]') }}
+    timeout-minutes: 10
+    steps:
+      - name: Create or update lifecycle labels
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh label create status:backlog --repo "$GITHUB_REPOSITORY" --color BFD4F2 --description "Issue not yet actionable" --force
+          gh label create status:ready --repo "$GITHUB_REPOSITORY" --color 0E8A16 --description "Claimable issue with acceptance criteria and no owner" --force
+          gh label create status:in-progress --repo "$GITHUB_REPOSITORY" --color 1D76DB --description "Actively owned by an agent" --force
+          gh label create status:in-review --repo "$GITHUB_REPOSITORY" --color A371F7 --description "PR review and validation in progress" --force
+          gh label create status:blocked --repo "$GITHUB_REPOSITORY" --color D93F0B --description "Requires external unblocker" --force
+          gh label create status:done --repo "$GITHUB_REPOSITORY" --color 6F7781 --description "Merged and accepted with evidence" --force
