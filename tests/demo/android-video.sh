@@ -8,10 +8,11 @@ app=io.wopee.demos.tazumo
 mkdir -p "$out"
 adb wait-for-device
 adb install -r "$apk"
-export MOBILECLI_DEVICE="$(adb devices | awk 'NR>1 && $2=="device"{print $1; exit}')"
-test -n "$MOBILECLI_DEVICE"
 mobilecli --version
-mobilecli devices
+# mobilecli names an emulator by its AVD, not by the adb serial.
+export MOBILECLI_DEVICE="$(mobilecli devices | node -e 'const d=JSON.parse(require("fs").readFileSync(0,"utf8")).data.devices.find(x=>x.platform==="android"&&x.state==="online");if(d)console.log(d.id)')"
+test -n "$MOBILECLI_DEVICE"
+echo "mobilecli device: $MOBILECLI_DEVICE"
 adb shell settings put system screen_off_timeout 600000
 adb shell monkey -p "$app" -c android.intent.category.LAUNCHER 1 >/dev/null
 sleep 8
