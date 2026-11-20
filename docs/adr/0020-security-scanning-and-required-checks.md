@@ -12,7 +12,7 @@ Tazumo is a public repository. `security.yml` already fails a PR on high or crit
 
 ### CodeQL: a read-only PR gate and a separate upload job
 
-`.github/workflows/codeql.yml` analyses `javascript-typescript` with `build-mode: none` and the default query suite.
+`.github/workflows/codeql.yml` analyses `javascript-typescript` with `build-mode: none`. It uses the default query suite through `.github/codeql/codeql-config.yml`, which excludes `js/missing-rate-limiting` until #98 rate-limits the public API routes. The first run reported 5 results: the public catalogue and health routes have no limit, and CodeQL does not model the custom bearer-route limiter.
 
 - **`CodeQL PR analysis`** runs on `pull_request` only. It holds `contents: read` and nothing else, runs `analyze` with `upload: never`, and fails when the SARIF output contains any result. Each finding is printed as an `::error` annotation.
 - **`CodeQL analysis and upload`** runs on push to `main`, weekly (Monday 05:27 UTC) and on dispatch. It is the only job that holds `security-events: write`, and it uploads results to code scanning.
@@ -32,8 +32,9 @@ Cost: PRs get annotations in the job log, not code scanning PR alerts. Alerts on
 `.github/workflows/secret-scan.yml` downloads the gitleaks 8.30.1 linux x64 release archive, verifies its SHA-256 and scans with `gitleaks git --redact`. Nothing is uploaded, and no licence or secret is needed.
 
 - **Range:** a PR scans `base.sha..head.sha`. A push to `main` scans `before..after`, or the full history when `before` is missing. The weekly schedule and dispatch scan the full history.
-- **Allowlist:** `.github/gitleaks.toml` extends the default rules with two entries: the disposable CI Postgres password `tazumo-ci-only`, and fixture secrets that match `^tazumo-synthetic-[A-Za-z0-9-]{1,64}$` exactly. On a PR the allowlist is read from the base commit, so a PR cannot allowlist its own leak. A PR that changes the allowlist only takes effect after merge.
-- **Logs:** `--redact` keeps any hit out of the public logs.
+- **Allowlist:** `.github/gitleaks.toml` extends the default rules with two whole-secret entries: the disposable CI Postgres password `tazumo-ci-only`, and fixture secrets that match `^tazumo-synthetic-[A-Za-z0-9-]{1,64}$`. On a PR the allowlist is read from the base commit, and a checked-out `.gitleaksignore` and inline `gitleaks:allow` comments are ignored. A PR therefore cannot allowlist its own leak through configuration, and an allowlist change takes effect only after merge.
+- **Merge commits:** gitleaks runs `git log -p` without `-m`, so content that only a merge commit inside a PR introduces is not scanned on the PR. The squash merge's push scan on `main` covers it.
+- **Logs:** `--redact --verbose` prints the rule, file, line and commit of each finding, with the value replaced by `REDACTED`.
 
 Alternatives considered:
 
@@ -52,6 +53,7 @@ Alternatives considered:
   - `npm-minor-and-patch` groups everything else. Majors arrive one per PR.
   - `npm-security` groups security updates.
 - **github-actions:** one weekly group, 5-day cooldown, at most 3 open PRs. Dependabot keeps SHA pins and their version comments current.
+- **No lockfile:** without a committed `pnpm-lock.yaml` (#14), Dependabot updates manifests only and cannot raise transitive security fixes. Those stay with `pnpm audit` and the overrides in `package.json` until #14 lands a lockfile.
 
 ### Runners and fork PRs
 
@@ -74,6 +76,7 @@ Agents must not change rulesets. The repository owner applies the command in `do
 | `CodeQL analysis and upload` | CodeQL | no | Never runs on PRs |
 
 - **Strict mode is off:** an up-to-date branch is not required, because forcing every open PR to rebase after each merge re-queues long jobs for parallel agents. A merge queue is the better tool if strict ordering becomes necessary.
+- **Runner dependency:** `check`, `evidence` and `dependency-audit` reach a runner only while `vars.RUNNER_MODE == 'hosted'` (or, after #69, for fork PRs). The self-hosted pool does not serve this public repository, so flipping the variable would leave these required checks queued and block every merge.
 - **No approvals:** the required approval count is 0, because every agent pushes as the same GitHub identity and cannot approve its own PR. Independent approval and CODEOWNERS stay open on #15 until a second identity exists.
 
 ## Consequences
@@ -82,3 +85,4 @@ Agents must not change rulesets. The repository owner applies the command in `do
 - The planted-secret test closes its throwaway PR without merging. The fake value stays reachable through that PR's `refs/pull/<n>/head`, so it must never resemble a live provider credential.
 - Required checks become server-enforced only after the owner runs the command. Until then they remain a documented process.
 - Renaming a required job breaks the ruleset. Rename jobs and the ruleset together.
+- `pull_request` runs the PR's own copy of each workflow, so a PR can weaken a scan by editing the workflow itself. Review of `.github/**` changes remains the final control until CODEOWNERS exists.

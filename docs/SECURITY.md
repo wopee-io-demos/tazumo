@@ -10,7 +10,7 @@ This is a proposed dependency remediation. CI audit, JS bundles and native build
 | Check | Workflow | When | Fails on |
 | --- | --- | --- | --- |
 | `dependency-audit` | `security.yml` | PRs, `main`, weekly | High or critical npm advisories |
-| `CodeQL PR analysis` | `codeql.yml` | PRs (read-only token) | Any CodeQL JavaScript/TypeScript result |
+| `CodeQL PR analysis` | `codeql.yml` | PRs (read-only token) | Any CodeQL JavaScript/TypeScript result outside the exclusions in `.github/codeql/codeql-config.yml` (`js/missing-rate-limiting` until #98) |
 | `CodeQL analysis and upload` | `codeql.yml` | `main`, weekly, dispatch | Analysis errors. Results go to the Security tab |
 | `Secret scan` | `secret-scan.yml` | PRs, `main`, weekly, dispatch | Any gitleaks finding in the scanned commits |
 
@@ -20,22 +20,23 @@ This is a proposed dependency remediation. CI audit, JS bundles and native build
   - npm is checked weekly with a 5-day cooldown and at most 5 PRs. Updates are grouped as `expo-sdk`, `npm-minor-and-patch` and `npm-security`.
   - Expo, React and React Native majors and minors are left to the Expo SDK upgrade (#14).
   - github-actions is checked weekly as one group, at most 3 PRs. SHA pins are updated with their version comments.
+  - Without a committed lockfile (#14), Dependabot updates manifests only. Transitive advisories are handled by `pnpm audit` and `pnpm.overrides`.
 
 ### Secret-scan allowlist
 
-`.github/gitleaks.toml` extends the gitleaks default rules. On a PR the allowlist is read from the base commit, so a change to it takes effect only after merge.
+`.github/gitleaks.toml` extends the gitleaks default rules. On a PR the allowlist is read from the base commit, so a change to it takes effect only after merge. CI ignores `.gitleaksignore` files and inline `gitleaks:allow` comments.
 
 | Entry | Covers | Why it is safe |
 | --- | --- | --- |
 | `tazumo-ci-only` | Password of the throwaway Postgres service container in `api.yml` | Exists only inside a CI job. It is not a real credential |
 | `^tazumo-synthetic-[A-Za-z0-9-]{1,64}$` (whole secret) | Synthetic fixture tokens, keys and passwords | Real provider credentials never take this shape |
 
-Fixture credentials must use the `tazumo-synthetic-` prefix, or be generated at test time (as `apps/api/test/idp.ts` does for signing keys). Do not add path-wide allowlists or `gitleaks:allow` comments.
+Fixture credentials must use the `tazumo-synthetic-` prefix, or be generated at test time (as `apps/api/test/idp.ts` does for signing keys). Do not add path-wide allowlists.
 
 Run the scan locally with gitleaks 8.30.1:
 
 ```bash
-gitleaks git --config .github/gitleaks.toml --log-opts="origin/main..HEAD" --redact .
+gitleaks git --config .github/gitleaks.toml --log-opts="origin/main..HEAD" --ignore-gitleaks-allow --redact --verbose .
 ```
 
 **If the scan fails on a real credential:**
@@ -53,6 +54,7 @@ This ruleset has not been applied. Agents do not change repository settings, so 
   - `Android debug APK` and `api`: path-filtered, so a required check that never starts would block unrelated PRs.
   - `CodeQL analysis and upload`: never runs on PRs.
   - Required approvals: every agent shares one GitHub identity. Independent review stays open on #15.
+- **Runner dependency:** `check`, `evidence` and `dependency-audit` run on hosted runners only while `vars.RUNNER_MODE` is `hosted`. Keep it that way while this ruleset is active, or required checks queue forever.
 - **Up-to-date branches are not required.** Forcing a rebase after every merge would re-queue long jobs for parallel agents. ADR-0020 has the reasoning.
 
 ```bash

@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Static analysis on every pull request
-The repository SHALL run CodeQL for JavaScript/TypeScript on every pull request, on every push to `main` and weekly. The pull request job SHALL hold only read permissions and SHALL fail when the analysis reports any result. Only the job that uploads results SHALL hold `security-events: write`, and that job SHALL NOT run for pull requests.
+The repository SHALL run CodeQL for JavaScript/TypeScript on every pull request, on every push to `main` and weekly. The pull request job SHALL hold only read permissions and SHALL fail when the analysis reports any result that a reviewed, issue-linked exclusion does not cover. Only the job that uploads results SHALL hold `security-events: write`, and that job SHALL NOT run for pull requests.
 
 #### Scenario: Clean pull request
 - **WHEN** a pull request introduces no CodeQL result
@@ -25,6 +25,10 @@ The repository SHALL scan the pull request commit range, each push to `main` and
 #### Scenario: Pull request widens the allowlist
 - **WHEN** a pull request edits `.github/gitleaks.toml` to allowlist its own credential
 - **THEN** the scan of that pull request still uses the base commit's allowlist and fails
+
+#### Scenario: Pull request suppresses its own finding
+- **WHEN** a pull request adds a `.gitleaksignore` entry or a `gitleaks:allow` comment for its credential
+- **THEN** `Secret scan` ignores both and fails
 
 ### Requirement: Automated dependency updates
 Dependabot SHALL propose grouped weekly npm and github-actions updates with open-PR limits. Expo-pinned packages SHALL receive patch updates only.

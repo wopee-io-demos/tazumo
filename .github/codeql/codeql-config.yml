@@ -1,0 +1,5 @@
+name: Tazumo CodeQL
+query-filters:
+  # Public API routes have no rate limit yet and the custom limiter is not modelled by CodeQL. Remove with #98.
+  - exclude:
+      id: js/missing-rate-limiting
