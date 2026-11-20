@@ -9,7 +9,7 @@ test('demo flow: search Margherita, add it, open the cart',async({page})=>{
   await pause(1500);
   await search.click();
   await search.pressSequentially('Margherita',{delay:110});
-  await expect(page.getByRole('heading',{level:3})).toHaveText(['Margherita pizza']);
+  await expect(page.locator('.products h3')).toHaveText(['Margherita pizza']);
   await pause();
   const add=page.getByRole('button',{name:'Add Margherita pizza'});
   await add.scrollIntoViewIfNeeded();
@@ -19,14 +19,14 @@ test('demo flow: search Margherita, add it, open the cart',async({page})=>{
   await expect(cart).toBeVisible();
   await pause();
   await cart.click();
-  const dialog=page.getByRole('dialog',{name:/Your basket/});
+  const dialog=page.getByTestId('sut-cart-dialog');
   await expect(dialog).toBeVisible();
   await expect(dialog.locator('.cartLine')).toHaveCount(1);
-  await expect(dialog.locator('.cartLine strong')).toHaveText('Margherita pizza');
-  await expect(dialog.locator('.stepper span')).toHaveText('1');
+  await expect(dialog.getByTestId('sut-cart-line-pizza')).toContainText('Margherita pizza');
+  await expect(dialog.getByTestId('sut-cart-quantity-pizza')).toHaveText('1');
   await expect(dialog.locator('.total')).toContainText('Subtotal');
-  await expect(dialog.locator('.total')).toContainText('€11.90');
+  await expect(dialog.getByTestId('sut-cart-subtotal')).toHaveText('€11.90');
   await expect(dialog.getByText('Checkout is disabled until payment and delivery integrations are ready.')).toBeVisible();
-  await expect(dialog.getByRole('button',{name:'Checkout coming later'})).toBeDisabled();
+  await expect(dialog.getByTestId('sut-checkout-disabled')).toBeDisabled();
   await pause(2500);
 });
