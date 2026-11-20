@@ -1,0 +1,7 @@
+appId: io.wopee.demos.tazumo
+---
+- extendedWaitUntil:
+    visible: "Preview catalogue.*"
+    timeout: 120000
+- assertVisible: "Margherita pizza"
+- waitForAnimationToEnd
