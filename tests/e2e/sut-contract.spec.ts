@@ -56,3 +56,37 @@ test('every catalogue fixture is addressable through the product and add templat
   await expect(tpl(page,'product',{productId:'bread'})).toBeVisible();
   await expect(sel(page,'productPizza')).toHaveCount(0);
 });
+
+test('every web selector and template is visible in at least one app state',async({page})=>{
+  const values={productId:'pizza',merchantId:'piazza-local',category:'groceries'};
+  const all=[...Object.entries(selectors).map(([k,s])=>[`selectors.${k}`,s]),...Object.entries(selectorTemplates).map(([k,s])=>[`selectorTemplates.${k}`,fill(s,values)])];
+  const seen=new Set<string>();
+  const record=async()=>{for(const [name,selector] of all)if(!seen.has(name)&&await page.locator(selector).first().isVisible())seen.add(name)};
+  await page.goto('/');
+  await record();
+  await sel(page,'cartOpen').click();
+  await expect(sel(page,'cartEmpty')).toBeVisible();
+  await record();
+  await sel(page,'cartClose').click();
+  await sel(page,'search').fill('zzz-no-match');
+  await expect(sel(page,'merchantsEmpty')).toBeVisible();
+  await record();
+  await sel(page,'searchReset').click();
+  await page.goto('/'+fill(routes.merchant,values));
+  await expect(sel(page,'merchantDetail')).toBeVisible();
+  await record();
+  await tpl(page,'add',values).click();
+  await page.goto('/'+fill(routes.product,values));
+  await expect(sel(page,'detailQuantityPizza')).toHaveText('1');
+  await record();
+  await sel(page,'cartOpen').click();
+  await expect(sel(page,'cartLinePizza')).toBeVisible();
+  await record();
+  await page.goto('/'+fill(routes.merchant,{merchantId:'no-such-merchant'}));
+  await expect(sel(page,'merchantNotFound')).toBeVisible();
+  await record();
+  await page.goto('/'+fill(routes.product,{productId:'no-such-product'}));
+  await expect(sel(page,'detailNotFound')).toBeVisible();
+  await record();
+  expect(all.map(([name])=>name).filter(name=>!seen.has(name))).toEqual([]);
+});

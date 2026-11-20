@@ -6,7 +6,7 @@ import {execFileSync} from 'node:child_process';
 import {readFileSync,readdirSync} from 'node:fs';
 import {join,relative,resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {checkCompatibility,checkFixtures,checkRoutes,checkSelectors,unregistered} from './sut-contract.mjs';
+import {checkCompatibility,checkDisabled,checkFixtures,checkRoutes,checkSelectors,unregistered} from './sut-contract.mjs';
 
 const root=resolve(fileURLToPath(import.meta.url),'../..');
 const read=p=>readFileSync(join(root,p),'utf8');
@@ -33,17 +33,19 @@ export async function loadRepo(){
 
 /** Structural and behavioural checks that do not depend on a previous contract version. */
 export function checkRepo({contract,core,sources}){
-  const errors=[...checkSelectors(contract,sources,core),...checkRoutes(contract,sources,core),...checkFixtures(contract,core)];
-  const native=sources.native.map(s=>s.text).join('\n');
-  for(const id of ['sut-checkout-disabled','sut-cart-checkout-disabled'])
-    if(!new RegExp(`testID="${id}"[^>]*disabled=\\{true\\}`).test(native))errors.push(`native ${id} must be a genuinely disabled control`);
-  if(!/data-testid="sut-checkout-disabled"[^>]*\bdisabled\b/.test(sources.web.map(s=>s.text).join('\n')))errors.push('web sut-checkout-disabled must be a disabled button');
-  return errors;
+  return [...checkSelectors(contract,sources,core),...checkRoutes(contract,sources,core),...checkFixtures(contract,core),
+    ...checkDisabled(sources.native,'native',['sut-checkout-disabled','sut-cart-checkout-disabled']),
+    ...checkDisabled(sources.web,'web',['sut-checkout-disabled'])];
 }
 
-function baseContract(ref){
-  try{return JSON.parse(execFileSync('git',['show',`${ref}:contracts/sut.json`],{cwd:root,encoding:'utf8',stdio:['ignore','pipe','ignore']}))}
-  catch{return null}
+function git(args){return execFileSync('git',args,{cwd:root,encoding:'utf8',stdio:['ignore','pipe','pipe']})}
+
+/** The contract published at a git ref, or null when the ref exists but has no contract. Throws on a bad ref. */
+export function baseContract(ref){
+  if(!ref||ref.startsWith('-'))throw new Error('--base needs a git ref');
+  try{git(['rev-parse','--verify','--quiet',`${ref}^{commit}`])}catch{throw new Error(`--base ${ref} is not a commit`)}
+  try{git(['cat-file','-e',`${ref}:contracts/sut.json`])}catch{return null}
+  return JSON.parse(git(['show',`${ref}:contracts/sut.json`]));
 }
 
 async function main(){

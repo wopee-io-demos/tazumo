@@ -26,12 +26,16 @@ jobs:
       - run: python3 scripts/check-agent-policy.py
       - run: node scripts/check-repo-policy.mjs
       - run: node scripts/validate-openapi.mjs
-      - name: SUT contract (IDs in both apps, semantic version against the base branch)
+      - name: SUT contract (IDs in both apps, semantic version against the previous contract)
         env:
           BASE_REF: ${{ github.base_ref }}
+          BEFORE: ${{ github.event.before }}
         run: |
           if [ -n "$BASE_REF" ]; then
-            git fetch --no-tags --depth=1 origin "$BASE_REF"
+            git fetch --no-tags --depth=1 origin -- "$BASE_REF"
+            pnpm check:sut --base FETCH_HEAD
+          elif [ -n "$BEFORE" ] && [ "$BEFORE" != "0000000000000000000000000000000000000000" ]; then
+            git fetch --no-tags --depth=1 origin -- "$BEFORE"
             pnpm check:sut --base FETCH_HEAD
           else
             pnpm check:sut

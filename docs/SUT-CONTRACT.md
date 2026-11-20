@@ -37,19 +37,45 @@ From the Tazumo monorepo run `pnpm install && pnpm dev:sut`. This intentionally 
 | `fixtures` | Synthetic products and merchants with stable IDs, names and prices. |
 | `journeys` | Scenario outlines with the `platforms` they apply to. |
 
-Match IDs exactly. Do not query by prefix: `sut-merchant-` also matches `sut-merchant-list` and `sut-merchant-detail`, and `sut-cart-` matches every cart control. Some IDs mean different elements per platform: web `sut-cart-empty` is the empty cart drawer, native `sut-cart-empty` is the empty cart screen; web `sut-checkout-disabled` is the cart drawer button, native `sut-checkout-disabled` is the inline mini-cart button and `sut-cart-checkout-disabled` the cart screen button.
+Match IDs exactly. Do not query by prefix: `sut-merchant-` also matches `sut-merchant-list` and `sut-merchant-detail`, and `sut-cart-` matches every cart control.
+
+Web and native differ in places; do not share one locator table across platforms:
+
+| Purpose | Web | Native |
+| --- | --- | --- |
+| Product page / screen root | `detailProduct` (`sut-detail-product`) | `detailScreen` (`sut-detail-screen`); title text `detailTitle` |
+| Quantity on the detail page | `selectorTemplates.detailQuantity` (`sut-detail-quantity-{productId}`), number only, after the first add | `selectors.detailQuantity` (`sut-detail-quantity`), text "In cart: N" |
+| Add on the detail page | `sut-add-{productId}` | `detailAdd` (`sut-detail-add`) |
+| Subtotal | `cartSubtotal` contains the amount only | `cartSubtotal` contains "Subtotal" and the amount |
+| Empty cart | `cartEmpty` in the cart drawer | `cartEmpty` on the cart screen |
+| Disabled checkout | `checkoutDisabled` in the cart drawer | `checkoutDisabled` in the inline mini-cart, `cartCheckoutDisabled` on the cart screen |
+| Open the cart | `cartOpen` opens the drawer | `cartOpen` toggles the inline mini-cart; `cartScreenOpen` and `navCart` open the cart screen |
+
+Assert on contains-text for amounts, not on the whole element text.
 
 ## Versioning
 
-The contract follows semantic versioning, enforced by `pnpm check:sut --base <ref>` in CI against the pull request's base branch:
+The contract version is checked by `pnpm check:sut --base <ref>`. CI compares a pull request with its base branch and a push to `main` with the previous `main` commit. The new version must be exactly the next one for the kind of change:
 
-- **Major**: an ID, template, route, fixture value, package/bundle ID or capability is removed or changed. Consumers need migration steps; list them here and update the downstream demos together.
+- **Major**: an ID, template, route, fixture value, package/bundle ID, capability or other field is removed or changed. This applies below 1.0.0 too, which is stricter than SemVer's 0.x rule: the first breaking change goes to 1.0.0. List migration steps here and update the downstream demos together.
 - **Minor**: something is added (IDs, templates, routes, fixtures, journeys, fields).
-- **Patch**: only prose changes (journey step wording, `isolation`).
+- **Patch**: only prose changes (journey step wording, `isolation`, `repo`).
+- **None**: an unchanged contract keeps its version.
 
-An unchanged contract keeps its version. A major bump without a breaking change is rejected.
+Reordering arrays of IDs or values (for example `platforms`) is not a change.
 
-`pnpm check:sut` also scans every `.ts`/`.tsx` file under `apps/web/src` and `apps/mobile/src` and fails when a registered ID is missing from the platform's code, when a selector is not a `sut-*` test ID, when a template uses an unknown placeholder, when a route is not in the web code, or when fixtures differ from `@tazumo/core`. IDs in the code that are not registered yet are printed as a note. `tests/contract/sut-contract.test.mts` removes each registered ID from the sources in turn and asserts the check fails. `tests/e2e/sut-contract.spec.ts` runs the `merchant-detail-cart` journey in Chromium using only contract selectors and routes. Native IDs are verified statically; this repository has no Appium run against them.
+## How the check works
+
+`pnpm check:sut` parses every `.ts`/`.tsx` file under `apps/web/src` and `apps/mobile/src` with the TypeScript compiler. It reads only the platform's test-ID attribute: `data-testid` on web, `testID` on native. Values can be string or template literals, conditionals, or a component prop whose string values come from JSX call sites (such as `testIdPrefix="sut-cart"`). Comments, other attributes and strings elsewhere do not count. The check fails when:
+
+- a registered ID or template is not rendered by that platform's code;
+- a concrete ID matches a template only with a value outside that placeholder's fixture domain;
+- a selector is not a `sut-*` test ID, or a template uses an unknown placeholder;
+- a route is missing from the web code;
+- fixtures differ from `@tazumo/core`, or IDs are duplicated;
+- a checkout control is not disabled.
+
+IDs that are in the code but not registered are printed as a note. `tests/contract/sut-contract.test.mts` covers the checker with mutations: it removes each registered ID's attribute, comments an element out, moves an ID to another attribute or the wrong platform's prop, and re-enables checkout, plus semantic-version cases. `tests/e2e/sut-contract.spec.ts` runs the `merchant-detail-cart` journey in Chromium using only contract selectors and routes, and asserts that every web selector and template is visible in at least one app state. Native IDs are verified statically only; there is no Appium run against them in this repository.
 
 ## Changelog
 
