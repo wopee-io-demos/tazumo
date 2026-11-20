@@ -31,6 +31,10 @@
       "languageCzech": "sut-language-cs",
       "categoryGroceries": "sut-category-groceries",
       "checkoutDisabled": "sut-checkout-disabled"
+    },
+    "locatorStrategies": {
+      "ios": "accessibility id",
+      "android": "id"
     }
   },
   "fixtures": {

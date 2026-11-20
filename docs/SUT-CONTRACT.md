@@ -18,3 +18,7 @@ Use Tazumo web, Android and iOS as the common application for Wopee demos. Its c
 
 ## Governance
 Downstream repos `mobile-agent`, `mobile-demo`, `web-demo`, `web-demo-pw-cli` must pin this contract version and be updated when changing `sut-*` identifiers. Changing IDs requires migration steps and negative tests. Real payment/dispatch cannot be tested until implemented; do not fake success.
+
+## Native Appium selector contract
+
+React Native `testID` is mapped differently across platforms. With Appium XCUITest, use **`accessibility id`** for iOS `testID` (usually the accessibility identifier/name). With Appium UiAutomator2, use **`id`** for Android `testID` (the view's `resource-id`). Android `accessibility id` targets the user-facing `accessibilityLabel` (content-desc), which is localized and **is not** the `sut-*` selector. `native.locatorStrategies` formalizes this requirement; consumers must verify locator attributes from a real Appium UI tree on both platforms. Do not replace localized accessible labels with synthetic IDs just to make tests pass.

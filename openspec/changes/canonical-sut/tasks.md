@@ -13,3 +13,6 @@ Issue #32, PR #33.
 
 - [x] Add a real disabled native checkout control and stable `sut-checkout-disabled` identifier, rather than relying on warning text alone.
 - [ ] Validate the disabled state with Appium WebDriver `GET /element/{id}/enabled` on actual iOS/Android devices.
+
+- [x] Specify iOS vs Android Appium locator strategies for React Native testIDs in SUT contract.
+- [ ] Verify both strategies against genuine Appium Inspector native hierarchy (resource-id vs accessibility identifier).

@@ -9,6 +9,7 @@ assert.match(contract.version,/^0\.1\.[0-9]+$/);
 assert.equal(contract.status,'synthetic-only');
 assert.equal(contract.native.iosBundleId,'io.wopee.demos.tazumo');
 assert.equal(contract.native.androidPackage,'io.wopee.demos.tazumo');
+assert.deepEqual(contract.native.locatorStrategies,{ios:'accessibility id',android:'id'});
 assert.equal(contract.capabilities.realCheckout,false);
 assert.equal(contract.capabilities.realDeliveryTracking,false);
 const nativeConfig=JSON.parse(read('apps/mobile/app.json')).expo;
