@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "app": "Tazumo",
   "status": "synthetic-only",
   "repo": "https://github.com/wopee-io-demos/tazumo",
@@ -14,7 +14,63 @@
       "productPizza": "[data-testid=\"sut-product-pizza\"]",
       "addPizza": "[data-testid=\"sut-add-pizza\"]",
       "language": "[data-testid=\"sut-language\"]",
-      "palette": "[data-testid=\"sut-palette\"]"
+      "palette": "[data-testid=\"sut-palette\"]",
+      "categoryAll": "[data-testid=\"sut-category-all\"]",
+      "categoryGroceries": "[data-testid=\"sut-category-groceries\"]",
+      "productLinkPizza": "[data-testid=\"sut-product-link-pizza\"]",
+      "merchantList": "[data-testid=\"sut-merchant-list\"]",
+      "merchantPiazza": "[data-testid=\"sut-merchant-piazza-local\"]",
+      "merchantLinkPiazza": "[data-testid=\"sut-merchant-link-piazza-local\"]",
+      "merchantsEmpty": "[data-testid=\"sut-merchants-empty\"]",
+      "searchReset": "[data-testid=\"sut-search-reset\"]",
+      "merchantDetail": "[data-testid=\"sut-merchant-detail\"]",
+      "merchantProductPizza": "[data-testid=\"sut-merchant-product-pizza\"]",
+      "merchantNotFound": "[data-testid=\"sut-merchant-not-found\"]",
+      "breadcrumbHome": "[data-testid=\"sut-breadcrumb-home\"]",
+      "backToMerchants": "[data-testid=\"sut-back-to-merchants\"]",
+      "detailProduct": "[data-testid=\"sut-detail-product\"]",
+      "detailPrice": "[data-testid=\"sut-detail-price\"]",
+      "detailMerchantLink": "[data-testid=\"sut-detail-merchant-link\"]",
+      "detailIncreasePizza": "[data-testid=\"sut-detail-increase-pizza\"]",
+      "detailDecreasePizza": "[data-testid=\"sut-detail-decrease-pizza\"]",
+      "detailRemovePizza": "[data-testid=\"sut-detail-remove-pizza\"]",
+      "detailQuantityPizza": "[data-testid=\"sut-detail-quantity-pizza\"]",
+      "backLink": "[data-testid=\"sut-back-link\"]",
+      "detailNotFound": "[data-testid=\"sut-detail-not-found\"]",
+      "cartLinePizza": "[data-testid=\"sut-cart-line-pizza\"]",
+      "cartIncreasePizza": "[data-testid=\"sut-cart-increase-pizza\"]",
+      "cartDecreasePizza": "[data-testid=\"sut-cart-decrease-pizza\"]",
+      "cartRemovePizza": "[data-testid=\"sut-cart-remove-pizza\"]",
+      "cartQuantityPizza": "[data-testid=\"sut-cart-quantity-pizza\"]",
+      "cartLineTotalPizza": "[data-testid=\"sut-cart-line-total-pizza\"]",
+      "cartSubtotal": "[data-testid=\"sut-cart-subtotal\"]",
+      "cartEmpty": "[data-testid=\"sut-cart-empty\"]",
+      "cartClose": "[data-testid=\"sut-cart-close\"]",
+      "checkoutDisabled": "[data-testid=\"sut-checkout-disabled\"]"
+    },
+    "selectorTemplates": {
+      "product": "[data-testid=\"sut-product-{productId}\"]",
+      "add": "[data-testid=\"sut-add-{productId}\"]",
+      "productLink": "[data-testid=\"sut-product-link-{productId}\"]",
+      "category": "[data-testid=\"sut-category-{category}\"]",
+      "merchant": "[data-testid=\"sut-merchant-{merchantId}\"]",
+      "merchantLink": "[data-testid=\"sut-merchant-link-{merchantId}\"]",
+      "merchantProduct": "[data-testid=\"sut-merchant-product-{productId}\"]",
+      "detailIncrease": "[data-testid=\"sut-detail-increase-{productId}\"]",
+      "detailDecrease": "[data-testid=\"sut-detail-decrease-{productId}\"]",
+      "detailRemove": "[data-testid=\"sut-detail-remove-{productId}\"]",
+      "detailQuantity": "[data-testid=\"sut-detail-quantity-{productId}\"]",
+      "cartLine": "[data-testid=\"sut-cart-line-{productId}\"]",
+      "cartIncrease": "[data-testid=\"sut-cart-increase-{productId}\"]",
+      "cartDecrease": "[data-testid=\"sut-cart-decrease-{productId}\"]",
+      "cartRemove": "[data-testid=\"sut-cart-remove-{productId}\"]",
+      "cartQuantity": "[data-testid=\"sut-cart-quantity-{productId}\"]",
+      "cartLineTotal": "[data-testid=\"sut-cart-line-total-{productId}\"]"
+    },
+    "routes": {
+      "home": "#/",
+      "merchant": "#/merchant/{merchantId}",
+      "product": "#/product/{productId}"
     }
   },
   "native": {
@@ -32,6 +88,12 @@
       "categoryGroceries": "sut-category-groceries",
       "checkoutDisabled": "sut-checkout-disabled"
     },
+    "selectorTemplates": {
+      "product": "sut-product-{productId}",
+      "add": "sut-add-{productId}",
+      "category": "sut-category-{category}",
+      "language": "sut-language-{language}"
+    },
     "locatorStrategies": {
       "ios": "accessibility id",
       "android": "id"
@@ -45,13 +107,24 @@
         "name": "Margherita pizza",
         "merchant": "Piazza Local",
         "priceMinor": 1190,
-        "currency": "EUR"
+        "currency": "EUR",
+        "merchantId": "piazza-local"
       },
       {
         "id": "bread",
         "name": "Sourdough loaf",
         "priceMinor": 450,
         "currency": "EUR"
+      }
+    ],
+    "merchants": [
+      {
+        "id": "piazza-local",
+        "name": "Piazza Local"
+      },
+      {
+        "id": "morning-market",
+        "name": "Morning Market"
       }
     ]
   },
@@ -62,6 +135,11 @@
         "open marketplace",
         "search Piazza",
         "assert Margherita pizza visible"
+      ],
+      "platforms": [
+        "web",
+        "ios",
+        "android"
       ]
     },
     {
@@ -72,6 +150,11 @@
         "assert Margherita pizza and subtotal",
         "assert checkout disabled",
         "assert native checkout control is disabled, not only warning text"
+      ],
+      "platforms": [
+        "web",
+        "ios",
+        "android"
       ]
     },
     {
@@ -79,6 +162,11 @@
       "steps": [
         "choose Groceries",
         "assert Sourdough loaf visible"
+      ],
+      "platforms": [
+        "web",
+        "ios",
+        "android"
       ]
     },
     {
@@ -87,6 +175,26 @@
         "select Czech",
         "assert localized headings",
         "assert cart preserved"
+      ],
+      "platforms": [
+        "web",
+        "ios",
+        "android"
+      ]
+    },
+    {
+      "id": "merchant-detail-cart",
+      "platforms": [
+        "web"
+      ],
+      "steps": [
+        "open merchant Piazza Local from the merchant list",
+        "add Margherita pizza",
+        "open the pizza product page",
+        "assert price and quantity 1",
+        "open cart",
+        "remove Margherita pizza",
+        "assert empty cart"
       ]
     }
   ],

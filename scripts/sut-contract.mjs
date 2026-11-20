@@ -19,45 +19,57 @@ export function domains(core){
   };
 }
 
-/** Collect test IDs from source text: quoted literals, template literals and string props spliced into templates. */
-export function extractIds(text){
-  const literals=new Set(),templates=new Set();
-  for(const m of text.matchAll(/["'`](sut-[a-z0-9-]+)["'`]/g))literals.add(m[1]);
-  const props=new Map();
-  for(const m of text.matchAll(/\b([a-zA-Z]+)="(sut-[a-z0-9-]+)"/g)){
+/** Locate every construct that yields a test ID: quoted literals, template literals, and string props spliced into templates.
+ * Props are gathered across all texts first, because a component and its call sites live in different files. */
+export function idSites(texts){
+  const props=new Map(),sites=[];
+  for(const text of texts)for(const m of text.matchAll(/\b([a-zA-Z]+)="(sut-[a-z0-9-]+)"/g)){
     if(m[1]==='testID'||m[1]==='testid')continue;
     props.set(m[1],[...(props.get(m[1])??[]),m[2]]);
   }
-  for(const m of text.matchAll(/`([^`]*)`/g)){
-    const raw=m[1];
-    const head=/^\$\{([a-zA-Z]+)\}/.exec(raw);
-    const starts=head&&props.has(head[1])?props.get(head[1]).map(p=>p+raw.slice(head[0].length)):[raw];
-    for(const s of starts){
-      if(!s.startsWith('sut-')||!s.includes('${'))continue;
-      templates.add(s.replace(/\$\{[^}]*\}/g,'{}'));
+  const direct=new Set(texts.flatMap(text=>[...text.matchAll(/(?:data-testid|testID)=\{([a-zA-Z]+)\}/g)].map(m=>m[1])));
+  const spliced=new Set([...props].filter(([name])=>!direct.has(name)).flatMap(([,values])=>values));
+  texts.forEach((text,file)=>{
+    for(const m of text.matchAll(/(?<!\^=)(["'`])(sut-[a-z0-9-]+)\1/g))
+      if(!spliced.has(m[2]))sites.push({file,start:m.index,end:m.index+m[0].length,literals:[m[2]],templates:[]});
+    for(const m of text.matchAll(/`([^`]*)`/g)){
+      const raw=m[1],head=/^\$\{([a-zA-Z]+)\}/.exec(raw);
+      const starts=head&&props.has(head[1])?props.get(head[1]).map(p=>p+raw.slice(head[0].length)):[raw];
+      const templates=starts.filter(x=>x.startsWith('sut-')&&x.includes('${')).map(x=>x.replace(/\$\{[^}]*\}/g,'{}'));
+      if(templates.length)sites.push({file,start:m.index,end:m.index+m[0].length,literals:[],templates});
     }
+  });
+  return sites;
+}
+
+export function extractIds(texts){
+  const literals=new Set(),templates=new Set();
+  for(const site of idSites(Array.isArray(texts)?texts:[texts])){
+    site.literals.forEach(x=>literals.add(x));
+    site.templates.forEach(x=>templates.add(x));
   }
   return {literals,templates};
 }
 
-export function mergeIds(sources){
-  const all={literals:new Set(),templates:new Set()};
-  for(const {text} of sources){
-    const ids=extractIds(text);
-    ids.literals.forEach(x=>all.literals.add(x));
-    ids.templates.forEach(x=>all.templates.add(x));
-  }
-  return all;
-}
+export const mergeIds=sources=>extractIds(sources.map(s=>s.text));
 
-function idPresent(id,found,values){
+const normalize=id=>id.replace(/\{[a-zA-Z]+\}/g,'{}');
+
+/** Whether a set of literals and templates produces a concrete ID (placeholders filled from fixture values) or a template. */
+export function yields(found,id,values){
+  if(id.includes('{'))return found.templates.has(normalize(id));
   if(found.literals.has(id))return true;
   for(const template of found.templates){
-    const re=new RegExp('^'+template.split('{}').map(escape).join('('+VALUE+')')+'$');
-    const m=re.exec(id);
+    const m=new RegExp('^'+template.split('{}').map(escape).join('('+VALUE+')')+'$').exec(id);
     if(m&&m.slice(1).every(v=>values.has(v)))return true;
   }
   return false;
+}
+
+/** Every contract selector and template as {platform,group,key,id}. */
+export function contractIds(contract){
+  return PLATFORMS.flatMap(platform=>['selectors','selectorTemplates'].flatMap(group=>
+    Object.entries(contract[platform]?.[group]??{}).map(([key,selector])=>({platform,group,key,id:toId(platform,selector)}))));
 }
 
 /** Every contract selector and template must exist in that platform's sources. */
@@ -71,24 +83,25 @@ export function checkSelectors(contract,sources,core){
       if(!id||!ID_PATTERN.test(id)){errors.push(`${platform}.selectors.${key}: not a stable sut-* test ID (${selector})`);continue}
       if(seen.has(id))errors.push(`${platform}.selectors.${key}: duplicates ${seen.get(id)} (${id})`);
       seen.set(id,key);
-      if(!idPresent(id,found,values))errors.push(`${platform}.selectors.${key}: ${id} not found in ${platform} sources`);
+      if(!yields(found,id,values))errors.push(`${platform}.selectors.${key}: ${id} not found in ${platform} sources`);
     }
     for(const [key,selector] of Object.entries(section.selectorTemplates??{})){
       const id=toId(platform,selector);
       const names=id?placeholders(id):[];
       if(!id||names.length===0||!ID_PATTERN.test(id.replace(/\{[a-zA-Z]+\}/g,'x'))){errors.push(`${platform}.selectorTemplates.${key}: not a sut-* template with a {placeholder} (${selector})`);continue}
       for(const name of names)if(!dom[name])errors.push(`${platform}.selectorTemplates.${key}: unknown placeholder {${name}}`);
-      if(!found.templates.has(id.replace(/\{[a-zA-Z]+\}/g,'{}')))errors.push(`${platform}.selectorTemplates.${key}: ${id} not found in ${platform} sources`);
+      if(!yields(found,id,values))errors.push(`${platform}.selectorTemplates.${key}: ${id} not found in ${platform} sources`);
     }
   }
   return errors;
 }
 
-export function checkRoutes(contract,core){
-  const errors=[],dom=domains(core);
+export function checkRoutes(contract,sources,core){
+  const errors=[],dom=domains(core),web=(sources.web??[]).map(s=>s.text).join('\n');
   for(const [key,route] of Object.entries(contract.web?.routes??{})){
     if(!route.startsWith('#/'))errors.push(`web.routes.${key}: must be a hash route (${route})`);
     for(const name of placeholders(route))if(!dom[name])errors.push(`web.routes.${key}: unknown placeholder {${name}}`);
+    if(!web.includes(route.split('{')[0]))errors.push(`web.routes.${key}: ${route} not found in web sources`);
   }
   return errors;
 }
