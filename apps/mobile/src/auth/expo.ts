@@ -2,9 +2,9 @@ import * as AuthSession from 'expo-auth-session';
 import * as Crypto from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
 import * as WebBrowser from 'expo-web-browser';
-import type { NativeAuthConfig, NativeAuthPort, TokenSet } from './session';
+import { RefreshRejected, type NativeAuthConfig, type NativeAuthPort, type StoreKey, type TokenSet } from './session';
 
-const storeKey = 'tazumo.auth.session';
+const storeKeys: Record<StoreKey, string> = { refreshToken: 'tazumo.auth.refresh', idToken: 'tazumo.auth.id' };
 const toTokens = (response: AuthSession.TokenResponse): TokenSet => ({
   accessToken: response.accessToken,
   refreshToken: response.refreshToken,
@@ -27,7 +27,12 @@ export function createExpoPort(config: NativeAuthConfig): NativeAuthPort {
     async discover() {
       const document = await discover();
       const prompts = document.discoveryDocument?.prompt_values_supported;
-      return { issuer: document.discoveryDocument?.issuer, endSessionEndpoint: document.endSessionEndpoint, promptValues: Array.isArray(prompts) ? prompts : [] };
+      return {
+        issuer: document.discoveryDocument?.issuer,
+        endSessionEndpoint: document.endSessionEndpoint,
+        promptValues: Array.isArray(prompts) ? prompts : [],
+        issParameter: document.discoveryDocument?.authorization_response_iss_parameter_supported === true,
+      };
     },
     async authorize({ nonce, prompt }) {
       const request = new AuthSession.AuthRequest({
@@ -48,7 +53,11 @@ export function createExpoPort(config: NativeAuthConfig): NativeAuthPort {
       return toTokens(await AuthSession.exchangeCodeAsync({ clientId: config.clientId, code, redirectUri, extraParams: { code_verifier: codeVerifier } }, await discover()));
     },
     async refresh(refreshToken) {
-      return toTokens(await AuthSession.refreshAsync({ clientId: config.clientId, refreshToken }, await discover()));
+      try {
+        return toTokens(await AuthSession.refreshAsync({ clientId: config.clientId, refreshToken }, await discover()));
+      } catch (error) {
+        throw error instanceof AuthSession.TokenError ? new RefreshRejected(error.code) : error;
+      }
     },
     async endSession(url) {
       await WebBrowser.openAuthSessionAsync(url, redirectUri);
@@ -58,11 +67,12 @@ export function createExpoPort(config: NativeAuthConfig): NativeAuthPort {
       return { status: response.status, body: response.ok ? await response.json() : undefined };
     },
     store: {
-      read: () => SecureStore.getItemAsync(storeKey),
-      write: (value) => SecureStore.setItemAsync(storeKey, value),
-      clear: () => SecureStore.deleteItemAsync(storeKey),
+      get: (key) => SecureStore.getItemAsync(storeKeys[key]),
+      set: (key, value) => SecureStore.setItemAsync(storeKeys[key], value),
+      delete: (key) => SecureStore.deleteItemAsync(storeKeys[key]),
     },
     randomNonce: () => Crypto.randomUUID(),
+    now: () => Date.now(),
     setTimer: (run, ms) => setTimeout(run, ms),
     clearTimer: (handle) => clearTimeout(handle as ReturnType<typeof setTimeout>),
   };

@@ -53,14 +53,15 @@ export function lintRealm(realm: Record<string, any>): string[] {
     for (const grant of ['oauth2.device.authorization.grant.enabled', 'oidc.ciba.grant.enabled', 'standard.token.exchange.enabled']) {
       if ((client.attributes?.[grant] ?? 'false') !== 'false') failures.push(`${name}: ${grant} must be off`);
     }
-    const uris = [
-      ...(client.redirectUris ?? []),
+    const redirects = [...(client.redirectUris ?? []), ...String(client.attributes?.['post.logout.redirect.uris'] ?? '').split('##').filter(Boolean)];
+    const others = [
       ...(client.webOrigins ?? []).filter((origin: string) => origin !== '+'),
-      ...String(client.attributes?.['post.logout.redirect.uris'] ?? '').split('##').filter(Boolean),
       ...['rootUrl', 'baseUrl', 'adminUrl'].map((key) => client[key]).filter(Boolean),
       ...['frontchannel.logout.url', 'backchannel.logout.url'].map((key) => client.attributes?.[key]).filter(Boolean),
     ];
-    for (const uri of uris) if (!isLoopback(uri) && !appRedirects[client.clientId]?.includes(uri)) failures.push(`${name}: ${uri} is not a localhost URI`);
+    const appScheme = Object.hasOwn(appRedirects, client.clientId) ? appRedirects[client.clientId] : [];
+    for (const uri of redirects) if (!isLoopback(uri) && !appScheme.includes(uri)) failures.push(`${name}: ${uri} is not a localhost URI`);
+    for (const uri of others) if (!isLoopback(uri)) failures.push(`${name}: ${uri} is not a localhost URI`);
     const audienceMapper = (client.protocolMappers ?? []).find(
       (mapper: Client) => mapper.protocolMapper === 'oidc-audience-mapper' && mapper.config?.['included.custom.audience'] === apiAudience,
     );

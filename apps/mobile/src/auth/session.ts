@@ -3,6 +3,7 @@ export type Me = { userId: string; roles: { role: string; merchantId: string | n
 export type Notice = 'signInFailed' | 'signInRefused' | 'sessionEnded' | 'accountUnavailable';
 export type AuthState =
   | { status: 'unconfigured' }
+  | { status: 'restoring' }
   | { status: 'pending' }
   | { status: 'signing-out' }
   | { status: 'signed-out'; notice?: Notice }
@@ -10,8 +11,12 @@ export type AuthState =
 
 export type NativeAuthConfig = { issuer: string; clientId: string; scope: string; apiUrl: string };
 export type TokenSet = { accessToken: string; refreshToken?: string; idToken?: string; expiresIn?: number };
-export type Discovery = { issuer?: string; endSessionEndpoint?: string; promptValues: string[] };
+export type Discovery = { issuer?: string; endSessionEndpoint?: string; promptValues: string[]; issParameter: boolean };
 export type AuthorizeResult = { type: 'success'; code: string; codeVerifier: string; iss?: string } | { type: 'cancel' } | { type: 'error' };
+export type StoreKey = 'refreshToken' | 'idToken';
+
+/** Thrown by `NativeAuthPort.refresh` when the token endpoint refuses the grant, as opposed to a network failure. */
+export class RefreshRejected extends Error {}
 
 /** What the state machine needs from the platform: system-browser authorization, the token endpoint and secure storage. */
 export type NativeAuthPort = {
@@ -22,8 +27,9 @@ export type NativeAuthPort = {
   refresh(refreshToken: string): Promise<TokenSet>;
   endSession(url: string): Promise<void>;
   fetchMe(accessToken: string): Promise<{ status: number; body?: unknown }>;
-  store: { read(): Promise<string | null>; write(value: string): Promise<void>; clear(): Promise<void> };
+  store: { get(key: StoreKey): Promise<string | null>; set(key: StoreKey, value: string): Promise<void>; delete(key: StoreKey): Promise<void> };
   randomNonce(): string;
+  now(): number;
   setTimer(run: () => void, ms: number): unknown;
   clearTimer(handle: unknown): void;
 };
@@ -36,8 +42,9 @@ export type NativeAuth = {
   signOut(): Promise<void>;
 };
 
-type Stored = { refreshToken: string; idToken?: string };
 const refreshLeadSeconds = 30;
+const retrySeconds = 30;
+const clockToleranceSeconds = 60;
 const trimSlash = (url: string) => url.replace(/\/+$/, '');
 
 /** Claims of a JWT received directly from the token endpoint over TLS (OIDC Core 3.1.3.7 allows TLS instead of a signature check). */
@@ -55,61 +62,88 @@ export function parseNativeAuthConfig(values: { issuer?: string; clientId?: stri
 }
 
 export function createNativeAuth(config: NativeAuthConfig | null, port: NativeAuthPort | null): NativeAuth {
-  let current: AuthState = config && port ? { status: 'pending' } : { status: 'unconfigured' };
+  let current: AuthState = config && port ? { status: 'restoring' } : { status: 'unconfigured' };
   const listeners = new Set<() => void>();
   const set = (next: AuthState) => {
     current = next;
     listeners.forEach((listener) => listener());
   };
   let access: string | null = null;
-  let stored: Stored | null = null;
+  let refreshToken: string | null = null;
+  let idToken: string | null = null;
   let timer: unknown;
   let generation = 0;
   let started: Promise<void> | null = null;
 
-  const endSession = async (notice?: Notice, next: AuthState = { status: 'signed-out', notice }) => {
+  /** Drops the in-memory session. `forget` also deletes the stored tokens; network failures keep them for the next start. */
+  const leave = async (next: AuthState, forget: boolean) => {
     generation++;
     port!.clearTimer(timer);
     access = null;
-    stored = null;
-    await port!.store.clear().catch(() => undefined);
+    if (forget) {
+      refreshToken = idToken = null;
+      await Promise.all((['refreshToken', 'idToken'] as const).map((key) => port!.store.delete(key).catch(() => undefined)));
+    }
     set(next);
   };
+  const endSession = (notice?: Notice) => leave({ status: 'signed-out', notice }, true);
 
   async function accept(tokens: TokenSet) {
     access = tokens.accessToken;
-    stored = tokens.refreshToken ? { refreshToken: tokens.refreshToken, idToken: tokens.idToken ?? stored?.idToken } : stored;
-    if (stored) await port!.store.write(JSON.stringify(stored));
+    if (tokens.refreshToken) {
+      refreshToken = tokens.refreshToken;
+      await port!.store.set('refreshToken', refreshToken);
+    }
+    if (tokens.idToken) {
+      idToken = tokens.idToken;
+      await port!.store.set('idToken', idToken);
+    }
+    schedule(tokens.expiresIn ? Math.max(5, tokens.expiresIn - refreshLeadSeconds) : undefined);
+  }
+
+  function schedule(seconds?: number) {
     port!.clearTimer(timer);
-    if (stored && tokens.expiresIn) timer = port!.setTimer(refresh, Math.max(5, tokens.expiresIn - refreshLeadSeconds) * 1000);
+    if (refreshToken && seconds) timer = port!.setTimer(refresh, seconds * 1000);
   }
 
   async function refresh() {
     const turn = generation;
     try {
-      const tokens = await port!.refresh(stored!.refreshToken);
+      const tokens = await port!.refresh(refreshToken!);
       if (turn === generation) await accept(tokens);
-    } catch {
-      if (turn === generation) await endSession('sessionEnded');
+    } catch (error) {
+      if (turn !== generation) return;
+      if (error instanceof RefreshRejected) await endSession('sessionEnded');
+      else schedule(retrySeconds);
     }
   }
 
   async function loadAccount(email?: string) {
     const turn = generation;
-    const response = await port!.fetchMe(access!);
+    const response = await port!.fetchMe(access!).catch(() => ({ status: 0, body: undefined }));
     if (turn !== generation) return;
     if (response.status === 401) return endSession('sessionEnded');
-    if (response.status !== 200 || !response.body) return endSession('accountUnavailable');
+    if (response.status !== 200 || !response.body) return leave({ status: 'signed-out', notice: 'accountUnavailable' }, false);
     set({ status: 'signed-in', me: response.body as Me, email });
   }
 
-  async function verifiedEmail(tokens: TokenSet, nonce: string) {
+  function verifiedEmail(tokens: TokenSet, nonce: string) {
     if (!tokens.idToken) throw new Error('no ID token');
     const claims = jwtClaims(tokens.idToken);
     const audience = [claims.aud].flat();
-    if (claims.nonce !== nonce || trimSlash(String(claims.iss)) !== config!.issuer || !audience.includes(config!.clientId)) throw new Error('ID token rejected');
+    const fresh = typeof claims.exp === 'number' && claims.exp > port!.now() / 1000 - clockToleranceSeconds;
+    if (claims.nonce !== nonce || trimSlash(String(claims.iss)) !== config!.issuer || !audience.includes(config!.clientId) || !fresh) throw new Error('ID token rejected');
     return typeof claims.email === 'string' ? claims.email : undefined;
   }
+
+  const storedEmail = () => {
+    try {
+      const email = idToken ? jwtClaims(idToken).email : undefined;
+      return typeof email === 'string' ? email : undefined;
+    } catch {
+      return undefined;
+    }
+  };
 
   return {
     state: () => current,
@@ -120,19 +154,18 @@ export function createNativeAuth(config: NativeAuthConfig | null, port: NativeAu
     start() {
       return (started ??= (async () => {
         if (!config || !port) return;
-        const saved = await port.store.read().catch(() => null);
-        if (!saved) return set({ status: 'signed-out' });
+        [refreshToken, idToken] = await Promise.all([port.store.get('refreshToken'), port.store.get('idToken')]).catch(() => [null, null]);
+        if (!refreshToken) return set({ status: 'signed-out' });
         try {
-          stored = JSON.parse(saved) as Stored;
-          await accept(await port.refresh(stored.refreshToken));
-          await loadAccount(stored?.idToken ? (jwtClaims(stored.idToken).email as string | undefined) : undefined);
-        } catch {
-          await endSession('sessionEnded');
+          await accept(await port.refresh(refreshToken));
+        } catch (error) {
+          return error instanceof RefreshRejected ? endSession('sessionEnded') : leave({ status: 'signed-out', notice: 'accountUnavailable' }, false);
         }
+        await loadAccount(storedEmail());
       })());
     },
     async signIn(mode) {
-      if (!config || !port) return;
+      if (!config || !port || current.status === 'pending' || current.status === 'signing-out') return;
       set({ status: 'pending' });
       try {
         const discovery = await port.discover();
@@ -141,9 +174,9 @@ export function createNativeAuth(config: NativeAuthConfig | null, port: NativeAu
         const result = await port.authorize({ nonce, ...(mode === 'sign-up' && discovery.promptValues.includes('create') ? { prompt: 'create' as const } : {}) });
         if (result.type === 'cancel') return set({ status: 'signed-out' });
         if (result.type === 'error') return endSession('signInRefused');
-        if (result.iss !== undefined && trimSlash(result.iss) !== config.issuer) throw new Error('iss mismatch');
+        if ((result.iss !== undefined || discovery.issParameter) && trimSlash(result.iss ?? '') !== config.issuer) throw new Error('iss mismatch');
         const tokens = await port.exchange(result.code, result.codeVerifier);
-        const email = await verifiedEmail(tokens, nonce);
+        const email = verifiedEmail(tokens, nonce);
         await accept(tokens);
         await loadAccount(email);
       } catch {
@@ -152,12 +185,12 @@ export function createNativeAuth(config: NativeAuthConfig | null, port: NativeAu
     },
     async signOut() {
       if (!config || !port) return;
-      const idToken = stored?.idToken;
-      await endSession(undefined, { status: 'signing-out' });
+      const hint = idToken;
+      await leave({ status: 'signing-out' }, true);
       try {
         const { endSessionEndpoint } = await port.discover();
         if (endSessionEndpoint) {
-          const params = { client_id: config.clientId, post_logout_redirect_uri: port.redirectUri, ...(idToken ? { id_token_hint: idToken } : {}) };
+          const params = { client_id: config.clientId, post_logout_redirect_uri: port.redirectUri, ...(hint ? { id_token_hint: hint } : {}) };
           const query = Object.entries(params).map(([key, value]) => `${key}=${encodeURIComponent(value)}`).join('&');
           await port.endSession(`${endSessionEndpoint}${endSessionEndpoint.includes('?') ? '&' : '?'}${query}`);
         }

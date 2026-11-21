@@ -19,6 +19,7 @@ const mutations: [string, (r: any) => void, RegExp][] = [
   ['another path on the app scheme', (r) => native(r).redirectUris.push('tazumo://evil'), /tazumo:\/\/evil is not a localhost URI/],
   ['a wildcard on the app scheme', (r) => native(r).redirectUris.push('tazumo://*'), /tazumo:\/\/\* is not a localhost URI/],
   ['a non-localhost native post-logout URI', (r) => (native(r).attributes['post.logout.redirect.uris'] += '##https://evil.example/'), /evil\.example\/ is not a localhost URI/],
+  ['the app scheme as a native web origin', (r) => native(r).webOrigins.push('tazumo://auth/callback'), /tazumo:\/\/auth\/callback is not a localhost URI/],
   ['a non-localhost web origin', (r) => web(r).webOrigins.push('https://evil.example'), /evil\.example is not a localhost URI/],
   ['a non-localhost post-logout URI', (r) => (web(r).attributes['post.logout.redirect.uris'] += '##https://evil.example/*'), /evil\.example\/\* is not a localhost URI/],
   ['a confidential client', (r) => (web(r).publicClient = false), /only public clients/],

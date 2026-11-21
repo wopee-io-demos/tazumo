@@ -19,7 +19,7 @@ EXPO_PUBLIC_API_URL=http://127.0.0.1:3001 \
 pnpm --filter @tazumo/mobile start
 ```
 
-- **Redirect:** `tazumo://auth/callback` in builds, and `exp://…/--/auth/callback` in Expo Go. Both are in the development realm (`infra/idp`).
+- **Redirect:** `tazumo://auth/callback` in builds, and `exp://…/--/auth/callback` in Expo Go. The development realm (`infra/idp`) allows Expo Go only on `127.0.0.1` or `localhost`, so start it with `expo start --localhost`. The default LAN address is refused.
 - **Storage:** the refresh token and ID token are kept in `expo-secure-store`. The access token stays in memory.
 - **Plain http:** an emulator or device needs a reachable host instead of `127.0.0.1`. Release builds block plain http on Android.
 
