@@ -11,5 +11,6 @@ appId: io.wopee.demos.tazumo
       id: "sut-cart-screen"
     timeout: 10000
 - assertVisible: "Subtotal €46.20"
-- assertVisible: "Checkout coming later"
+- assertVisible:
+    id: "sut-cart-checkout-disabled"
 - waitForAnimationToEnd

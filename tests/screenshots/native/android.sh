@@ -7,7 +7,8 @@ here="$(cd "$(dirname "$0")" && pwd)"
 mkdir -p "$out"
 adb wait-for-device
 adb shell settings put global sysui_demo_allowed 1
-demo(){ adb shell am broadcast -a com.android.systemui.demo -e command "$@" >/dev/null; }
+adb shell settings put global sysui_tuner_demo_on 1
+demo(){ adb shell am broadcast -a com.android.systemui.demo -e command "$@" | tr -d '\r' | tail -1; }
 statusbar(){
   demo enter
   demo clock -e hhmm 0941
@@ -15,7 +16,7 @@ statusbar(){
   demo network -e wifi show -e level 4 -e fully true
   demo network -e mobile hide
   demo notifications -e visible false
-  sleep 1
+  sleep 2
 }
 adb shell cmd uimode night no
 adb install -r "$apk"
