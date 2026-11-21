@@ -7,7 +7,7 @@ import { createPool } from '../src/db.ts';
 import { uuidV5 } from '../src/fixtures.ts';
 import { seed } from '../src/seed.ts';
 import { assertMatchesContract, createTestDb, databaseUrl, type TestDb } from './helpers.ts';
-import { audience, issuer, mint, signingKey, startIdp, type SigningKey, type TestIdp } from './idp.ts';
+import { audience, issuer, logSalt, mint, signingKey, startIdp, type SigningKey, type TestIdp } from './idp.ts';
 
 const merchantA = uuidV5('merchant:Piazza Local');
 const rolePath = '/v1/admin/users/{userId}/roles/{role}';
@@ -34,7 +34,7 @@ describe('admin role grants, running as the least-privilege tazumo_api role', ()
     appPool = createPool({ databaseUrl: url.toString(), schema: db.schema });
     key = await signingKey('admin-tests');
     idp = await startIdp([key]);
-    app = buildApp({ pool: appPool, auth: { issuer, audience, jwksUrl: idp.url } });
+    app = buildApp({ pool: appPool, auth: { issuer, audience, logSalt, jwksUrl: idp.url } });
     await app.ready();
     for (const name of ['admin', 'customer', 'staff', 'support', 'target', 'target2']) {
       tokens[name] = await mint(key, { sub: `admin-test-${name}` });
@@ -179,7 +179,10 @@ describe('admin role grants, running as the least-privilege tazumo_api role', ()
       `DELETE FROM audit_events`,
       `TRUNCATE audit_events`,
       `SELECT * FROM audit_events`,
-      `UPDATE users SET subject = 'x'`,
+      `UPDATE users SET subject = 'attacker-sub'`,
+      `UPDATE users SET erased_at = NULL`,
+      `UPDATE users SET issuer = 'x'`,
+      `UPDATE users SET created_at = now()`,
       `INSERT INTO products (id, slug, merchant_id, category_code, name, price_minor, currency) VALUES (gen_random_uuid(), 'x', '${merchantA}', 'food', 'X', 1, 'EUR')`,
       `UPDATE merchants SET accepting_orders = true`,
       `SELECT * FROM schema_migrations`

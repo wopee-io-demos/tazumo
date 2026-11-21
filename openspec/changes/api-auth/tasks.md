@@ -39,4 +39,37 @@
 - [x] Current-head CI green on PR #66 head c1c5f69: [API integration](https://github.com/wopee-io-demos/tazumo/actions/runs/44818849484) (81/81), [Quality checks](https://github.com/wopee-io-demos/tazumo/actions/runs/44818849402), [Dependency audit](https://github.com/wopee-io-demos/tazumo/actions/runs/44818849429), [Test evidence](https://github.com/wopee-io-demos/tazumo/actions/runs/44818849465).
 - [x] Merged as 3f95fbd02ad09e1526252e931dd8eb5b2104ac08; recorded on #56.
 
+
+## Slice 3 (GDPR erasure and export)
+
+- [x] Self-service and admin/support erasure in one transaction: keyed-hash subject, grants deleted, audit event without personal data. Idempotent, blocked by an `admin` grant. Evidence: `test/privacy.test.ts`, which runs as `tazumo_api`.
+- [x] Tokens issued before the erasure are rejected; later tokens re-provision an unlinked customer. Evidence: same suite, using a deterministic `iat` with no sleeps.
+- [x] `GET /v1/me/export` through a `SECURITY DEFINER` audit function; it returns only the caller's data.
+- [x] Negative tests: customer and staff get 403, double erasure has no new effect, old tokens get 401, an admin target gets 409, unknown user 404, malformed ID 400, `erased:` subjects are rejected, and no erased subject remains in `users` or `audit_events`.
+- [x] Mutation checks: removing the erased-token check, the blockers, or the policy denial each makes a test fail.
+- [x] Migration `0004` and contract `0.5.0-draft`; ADR-0017 erasure section updated.
+- [x] Independent review on 4b268bc. 2 blockers and 9 should-fix findings, all resolved:
+  - Blocker: the column UPDATE grant allowed taking over an admin and un-erasing. Replaced by the `SECURITY DEFINER` `erase_user`; the runtime has no UPDATE on `users`.
+  - Blocker: a second erasure of the same subject collided. The older tombstone is now re-tombstoned at random.
+  - Should-fix:
+    - the `resolvePrincipal` race is closed by a re-check after the upsert;
+    - grants to erased users are refused (trigger plus 409);
+    - support can no longer erase staff (`staff_grant` blocker);
+    - the clock tolerance is applied after erasure;
+    - token tests derive `iat` from `erasedAt`;
+    - the export function's limits are documented;
+    - recognition uses its own HKDF key and expires after the token-lifetime window;
+    - the export includes whitelisted details;
+    - ADR-0016 was corrected.
+  - Nits: `logSalt` is required, HMAC domain separation, a consistent export snapshot, a re-authentication note in ADR-0017.
+- [x] Re-review on 75b9346: no blockers. Then fixed:
+  - The existing-user race returned 500; it now returns 401.
+  - The recognition window was a caller parameter, which allowed premature forgetting. It is now fixed in the function, EXECUTE is revoked from the runtime, and an owner-run `db:forget-erased` script exists.
+  - `erase_user` checks that the actor holds the initiator role.
+  - The export releases its connection on errors.
+  - ADR-0016 states the remaining limits honestly.
+- [x] Third check on ac89634: all six items resolved. Its three nits are fixed: the export builds its result before releasing the connection, a revoked-initiator race now returns 403, and the ADR-0016 lead-in is corrected.
+- [ ] Current-head CI green (record run URLs).
+- [ ] Merge and record the merge SHA on #56.
+
 Not implemented: provider wiring (pending ADR-0017), a shared rate-limit store, courier scopes, payments, orders.

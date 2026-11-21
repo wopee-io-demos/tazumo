@@ -1,8 +1,8 @@
-import { createHmac, randomBytes } from 'node:crypto';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import type pg from 'pg';
 import { apiError } from '../errors.ts';
 import { AuthError, createVerifier, type AuthConfig } from './jwt.ts';
+import type { Pseudonymizer } from './pseudonym.ts';
 import type { Principal } from './policy.ts';
 import { resolvePrincipal } from './principals.ts';
 
@@ -17,11 +17,8 @@ export type AuthOptions = AuthConfig & { logSalt?: string };
 const bearer = /^Bearer ([A-Za-z0-9_-]+\.[A-Za-z0-9_-]*\.[A-Za-z0-9_-]*)$/i;
 const challenge = 'Bearer realm="tazumo"';
 
-export function createAuthenticate(pool: pg.Pool, options: AuthOptions | undefined) {
+export function createAuthenticate(pool: pg.Pool, options: AuthOptions | undefined, pseudonymizer: Pseudonymizer) {
   const verify = options ? createVerifier(options) : undefined;
-  const salt = options?.logSalt ?? randomBytes(32).toString('hex');
-  const principalTag = (issuer: string, subject: string) =>
-    createHmac('sha256', salt).update(`${issuer}\n${subject}`).digest('hex').slice(0, 16);
 
   return async function authenticate(request: FastifyRequest, reply: FastifyReply) {
     if (!verify) {
@@ -36,6 +33,7 @@ export function createAuthenticate(pool: pg.Pool, options: AuthOptions | undefin
     let token;
     try {
       token = await verify(match[1]);
+      request.principal = await resolvePrincipal(pool, token, pseudonymizer);
     } catch (error) {
       if (!(error instanceof AuthError)) throw error;
       if (error.status === 503) {
@@ -46,7 +44,6 @@ export function createAuthenticate(pool: pg.Pool, options: AuthOptions | undefin
       reply.header('www-authenticate', `${challenge}, error="invalid_token"`);
       return reply.code(401).send(apiError(request, 'invalid_token', 'Token is not valid'));
     }
-    request.principal = await resolvePrincipal(pool, token);
-    request.log.info({ principal: principalTag(token.issuer, token.subject) }, 'authenticated');
+    request.log.info({ principal: pseudonymizer.logTag(token.issuer, token.subject) }, 'authenticated');
   };
 }

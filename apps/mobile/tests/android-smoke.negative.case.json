@@ -1,0 +1,13 @@
+{
+  "id": "tazumo-android-smoke-negative",
+  "intent": "Runner self-check: a missing test identifier must fail the case.",
+  "platforms": {
+    "android": {
+      "app": "io.wopee.demos.tazumo",
+      "steps": [
+        {"action": "see", "by": "id", "value": "sut-open-product-pizza"},
+        {"action": "see", "by": "id", "value": "sut-does-not-exist"}
+      ]
+    }
+  }
+}
