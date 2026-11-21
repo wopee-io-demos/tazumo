@@ -13,5 +13,6 @@ export const tokenType = 'at+jwt';
 export const clients = {
   web: { id: 'tazumo-web', redirectUri: 'http://127.0.0.1:5173/auth/callback' },
   backoffice: { id: 'tazumo-backoffice', redirectUri: 'http://127.0.0.1:4174/' },
+  native: { id: 'tazumo-native', redirectUri: 'tazumo://auth/callback' },
   probe: { id: 'tazumo-audience-probe', redirectUri: 'http://127.0.0.1:5173/auth/callback' },
 };

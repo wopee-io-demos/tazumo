@@ -1,0 +1,14 @@
+{
+  "name": "@tazumo/image-size-v1-compat",
+  "version": "0.0.0",
+  "private": true,
+  "description": "image-size 1.x call signature for Metro on top of the patched image-size 2.x (tazumo #136)",
+  "main": "index.js",
+  "license": "MIT",
+  "dependencies": {
+    "image-size-v2": "npm:image-size@^2.0.3"
+  },
+  "files": [
+    "index.js"
+  ]
+}

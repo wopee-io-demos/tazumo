@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Tazumo Marketplace API",
-    "version": "0.7.0-draft",
+    "version": "0.8.0-draft",
     "description": "Contract proposal. The read-only Discovery operations and the Identity, Admin role-grant, Privacy (erasure, export) and quote (synthetic fees, VAT rates to re-verify) operations have a reference implementation in apps/api (synthetic fixture data, not deployed). All prices are server-calculated. Checkout is disabled in the current clients."
   },
   "servers": [
@@ -1511,6 +1511,13 @@
           "synthetic": {
             "type": "boolean",
             "description": "True when the record is synthetic demonstration data, not a real merchant or offer"
+          },
+          "optionGroups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductOptionGroup"
+            },
+            "description": "Present only when the product has options"
           }
         }
       },
@@ -1562,6 +1569,9 @@
             "type": "integer",
             "minimum": 1,
             "maximum": 100
+          },
+          "selectedOptions": {
+            "$ref": "#/components/schemas/OptionSelection"
           }
         },
         "additionalProperties": false
@@ -1810,6 +1820,13 @@
               }
             },
             "additionalProperties": false
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QuoteLine"
+            },
+            "description": "One entry per request item, in request order"
           }
         },
         "description": "Server-authoritative price breakdown. total is the exact total; payable and rounding differ from it only for cash payments. Fees are synthetic and VAT rates are research data to re-verify."
@@ -2103,6 +2120,188 @@
         },
         "additionalProperties": false,
         "description": "Money that may be negative, such as a rounding adjustment"
+      },
+      "OptionSelection": {
+        "type": "object",
+        "maxProperties": 20,
+        "propertyNames": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"
+        },
+        "additionalProperties": {
+          "type": "array",
+          "maxItems": 50,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"
+          }
+        },
+        "description": "Option group ID to chosen option IDs. In a request, a group left out takes its available defaults and an empty array chooses none. In a quote line, every group of the product is listed.",
+        "example": {
+          "size": [
+            "large"
+          ],
+          "extras": [
+            "olives",
+            "mushrooms"
+          ]
+        }
+      },
+      "ProductOption": {
+        "type": "object",
+        "required": [
+          "id",
+          "labelKey",
+          "priceDeltaMinor",
+          "available",
+          "isDefault"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"
+          },
+          "labelKey": {
+            "type": "string",
+            "pattern": "^\\S{1,200}$",
+            "description": "Translation key; clients resolve the label"
+          },
+          "priceDeltaMinor": {
+            "type": "integer",
+            "description": "Signed change to the unit price in minor units of the product price currency"
+          },
+          "available": {
+            "type": "boolean",
+            "description": "Resolved when the response is built; an unavailable option cannot be selected"
+          },
+          "isDefault": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ProductOptionGroup": {
+        "type": "object",
+        "required": [
+          "id",
+          "labelKey",
+          "selection",
+          "min",
+          "max",
+          "required",
+          "options"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"
+          },
+          "labelKey": {
+            "type": "string",
+            "pattern": "^\\S{1,200}$",
+            "description": "Translation key; clients resolve the label"
+          },
+          "selection": {
+            "type": "string",
+            "enum": [
+              "single",
+              "multiple"
+            ]
+          },
+          "min": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "max": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductOption"
+            }
+          }
+        },
+        "additionalProperties": false,
+        "description": "Validated and priced by @tazumo/product-options on every surface; the quote is authoritative"
+      },
+      "QuoteLine": {
+        "type": "object",
+        "required": [
+          "productId",
+          "quantity",
+          "selectedOptions",
+          "options",
+          "basePrice",
+          "unitPrice",
+          "lineTotal"
+        ],
+        "properties": {
+          "productId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "selectedOptions": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "description": "Resolved selection: every option group of the product with its chosen option IDs"
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "groupId",
+                "optionId",
+                "labelKey",
+                "priceDeltaMinor"
+              ],
+              "properties": {
+                "groupId": {
+                  "type": "string",
+                  "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"
+                },
+                "optionId": {
+                  "type": "string",
+                  "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"
+                },
+                "labelKey": {
+                  "type": "string",
+                  "pattern": "^\\S{1,200}$",
+                  "description": "Translation key; clients resolve the label"
+                },
+                "priceDeltaMinor": {
+                  "type": "integer"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "basePrice": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "unitPrice": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "lineTotal": {
+            "$ref": "#/components/schemas/Money"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Snapshot of the priced line: the resolved selection, each chosen option with its delta, and the resulting unit price"
       }
     }
   }

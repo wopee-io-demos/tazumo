@@ -98,4 +98,6 @@ Alternatives:
 - `group-by: dependency-name`: one PR per dependency across directories, which removes the per-directory duplicates but still opens majors automatically.
 - Group majors with minor and patch updates: one breaking change blocks every safe update in the group.
 
+`@types/node` also ignores every version from 23 up (`versions: ['>=23']`), because its major must follow the Node 22 runtime that CI and the API run. Change that rule together with the runtime.
+
 Consequence: nothing announces a new major. It is noticed through `pnpm outdated`, security advisories or upstream deprecations, such as an action's Node.js runtime moving.

@@ -13,4 +13,13 @@
   - A group list longer than the group's options gives one `too_many_options` error, not one error per item.
   - Messages never echo IDs that are long or malformed.
 - **Line keys.** `lineKey` sorts group IDs and option IDs and serialises the result as JSON. It is therefore order-independent and can't collide on delimiter characters. Call it with the resolved selection that `validateSelection` and `priceSelection` return, which lists every group. Clients in slice 3 key cart lines by that result and never by the raw selection, so they agree with the server.
-- **No ADR.** No contract, storage or security trade-off arises in this slice. Option snapshot storage (slice 2) is the likely ADR; 0022 is reserved for it.
+- **No ADR in slice 1.** No contract, storage or security trade-off arises in the package itself.
+
+## Slice 2: contract, storage and quote
+
+- **Storage** (ADR-0022): two tables, `product_option_groups` and `product_options`, keyed by product. The database repeats the cheap consistency rules (ID pattern, `min <= max`, `required = min >= 1`, `single` means `max = 1`, option IDs unique per product, an option's group belongs to the same product). The rest stays in `validateOptionGroups`, which the seed runs before inserting and the quote runs on every request.
+- **Availability** is stored as the `@tazumo/merchant-ops` `Availability` JSON and resolved with `isAvailableAt` when a response is built, not as a static boolean. An invalid value resolves to unavailable.
+- **Contract**: `Product.optionGroups` uses the package shape (`priceDeltaMinor` as a signed integer in the product price currency, `labelKey` for client translation), so clients can feed it to `priceSelection` unchanged. `OrderItem.selectedOptions` and `QuoteLine.selectedOptions` share the `OptionSelection` schema.
+- **Quote**: each item is priced with `priceSelection` before commerce runs; commerce lines are keyed by `lineKey(productId, resolvedSelection)`, so commerce detects a duplicate configuration and two configurations of one product coexist. `selection` errors are client errors (400, or 409 when the only problem is availability, which can change while a client holds a cart); `definition` and `pricing` errors come from server data and are 500s that log only the stage and codes.
+- **Snapshot**: `Quote.lines` returns what an order line has to keep. Storing it waits for #83 (ADR-0022).
+

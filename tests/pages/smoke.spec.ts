@@ -1,4 +1,6 @@
 import {test,expect,type Page} from '@playwright/test';
+import {readFileSync} from 'node:fs';
+import {join} from 'node:path';
 import {cartButton,search} from '../e2e/support/locators';
 
 const origin=new URL(process.env.PAGES_URL??'http://invalid').origin;
@@ -41,4 +43,20 @@ test('a hash deep link loads directly with no 404 fallback',async({page},testInf
   await expect(page.getByTestId('sut-detail-merchant-link')).toHaveText('Bloom & Grow');
   await page.screenshot({path:testInfo.outputPath('pages-deep-link.png'),fullPage:true});
   expect(errors).toEqual([]);
+});
+
+test('version.json and the version meta tag identify this deployment',async({page,request})=>{
+  const read=(path:string)=>JSON.parse(readFileSync(join(__dirname,'..','..',path),'utf8'));
+  const response=await request.get(`version.json${process.env.PAGES_QUERY??''}`);
+  expect(response.status()).toBe(200);
+  const info=await response.json();
+  expect(info).toEqual({
+    version:read('package.json').version,
+    commit:process.env.EXPECTED_COMMIT??expect.stringMatching(/^[0-9a-f]{40}$/),
+    builtAt:expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/),
+    contracts:{sut:read('contracts/sut.json').version,openapi:read('contracts/openapi.json').info.version}
+  });
+  await open(page);
+  await expect(page.locator('meta[name="tazumo-version"]')).toHaveAttribute('content',info.version);
+  await expect(page.locator('meta[name="tazumo-commit"]')).toHaveAttribute('content',info.commit);
 });

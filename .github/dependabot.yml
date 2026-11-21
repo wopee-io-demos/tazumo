@@ -19,6 +19,8 @@ updates:
     ignore:
       - dependency-name: '*'
         update-types: [version-update:semver-major]
+      - dependency-name: '@types/node'
+        versions: ['>=23']
       - dependency-name: expo
         update-types: [version-update:semver-major, version-update:semver-minor]
       - dependency-name: react-native

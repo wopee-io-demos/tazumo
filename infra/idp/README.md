@@ -27,7 +27,7 @@ Nothing secret is committed. On first run `up.sh` writes `infra/idp/.env` (gitig
 
 - **Clients:** public only, Authorization Code with PKCE `S256` required. No password grant, implicit flow or service accounts.
   - `tazumo-web`: `http://localhost:5173/*` and `http://127.0.0.1:5173/*`.
-  - `tazumo-native`: Expo development URLs `exp://127.0.0.1:8081/--/auth/callback` and `exp://localhost:8081/--/auth/callback`. The app's own `tazumo:` scheme is added with the client wiring in #88.
+  - `tazumo-native`: the app's `tazumo://auth/callback` and the Expo development URLs `exp://127.0.0.1:8081/--/auth/callback` and `exp://localhost:8081/--/auth/callback`, as redirect and post-logout URIs. The lint allows the custom scheme only for this exact URI on this client.
   - `tazumo-backoffice`: `http://127.0.0.1:5174/*` (dev server) and `http://127.0.0.1:4174/*` (preview).
   - `tazumo-audience-probe`: test only; its tokens lack the API audience.
 - **Tokens:** access tokens are RS256 JWTs with header `typ: at+jwt` (RFC 9068, client attribute `access.token.header.type.rfc9068`), 300 s lifespan, and `aud` containing `tazumo-api` from an audience mapper on each app client. ID tokens do not carry `tazumo-api`.
@@ -66,7 +66,7 @@ TAZUMO_API_URL=http://127.0.0.1:3001 \
 pnpm --filter @tazumo/web dev --host 127.0.0.1 --port 5173 --strictPort
 ```
 
-`TAZUMO_API_URL` makes the dev and preview servers proxy `/v1` to the API. Without `VITE_OIDC_ISSUER` and `VITE_OIDC_CLIENT_ID` the header says sign-in isn't available in this build. Native sign-in is slice 2 of #88.
+`TAZUMO_API_URL` makes the dev and preview servers proxy `/v1` to the API. Without `VITE_OIDC_ISSUER` and `VITE_OIDC_CLIENT_ID` the header says sign-in isn't available in this build. `apps/mobile` signs in with `tazumo-native` (see [its README](../../apps/mobile/README.md#sign-in)). `tests/idp/native-client.spec.ts` checks the native client's protocol against this realm: Authorization Code + PKCE on `tazumo://auth/callback`, refresh, RP-initiated logout, and refusal of other app-scheme paths.
 
 ## Tests
 

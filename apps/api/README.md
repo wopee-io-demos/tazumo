@@ -9,7 +9,7 @@ Catalogue API over PostgreSQL with bearer-token identity. Serves synthetic fixtu
 | `start` | Serve on `HOST:PORT` (default `127.0.0.1:3001`) |
 | `test` | Integration tests; needs `DATABASE_URL` for a disposable database |
 
-Environment: `DATABASE_URL` (required), `HOST`, `PORT`, `LOG_LEVEL`.
+Environment: `DATABASE_URL` (required), `HOST`, `PORT`, `LOG_LEVEL`, `TAZUMO_COMMIT` (the deployed commit's full SHA, reported by `/health` with the product version; `unknown` when unset).
 
 Auth (all three or none; without them `/v1/me` and other protected routes return 503): `AUTH_ISSUER`, `AUTH_AUDIENCE`, `AUTH_JWKS_URL` (https, or http on loopback only). `AUTH_LOG_SALT` (32+ characters) is required with them and keys the hashed principal tag in logs. Optional `AUTH_TOKEN_TYPE` (for example `at+jwt`) enforces the token `typ`, and `AUTH_MAX_TOKEN_LIFETIME` (seconds, default 3600) caps `exp - iat`. `AUTH_AUDIENCE` must be the API resource identifier, never an OIDC client ID. Admins grant and revoke `merchant_staff` and `support` with `PUT`/`DELETE /v1/admin/users/{userId}/roles/{role}`. The first admin is granted in the database.
 
@@ -30,6 +30,7 @@ Quotes: `POST /v1/order-quotes` prices a basket with `@tazumo/commerce` rules fo
 - The seeded IE demo market has no rules and returns 422 `unsupported_market`.
 - Fees and the distance (derived from the postal code) are synthetic. VAT rates are research data to re-verify.
 - `total` is exact. `payable` differs from it only for cash payments in CZK.
+- Product options ([ADR-0022](../../docs/adr/0022-product-option-storage.md)): the catalogue returns `optionGroups`; each quote item may send `selectedOptions`, which `@tazumo/product-options` validates and prices (400 `invalid_options`, 409 `option_unavailable`). `lines` is the per-line snapshot with the resolved options and unit price. Fastify's `coerceTypes: 'array'` accepts a single option ID string in place of a one-element list.
 - Quotes are not stored yet.
 
 GDPR: `POST /v1/me/erasure` (self-service) and `POST /v1/admin/users/{userId}/erasure` (admin or support) pseudonymise the user, delete their grants and audit the erasure. Tokens issued before the erasure are rejected afterwards. `GET /v1/me/export` returns the caller's data. Deleting the account at the identity provider is a separate operator step until a provider is wired in. Erasure recognition depends on `AUTH_LOG_SALT`, so rotate it deliberately. Schedule `pnpm db:forget-erased` daily with owner credentials; it replaces keyed-hash tombstones older than 24 h 2 min with random ones.
