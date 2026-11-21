@@ -1,0 +1,39 @@
+name: tazumo-geocoding
+
+services:
+  nominatim:
+    image: mediagis/nominatim:5.3.3@sha256:168c30e20fbba0c2e8199fca7a8aa2640e8cc1a62f8b05b1958897796fdb38f1
+    restart: ${NOMINATIM_RESTART:-unless-stopped}
+    shm_size: ${NOMINATIM_SHM_SIZE:-8g}
+    environment:
+      PBF_PATH: /data/markets.osm.pbf
+      IMPORT_STYLE: address
+      FREEZE: "true"
+      THREADS: ${NOMINATIM_THREADS:-6}
+      NOMINATIM_PASSWORD: ${NOMINATIM_PASSWORD:?set NOMINATIM_PASSWORD in .env}
+      GUNICORN_WORKERS: ${NOMINATIM_WORKERS:-4}
+      NOMINATIM_QUERY_TIMEOUT: "5"
+      NOMINATIM_REQUEST_TIMEOUT: "10"
+      POSTGRES_SHARED_BUFFERS: ${NOMINATIM_PG_SHARED_BUFFERS:-4GB}
+      POSTGRES_MAINTENANCE_WORK_MEM: ${NOMINATIM_PG_MAINTENANCE_WORK_MEM:-10GB}
+      POSTGRES_EFFECTIVE_CACHE_SIZE: ${NOMINATIM_PG_EFFECTIVE_CACHE_SIZE:-24GB}
+    volumes:
+      - ${NOMINATIM_DATA_DIR:-./data}:/data:ro
+      - nominatim-db:/var/lib/postgresql/16/main
+      - ./postgres-privacy.conf:/etc/postgresql/16/main/conf.d/zz-privacy.conf:ro
+    ports:
+      - "${NOMINATIM_BIND:-127.0.0.1}:${NOMINATIM_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/status"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 24h
+    logging:
+      driver: local
+      options:
+        max-size: 10m
+        max-file: "3"
+
+volumes:
+  nominatim-db:

@@ -3,27 +3,39 @@ on:
   pull_request:
     paths:
       - 'apps/api/**'
-      - 'packages/core/**'
+      - '!apps/api/**/*.md'
+      - 'packages/core/src/**'
+      - 'packages/commerce/src/**'
+      - '!packages/**/*.test.ts'
+      - 'packages/core/package.json'
+      - 'packages/commerce/package.json'
       - 'contracts/openapi.json'
       - 'scripts/validate-openapi.mjs'
       - 'package.json'
       - 'pnpm-workspace.yaml'
+      - 'pnpm-lock.yaml'
       - '.github/workflows/api.yml'
   push:
     branches: [main]
     paths:
       - 'apps/api/**'
-      - 'packages/core/**'
+      - '!apps/api/**/*.md'
+      - 'packages/core/src/**'
+      - 'packages/commerce/src/**'
+      - '!packages/**/*.test.ts'
+      - 'packages/core/package.json'
+      - 'packages/commerce/package.json'
       - 'contracts/openapi.json'
       - 'scripts/validate-openapi.mjs'
       - 'package.json'
       - 'pnpm-workspace.yaml'
+      - 'pnpm-lock.yaml'
       - '.github/workflows/api.yml'
 permissions:
   contents: read
 concurrency:
-  group: api-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: api-${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   api:
     runs-on: ${{ (vars.RUNNER_MODE == 'hosted' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository)) && 'ubuntu-latest' || fromJSON('["self-hosted","linux","x64","demos"]') }}
@@ -52,7 +64,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: pnpm install --no-frozen-lockfile
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
       - run: node scripts/validate-openapi.mjs
       - run: pnpm --filter @tazumo/api typecheck
       - run: pnpm --filter @tazumo/api test

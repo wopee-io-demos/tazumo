@@ -6,7 +6,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: quality-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: quality-${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   check:
@@ -14,19 +14,28 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-      - name: Validate issue-status helper shell syntax
-        run: bash -n scripts/issue-status.sh
-      - uses: pnpm/action-setup@v4
         with:
-          version: 10.11.0
+          fetch-depth: 2
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: pnpm install --no-frozen-lockfile
+      - name: Classify changed files
+        id: changes
+        run: node scripts/ci-changes.mjs
+      - run: node --test scripts/ci-changes.test.mjs
+      - name: Validate issue-status helper shell syntax
+        run: bash -n scripts/issue-status.sh
       - run: python3 scripts/check-agent-policy.py
       - run: node scripts/check-repo-policy.mjs
       - run: node scripts/validate-openapi.mjs
+      - uses: pnpm/action-setup@v4
+        if: steps.changes.outputs.code == 'true'
+        with:
+          version: 10.11.0
+      - if: steps.changes.outputs.code == 'true'
+        run: pnpm install --frozen-lockfile
       - name: SUT contract (IDs in both apps, semantic version against the previous contract)
+        if: steps.changes.outputs.code == 'true'
         env:
           BASE_REF: ${{ github.base_ref }}
           BEFORE: ${{ github.event.before }}
@@ -40,20 +49,17 @@ jobs:
           else
             pnpm check:sut
           fi
-      - run: pnpm typecheck
-      - run: pnpm test
-      - run: pnpm build
-      - run: pnpm bundle:mobile
+      - if: steps.changes.outputs.code == 'true'
+        run: pnpm typecheck
+      - if: steps.changes.outputs.code == 'true'
+        run: pnpm test
+      - if: steps.changes.outputs.web == 'true'
+        run: pnpm build
       - uses: actions/upload-artifact@v4
+        if: steps.changes.outputs.web == 'true'
         with:
           name: tazumo-web-dist
           path: apps/web/dist/
           retention-days: 7
-      - run: pnpm exec playwright install --with-deps chromium
-      - run: pnpm test:e2e
-      - uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: playwright-failure-artifacts
-          path: test-results/
-          retention-days: 7
+      - if: steps.changes.outputs.mobile == 'true'
+        run: pnpm bundle:mobile

@@ -6,7 +6,7 @@ import {execFileSync} from 'node:child_process';
 import {readFileSync,readdirSync} from 'node:fs';
 import {join,relative,resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {checkCompatibility,checkDisabled,checkFixtures,checkRoutes,checkSelectors,unregistered} from './sut-contract.mjs';
+import {checkCompatibility,checkDisabled,checkFixtures,checkRequiresAuth,checkRoutes,checkSelectors,unregistered} from './sut-contract.mjs';
 
 const root=resolve(fileURLToPath(import.meta.url),'../..');
 const read=p=>readFileSync(join(root,p),'utf8');
@@ -33,7 +33,7 @@ export async function loadRepo(){
 
 /** Structural and behavioural checks that do not depend on a previous contract version. */
 export function checkRepo({contract,core,sources}){
-  return [...checkSelectors(contract,sources,core),...checkRoutes(contract,sources,core),...checkFixtures(contract,core),
+  return [...checkSelectors(contract,sources,core),...checkRequiresAuth(contract),...checkRoutes(contract,sources,core),...checkFixtures(contract,core),
     ...checkDisabled(sources.native,'native',['sut-checkout-disabled','sut-cart-checkout-disabled']),
     ...checkDisabled(sources.web,'web',['sut-checkout-disabled'])];
 }

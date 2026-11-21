@@ -3,7 +3,7 @@
 ## ADDED Requirements
 
 ### Requirement: Web captures come from the real production build
-The repository SHALL provide one command that builds the web app, serves the production bundle and captures desktop and mobile PNGs of the catalogue, a category filter, search results and a cart containing items.
+The repository SHALL provide one command that builds the web app, serves the production bundle and captures desktop and mobile PNGs of the catalogue, a category filter, search results, a cart containing items, a merchant detail page and a product detail page.
 
 #### Scenario: Regenerate the web gallery
 - **WHEN** a maintainer runs `bash scripts/capture-web-screenshots.sh` after `pnpm install` and `pnpm exec playwright install chromium`
@@ -35,12 +35,27 @@ Each committed PNG SHALL be optimised and stay under about 300 KB.
 - **THEN** it quantises every PNG with `pngquant`, records the optimiser version in `provenance.json`, and fails without touching the gallery if `pngquant` is missing or any PNG exceeds 300 KB
 
 ### Requirement: Native captures come from simulator and emulator builds in CI
-The `SUT screenshots` workflow SHALL build the Expo app for the iOS simulator and the Android emulator on hosted runners, install and launch `io.wopee.demos.tazumo`, drive it to the catalogue and to a cart with items, capture with `xcrun simctl io screenshot` and `adb exec-out screencap`, and upload the PNGs with a `provenance.json` that names the workflow run, SUT commit, device, OS and build.
+The `SUT screenshots` workflow SHALL build the Expo app for the iOS simulator and the Android emulator on hosted runners, install and launch `io.wopee.demos.tazumo`, drive it to the catalogue, the product screen, the inline basket and the cart screen, capture with `xcrun simctl io screenshot` and `adb exec-out screencap`, and upload the PNGs with a `provenance.json` that names the workflow run, SUT commit, device, OS and build.
 
 #### Scenario: Publish native captures
 - **WHEN** a maintainer copies native PNGs into `docs/screenshots/ios/` or `docs/screenshots/android/`
 - **THEN** they are byte-identical to the artifact of the workflow run cited in the README
 
 #### Scenario: App does not reach the expected state
-- **WHEN** the catalogue text, the cart button or the subtotal €46.20 is not found
+- **WHEN** the catalogue text, the product screen, the cart button, the cart screen or the subtotal €46.20 is not found
 - **THEN** the job fails and uploads no screenshot artifact for that platform
+
+### Requirement: Captures run only where a change can alter them
+On pull requests the `SUT screenshots` workflow SHALL run the web capture only for changes under `apps/web/**` or the web capture files, and the Android capture only for changes under `apps/mobile/**` or `tests/screenshots/native/**`. The iOS capture SHALL NOT run on pull requests; it runs on pushes to `main`, nightly and on manual dispatch, on the self-hosted `mac-ios` runner when `IOS_RUNNER` selects it and on hosted `macos-15` otherwise, in a dedicated simulator that is deleted afterwards. Pushes to `main`, the nightly schedule and manual dispatch SHALL run every capture. A native capture SHALL relaunch the app and retry once before failing.
+
+#### Scenario: Unrelated pull request
+- **WHEN** a pull request changes only `packages/**`, `apps/api/**` or documentation
+- **THEN** no capture job runs and the workflow reports no failure
+
+#### Scenario: Transient Maestro failure
+- **WHEN** a Maestro flow fails on the first attempt
+- **THEN** the script force-stops and relaunches the app, deletes the partial PNGs and repeats the whole capture once
+
+#### Scenario: System ANR dialog on the hosted emulator
+- **WHEN** the emulator raises a system "isn't responding" dialog
+- **THEN** error dialogs are hidden after boot, the emulator settles for 30 s, and `CLOSE_SYSTEM_DIALOGS` is sent before every flow and before a relaunch

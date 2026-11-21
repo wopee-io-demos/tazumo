@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./nominatim": "./src/nominatim.ts",
     "./testing": "./src/testing.ts"
   },
   "scripts": {

@@ -1,26 +1,57 @@
 name: SUT screenshots
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '17 2 * * *'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/screenshots.yml'
+      - 'apps/mobile/**'
+      - 'apps/web/**'
+      - 'packages/**'
+      - 'scripts/capture-web-screenshots.sh'
+      - 'tests/screenshots/**'
   pull_request:
     paths:
       - '.github/workflows/screenshots.yml'
       - 'apps/mobile/**'
-      - 'packages/**'
+      - 'apps/web/**'
       - 'scripts/capture-web-screenshots.sh'
       - 'tests/screenshots/**'
 permissions:
   contents: read
 concurrency:
-  group: screenshots-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: screenshots-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 env:
   MAESTRO_VERSION: 1.41.0
   MAESTRO_SHA256: 0b87a2eed8c1594fe572c5f29d6d64af389f4b7231ddde714179bbcb05f0fe0c
   MAESTRO_CLI_NO_ANALYTICS: '1'
   MAESTRO_CLI_ANALYSIS_NOTIFICATION_DISABLED: 'true'
 jobs:
+  scope:
+    name: Select captures
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      web: ${{ steps.scope.outputs.web }}
+      native: ${{ steps.scope.outputs.native }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - id: scope
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: bash tests/screenshots/scope.sh "$BASE" >> "$GITHUB_OUTPUT"
+
   web:
     name: Web (Playwright Chromium)
+    needs: scope
+    if: needs.scope.outputs.web == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -35,7 +66,7 @@ jobs:
         with:
           node-version: '22'
       - run: sudo apt-get update -q && sudo apt-get install -yq pngquant
-      - run: pnpm install --no-frozen-lockfile
+      - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
       - run: bash scripts/capture-web-screenshots.sh
         env:
@@ -48,7 +79,8 @@ jobs:
 
   ios:
     name: iOS simulator
-    runs-on: macos-15
+    if: github.event_name != 'pull_request'
+    runs-on: ${{ ((vars.RUNNER_MODE == 'hosted' && vars.IOS_RUNNER != 'self-hosted') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository)) && 'macos-15' || fromJSON('["self-hosted","macOS","mac-ios"]') }}
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
@@ -61,16 +93,23 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: pnpm install --no-frozen-lockfile
-      - name: Pick and boot an iPhone simulator
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Create and boot a dedicated iPhone simulator
         id: sim
         run: |
-          udid="$(xcrun simctl list devices available -j | node -e "
-            const d=JSON.parse(require('fs').readFileSync(0)).devices;
-            const ver=r=>r.split('iOS-')[1].split('-').map(Number);
-            const ios=Object.keys(d).filter(r=>r.includes('iOS-')).sort((a,b)=>{const x=ver(a),y=ver(b);return (y[0]-x[0])||((y[1]||0)-(x[1]||0))});
-            for(const r of ios){const x=d[r].find(x=>/^iPhone 16( |$)/.test(x.name))||d[r].find(x=>x.name.startsWith('iPhone'));if(x){console.log(x.udid);break}}")"
-          test -n "$udid"
+          read -r runtime devtype < <(xcrun simctl list runtimes available -j | node -e "
+            const r=JSON.parse(require('fs').readFileSync(0)).runtimes.filter(x=>x.platform==='iOS');
+            r.sort((a,b)=>b.version.localeCompare(a.version,undefined,{numeric:true}));
+            const rt=r[0];if(!rt)process.exit(1);
+            const types=(rt.supportedDeviceTypes||[]).filter(t=>t.productFamily==='iPhone');
+            const t=types.find(t=>t.name==='iPhone 16 Pro')||types[types.length-1];
+            console.log(rt.identifier,t?t.identifier:'com.apple.CoreSimulator.SimDeviceType.iPhone-16-Pro')")
+          test -n "$runtime"
+          udid="$(xcrun simctl create "tazumo-screenshots-$GITHUB_RUN_ID" "$devtype" "$runtime")"
           xcrun simctl boot "$udid"
           echo "udid=$udid" >> "$GITHUB_OUTPUT"
       - run: pnpm --filter @tazumo/mobile exec expo prebuild --platform ios --non-interactive --no-install
@@ -82,7 +121,7 @@ jobs:
       - name: Install Maestro and pngquant
         run: |
           bash tests/screenshots/native/install-maestro.sh
-          HOMEBREW_NO_AUTO_UPDATE=1 brew install pngquant
+          command -v pngquant >/dev/null || HOMEBREW_NO_AUTO_UPDATE=1 brew install pngquant
       - name: Capture
         run: bash tests/screenshots/native/ios.sh "$RUNNER_TEMP/tazumo-ios/Build/Products/Release-iphonesimulator/Tazumo.app" "${{ steps.sim.outputs.udid }}" screenshots/ios
       - uses: actions/upload-artifact@v4
@@ -96,9 +135,16 @@ jobs:
           name: tazumo-maestro-logs-ios
           path: ~/.maestro/tests/
           retention-days: 7
+      - name: Delete the dedicated simulator
+        if: always() && steps.sim.outputs.udid != ''
+        run: |
+          xcrun simctl shutdown "${{ steps.sim.outputs.udid }}" || true
+          xcrun simctl delete "${{ steps.sim.outputs.udid }}"
 
   android:
     name: Android emulator
+    needs: scope
+    if: needs.scope.outputs.native == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
@@ -116,7 +162,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - run: pnpm install --no-frozen-lockfile
+      - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @tazumo/mobile exec expo prebuild --platform android --non-interactive --no-install
       - name: Assemble release-variant APK (debug keystore, x86_64)
         working-directory: apps/mobile/android

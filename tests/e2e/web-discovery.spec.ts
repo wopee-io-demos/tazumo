@@ -133,6 +133,8 @@ test('keyboard navigation, landmarks and visible focus on discovery routes',asyn
   await page.keyboard.press('Enter');
   await expect(page.getByRole('heading',{level:1,name:'Green Table'})).toBeFocused();
   await page.keyboard.press('Tab');
+  await expect(page.getByTestId('sut-favourite-green-table')).toBeFocused();
+  await page.keyboard.press('Tab');
   await expect(page.getByTestId('sut-product-link-bowl')).toBeFocused();
   await page.keyboard.press('Tab');
   await expect(page.getByRole('button',{name:'Add Seasonal veggie bowl'})).toBeFocused();

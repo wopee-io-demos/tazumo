@@ -34,7 +34,7 @@ const sutPaths='apps/web packages package.json pnpm-workspace.yaml';
     sutCommit:sh(`git log -1 --format=%H -- ${sutPaths}`),
     captureCommit:sh('git rev-parse HEAD'),
     worktreeDirty:sh(`git status --porcelain -- ${sutPaths} tests/screenshots scripts/capture-web-screenshots.sh`)!=='',
-    fixtureData:'packages/core/src/index.ts products (synthetic, illustrative)',
+    fixtureData:'packages/core products and merchants (synthetic, illustrative)',
     captureCommand:'bash scripts/capture-web-screenshots.sh',
     server:'vite preview of the production build (pnpm build)',
     browser:`Chromium ${browser.version()}`,

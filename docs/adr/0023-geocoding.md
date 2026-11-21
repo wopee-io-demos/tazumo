@@ -1,7 +1,7 @@
 # ADR-0023: Geocoding provider for delivery addresses
 
-Status: **Proposed.** The recommendation needs a host and running cost, so the decision belongs to the repository owner.
-Date: 2026-11-20
+Status: **Accepted** on 2026-11-21, decided by the repository owner (recorded on issue #94): self-hosted Nominatim on an EU-owned host with a SK+CZ+DE+AT extract. HERE remains the documented fallback only.
+Date: 2026-11-20 (proposed), 2026-11-21 (accepted)
 Tracking: issue #94, `@tazumo/address`, ADR-0019 (merchant delivery zones, PR #76)
 
 ## Context
@@ -38,7 +38,7 @@ Two more options from issue #94:
 - **Postal-code centroid table.** A static table of postal-code centroids (for example derived from OSM boundaries or a national open-data set) with no external calls at all. Free, private and offline, but a centroid can be several kilometres from the door, so addresses near a zone edge would be judged wrongly, and DE/AT postal areas vary a lot in size. Useful as a fallback when a geocoder returns `not_found`, not as the primary answer.
 - **No geocoding.** Merchants declare the postal codes they serve and eligibility becomes a set lookup. Simplest and fully private, but it discards the radius semantics of ADR-0019 and `checkDelivery`, which would have to be redesigned.
 
-## Recommendation
+## Decision
 
 **Self-hosted Nominatim on an EU-owned host, with a SK+CZ+DE+AT OpenStreetMap extract, behind the `Geocoder` port.**
 
@@ -49,7 +49,7 @@ Two more options from issue #94:
 
 Photon alone would cover search-as-you-type, but its strength is free-text prefix search; our validated input is structured, and Nominatim's structured query matches it directly. If slice 2 needs autocomplete, Photon can be imported from the same Nominatim database as a second, smaller service; that is a separate decision. OSM house-number coverage in SK must be measured in the spike: if it is too thin, that argues for HERE. If the owner prefers no operations work, the fallback is **HERE** (EU company, the lowest price, 30k free lookups per month), accepting a DPA review and a cache limited to 30 days. Mapbox and Google are not recommended: US processing with no EU option, Mapbox forbids caching its free-tier results, and Google's 30-day caching limit plus its price make every repeat lookup a paid transfer of the address. Public Nominatim is ruled out by its own usage policy.
 
-**Owner decision needed:** a host and its monthly cost (a VM sized for the four-country import, plus backups), or a HERE account. Until then, the demo and CI use `FixtureGeocoder`, which resolves only fictional fixture addresses and returns `not_found` for everything else.
+**Implementation:** `NominatimGeocoder` in `@tazumo/address` is the adapter; `infra/geocoding/` holds the pinned compose file, the extract script and the sizing. Provisioning the host is a separate owner action, tracked in #146. Until it exists, the demo and CI use `FixtureGeocoder`, which resolves only fictional fixture addresses and returns `not_found` for everything else.
 
 ## Consequences
 
