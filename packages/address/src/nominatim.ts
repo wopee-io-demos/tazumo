@@ -107,7 +107,7 @@ async function readLimited(response: Response, limit: number): Promise<string | 
   return new TextDecoder().decode(bytes);
 }
 
-/** `Geocoder` adapter for a self-hosted Nominatim (ADR-0023). Never point it at the public nominatim.openstreetmap.org. */
+/** Server-side `Geocoder` adapter for a self-hosted Nominatim (ADR-0023), imported from `@tazumo/address/nominatim`. Refuses any openstreetmap.org host. */
 export class NominatimGeocoder implements Geocoder {
   readonly #baseUrl: URL;
   readonly #timeoutMs: number;
@@ -118,7 +118,8 @@ export class NominatimGeocoder implements Geocoder {
 
   constructor(options: NominatimOptions) {
     this.#baseUrl = parseBaseUrl(options.baseUrl);
-    if (this.#baseUrl.hostname === 'nominatim.openstreetmap.org') throw new TypeError('The public Nominatim usage policy forbids this use; configure a self-hosted instance');
+    const host = this.#baseUrl.hostname.replace(/\.$/, '').toLowerCase();
+    if (host === 'openstreetmap.org' || host.endsWith('.openstreetmap.org')) throw new TypeError('The public Nominatim usage policy forbids this use; configure a self-hosted instance');
     const timeoutMs = options.timeoutMs ?? nominatimDefaultTimeoutMs;
     if (!Number.isInteger(timeoutMs) || timeoutMs < 100 || timeoutMs > 10_000) throw new RangeError('timeoutMs must be an integer between 100 and 10000');
     this.#timeoutMs = timeoutMs;
@@ -131,14 +132,18 @@ export class NominatimGeocoder implements Geocoder {
   async geocode(address: DeliveryAddress): Promise<GeocodeResult> {
     const started = this.#now();
     const outcome = isAddressMarket(address.countryCode) ? await this.#request(address) : notFound('unsupported_country');
-    this.#log?.({
-      event: 'geocode',
-      outcome: outcome.result.status,
-      ...(outcome.reason && { reason: outcome.reason }),
-      ...(outcome.httpStatus !== undefined && { httpStatus: outcome.httpStatus }),
-      address: redactAddress(address),
-      durationMs: this.#now() - started,
-    });
+    try {
+      this.#log?.({
+        event: 'geocode',
+        outcome: outcome.result.status,
+        ...(outcome.reason && { reason: outcome.reason }),
+        ...(outcome.httpStatus !== undefined && { httpStatus: outcome.httpStatus }),
+        address: redactAddress(address),
+        durationMs: this.#now() - started,
+      });
+    } catch {
+      // A failing log sink must not change the geocoding result.
+    }
     return outcome.result;
   }
 

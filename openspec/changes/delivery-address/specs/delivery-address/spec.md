@@ -39,7 +39,7 @@ The system SHALL provide a log form of an address that contains only the country
 - THEN no output contains the street, the house number, the city or the instructions, and the output does not change when those fields change.
 
 ### Requirement: Self-hosted Nominatim adapter
-The system SHALL provide a `NominatimGeocoder` for a configured self-hosted base URL (ADR-0023) that sends one structured search per address with only street, city, postal code and the address's own market as `countrycodes`, `format=jsonv2` and `limit=1`, under a strict timeout and a generic User-Agent without personal data. It SHALL refuse the public `nominatim.openstreetmap.org`, base URLs with credentials, a query or a fragment, and non-http schemes.
+The system SHALL provide a `NominatimGeocoder` for a configured self-hosted base URL (ADR-0023) that sends one structured search per address with only street, city, postal code and the address's own market as `countrycodes`, `format=jsonv2`, `addressdetails=1` (for the returned country check) and `limit=1`, under a strict timeout and a generic User-Agent without personal data. It SHALL refuse any `openstreetmap.org` host (public Nominatim), base URLs with credentials, a query or a fragment, and non-http schemes.
 
 #### Scenario: Recorded answers
 - WHEN the instance answers with a house-level, street-level or postcode-level result for the requested country
@@ -55,4 +55,4 @@ The system SHALL provide a `NominatimGeocoder` for a configured self-hosted base
 
 #### Scenario: Logging
 - WHEN the adapter reports an outcome to its log hook
-- THEN the entry holds only the outcome, a reason, the HTTP status, the duration and `redactAddress` output.
+- THEN the entry holds only the outcome, a reason, the HTTP status, the duration and `redactAddress` output, and a failing log sink does not change the result.

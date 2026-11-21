@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { distanceMeters, NominatimGeocoder, resolveAddressDelivery } from '../src/index.ts';
+import { distanceMeters, resolveAddressDelivery } from '../src/index.ts';
+import { NominatimGeocoder } from '../src/nominatim.ts';
 
 const baseUrl = process.env.NOMINATIM_URL;
 const skip = !baseUrl && 'NOMINATIM_URL is not set (self-hosted instance with the Bremen extract, see infra/geocoding)';

@@ -3,7 +3,8 @@ import { readFileSync } from 'node:fs';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import test, { after, before } from 'node:test';
-import { NominatimGeocoder, nominatimSearchUrl, nominatimUserAgent, type DeliveryAddress, type NominatimLogEntry } from './index.ts';
+import type { DeliveryAddress } from './index.ts';
+import { NominatimGeocoder, nominatimSearchUrl, nominatimUserAgent, type NominatimLogEntry } from './nominatim.ts';
 
 type Recording = { recordedFrom: string; query: Record<string, string>; status: number; body: unknown };
 const recording = (name: string): Recording => JSON.parse(readFileSync(new URL(`./recorded/nominatim/${name}.json`, import.meta.url), 'utf8'));
@@ -25,7 +26,9 @@ const requests: { url: URL; headers: IncomingMessage['headers'] }[] = [];
 let route: Route = (_req, res) => res.writeHead(500).end();
 let baseUrl = '';
 const server = createServer((req, res) => {
-  requests.push({ url: new URL(req.url ?? '/', 'http://localhost'), headers: req.headers });
+  const url = new URL(req.url ?? '/', 'http://localhost');
+  if (url.pathname === '/elsewhere/search') return replay(house)(req, res);
+  requests.push({ url, headers: req.headers });
   route(req, res);
 });
 
@@ -41,9 +44,9 @@ after(() => {
 const json = (status: number, body: unknown): Route => (_req, res) => res.writeHead(status, { 'content-type': 'application/json; charset=utf-8' }).end(JSON.stringify(body));
 const replay = (r: Recording) => json(r.status, r.body);
 
-function geocoder(log?: NominatimLogEntry[]) {
+function geocoder(log?: NominatimLogEntry[], timeoutMs = 2_000) {
   requests.length = 0;
-  return new NominatimGeocoder({ baseUrl, timeoutMs: 300, log: log && ((entry) => log.push(entry)) });
+  return new NominatimGeocoder({ baseUrl, timeoutMs, now: () => 0, log: log && ((entry) => log.push(entry)) });
 }
 
 test('a recorded house-level answer maps to found with address precision', async () => {
@@ -98,13 +101,16 @@ test('provider failures are unavailable, never not_found', async () => {
     ['bad coordinates', json(200, [{ ...hit, lat: '95.0' }])],
     ['numeric coordinates', json(200, [{ ...hit, lat: 53.07, lon: 8.8 }])],
     ['oversized', json(200, [{ ...hit, padding: 'x'.repeat(70_000) }])],
-    ['redirect', (_q, res) => res.writeHead(302, { location: 'https://example.org/search' }).end()],
-    ['timeout', () => undefined],
+    ['redirect to a working endpoint', (req, res) => res.writeHead(302, { location: `${baseUrl.replace('/nominatim', '/elsewhere')}/search?${req.url?.split('?')[1]}` }).end()],
+    ['no response', () => undefined],
+    ['body stalls after the headers', (_q, res) => res.writeHead(200, { 'content-type': 'application/json' }).write('[')],
     ['reset', (req) => req.socket.destroy()],
   ];
   for (const [name, handler] of cases) {
     route = handler;
-    assert.deepEqual(await geocoder().geocode(addressOf(house)), { status: 'unavailable' }, name);
+    const log: NominatimLogEntry[] = [];
+    assert.deepEqual(await geocoder(log, 300).geocode(addressOf(house)), { status: 'unavailable' }, name);
+    if (name === 'body stalls after the headers' || name === 'no response') assert.equal(log[0].reason, 'timeout', name);
   }
   const offline = new NominatimGeocoder({ baseUrl: 'http://127.0.0.1:9/', timeoutMs: 300 });
   assert.deepEqual(await offline.geocode(addressOf(house)), { status: 'unavailable' });
@@ -129,6 +135,7 @@ test('log entries carry only the redacted address and the outcome', async () => 
     ['unavailable', 'http_status', 503],
     ['not_found', 'unsupported_country', undefined],
   ]);
+  assert.ok(log.every((entry) => entry.durationMs === 0));
   const text = JSON.stringify(log);
   for (const secret of [house.query.street, house.query.city, house.query.street.match(/\d+/)?.[0] ?? '']) {
     assert.ok(!text.includes(secret), secret);
@@ -136,8 +143,14 @@ test('log entries carry only the redacted address and the outcome', async () => 
   assert.equal(log[0].address, `DE ${house.query.postalcode.slice(0, 2)}***`);
 });
 
+test('a throwing log sink does not change the result', async () => {
+  route = replay(house);
+  const g = new NominatimGeocoder({ baseUrl, log: () => { throw new Error('sink down'); } });
+  assert.equal((await g.geocode(addressOf(house))).status, 'found');
+});
+
 test('invalid configuration is rejected', () => {
-  for (const url of ['ftp://geo.internal/', 'https://user:pw@geo.internal/', 'https://geo.internal/?key=1', 'https://geo.internal/#x', 'geo.internal', 'https://nominatim.openstreetmap.org/']) {
+  for (const url of ['ftp://geo.internal/', 'https://user:pw@geo.internal/', 'https://geo.internal/?key=1', 'https://geo.internal/#x', 'geo.internal', 'https://nominatim.openstreetmap.org/', 'https://nominatim.openstreetmap.org./', 'https://NOMINATIM.openstreetmap.org/']) {
     assert.throws(() => new NominatimGeocoder({ baseUrl: url }), TypeError, url);
   }
   for (const timeoutMs of [0, 50, 10_001, 1.5]) assert.throws(() => new NominatimGeocoder({ baseUrl: 'https://geo.internal/', timeoutMs }), RangeError);

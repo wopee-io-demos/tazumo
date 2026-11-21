@@ -7,7 +7,9 @@ on:
     paths:
       - '.github/workflows/geocoding-integration.yml'
       - 'infra/geocoding/**'
-      - 'packages/address/**'
+      - 'packages/address/src/nominatim.ts'
+      - 'packages/address/src/recorded/**'
+      - 'packages/address/integration/**'
 permissions:
   contents: read
 concurrency:
@@ -29,6 +31,7 @@ jobs:
       NOMINATIM_PG_SHARED_BUFFERS: 1GB
       NOMINATIM_PG_MAINTENANCE_WORK_MEM: 2GB
       NOMINATIM_PG_EFFECTIVE_CACHE_SIZE: 4GB
+      NOMINATIM_RESTART: 'no'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -40,7 +43,7 @@ jobs:
         with:
           path: geo-data/extracts
           key: geofabrik-bremen-${{ steps.week.outputs.iso }}
-      - run: REGIONS=europe/germany/bremen bash infra/geocoding/prepare-extract.sh
+      - run: REGIONS=europe/germany/bremen KEEP_EXISTING=1 bash infra/geocoding/prepare-extract.sh
       - run: docker compose -f infra/geocoding/compose.yaml up -d
       - name: Wait for the import
         run: |
@@ -57,6 +60,8 @@ jobs:
       - name: Search parameters never reach the container log
         run: |
           docker compose -f infra/geocoding/compose.yaml logs > nominatim.log 2>&1
+          grep -q 'Nominatim is ready to accept requests' nominatim.log
           if grep -nE 'Am(%20|\+| )Markt|Erfundene' nominatim.log; then exit 1; fi
+          docker compose -f infra/geocoding/compose.yaml exec -T nominatim sh -c '! grep -rlE "Am Markt|Erfundene" /var/log'
       - if: always()
         run: docker compose -f infra/geocoding/compose.yaml down -v
