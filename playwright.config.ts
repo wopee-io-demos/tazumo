@@ -16,6 +16,7 @@ export default defineConfig({
     command:`pnpm --filter @tazumo/web dev --host 127.0.0.1 --port ${port} --strictPort`,
     url:baseURL,
     reuseExistingServer:!process.env.CI,
+    env:{VITE_OIDC_ISSUER:'',VITE_OIDC_CLIENT_ID:''},
     timeout:90000
   }
 });

@@ -3,7 +3,7 @@
 This is the durable onboarding entry point for a new agent, maintainer or a resumed conversation. **Read live GitHub status, not an older chat transcript or cached checklist.**
 
 ## Project purpose
-Canonical SUT, a React/Vite web app plus Expo iOS/Android app in a pnpm TypeScript monorepo. Shared @tazumo/core catalogue/cart data and @tazumo/brand tokens. Source of truth for SUT identifiers and fixture version is contracts/sut.json in PR #33 until merged. Draft PR #30 publishes org testing artifacts. Screenshot work is Issue #37. Never claim checkout, payments, merchants, real tracking or native device screenshots are live without evidence.
+Canonical SUT, a React/Vite web app plus Expo iOS/Android app in a pnpm TypeScript monorepo. Shared @tazumo/core catalogue/cart data and @tazumo/brand tokens. Source of truth for SUT identifiers and fixture version is [contracts/sut.json](../contracts/sut.json), described in [SUT-CONTRACT](SUT-CONTRACT.md). Draft PR #30 publishes org testing artifacts. Screenshot work is Issue #37. Never claim checkout, payments, merchants, real tracking or native device screenshots are live without evidence.
 
 ## Organization-wide onboarding
 

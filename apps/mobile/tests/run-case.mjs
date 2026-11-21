@@ -3,8 +3,9 @@
 // Mirrors mobile-agent skills/wopee-mobile-run/scripts/native.py (validation, step semantics, report.json shape) and
 // additionally saves a screenshot and UI tree after every step.
 // Usage: node run-case.mjs <case.json> <outDir> [--expect-fail]
-import {readFileSync,writeFileSync,mkdirSync} from 'node:fs';
+import {readFileSync,writeFileSync,mkdirSync,realpathSync} from 'node:fs';
 import {join} from 'node:path';
+import {fileURLToPath} from 'node:url';
 
 const ELEMENT='element-6066-11e4-a52e-4f735466cecf';
 const STRATEGIES=new Set(['id','accessibility id','class name','xpath']);
@@ -100,7 +101,25 @@ export async function execute(testCase,call,folder,{timeout=15000,firstTimeout=t
  return report;
 }
 
-if(import.meta.url===`file://${process.argv[1]}`){
+// Fail-closed check of a written report: the run must cover every case step, never zero.
+export function verdict(testCase,report,expectFail=false){
+ const steps=testCase?.platforms?.android?.steps?.length??0;
+ if(!report)return {ok:false,reason:'report.json missing or unreadable'};
+ if(!testCase?.id)return {ok:false,reason:'case has no id'};
+ if(report.case!==testCase.id)return {ok:false,reason:`report is for case ${report.case}, expected ${testCase.id}`};
+ if(steps===0)return {ok:false,reason:'case has no android steps'};
+ const entries=Array.isArray(report.steps)?report.steps:[];
+ if(entries.some((s,i)=>s.index!==i+1))return {ok:false,reason:'report steps are out of order'};
+ const done=entries.filter(s=>s.outcome==='completed').length;
+ if(expectFail)return report.outcome==='failed'&&report.currentStep===steps&&done===steps-1
+  ?{ok:true,reason:'expectation failed on the last step as required'}
+  :{ok:false,reason:`negative case did not fail on its last step (outcome ${report.outcome}, step ${report.currentStep}/${steps}, completed ${done})`};
+ return report.outcome==='passed'&&done===steps
+  ?{ok:true,reason:`all ${steps} steps completed`}
+  :{ok:false,reason:`outcome ${report.outcome}, completed ${done} of ${steps} steps`};
+}
+
+if(process.argv[1]&&realpathSync(fileURLToPath(import.meta.url))===realpathSync(process.argv[1])){
  const args=process.argv.slice(2),[casePath,outDir]=args.filter(a=>!a.startsWith('--')),expectFail=args.includes('--expect-fail');
  if(!casePath||!outDir){console.error('usage: run-case.mjs <case.json> <outDir> [--expect-fail]');process.exit(2)}
  const testCase=JSON.parse(readFileSync(casePath,'utf8'));
@@ -111,12 +130,12 @@ if(import.meta.url===`file://${process.argv[1]}`){
   settings:{disableIdLocatorAutocompletion:true},
   extra:{'appium:appActivity':'.MainActivity','appium:forceAppLaunch':true,'appium:autoGrantPermissions':true,'appium:newCommandTimeout':300,'appium:uiautomator2ServerLaunchTimeout':120000,'appium:uiautomator2ServerInstallTimeout':120000,'appium:adbExecTimeout':120000}
  });
- console.log(`${report.outcome} ${join(outDir,'report.json')}${report.error?` :: ${report.error}`:''}`);
- if(expectFail){
-  const steps=testCase.platforms.android.steps.length;
-  const ok=report.outcome==='failed'&&report.currentStep===steps&&report.steps.length===steps-1;
-  console.log(ok?'negative check: expectation failed on the last step as required':'negative check: did not fail as required');
-  process.exit(ok?0:1);
+ const result=verdict(testCase,report,expectFail);
+ if(!expectFail&&report.outcome==='passed'&&!result.ok){
+  Object.assign(report,{outcome:'infrastructure-failed',error:result.reason});
+  writeFileSync(join(outDir,'report.json'),JSON.stringify(report,null,2)+'\n');
  }
- process.exit(report.outcome==='passed'?0:1);
+ console.log(`${report.outcome} ${join(outDir,'report.json')}${report.error?` :: ${report.error}`:''}`);
+ console.log(`${expectFail?'negative check':'verdict'}: ${result.reason}`);
+ process.exit(result.ok?0:1);
 }

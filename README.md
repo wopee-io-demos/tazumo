@@ -2,6 +2,8 @@
 
 Europe-first, multi-category delivery marketplace. **Working three-platform prototype, not a live ordering service.**
 
+**Web preview:** https://wopee-io-demos.github.io/tazumo/ (synthetic demo data, no real orders, payments or delivery). Deployed from `main` by [`pages.yml`](.github/workflows/pages.yml), which smoke-tests the live URL after every deploy.
+
 ## Packages
 - `apps/web`: React/Vite responsive marketplace with Playwright-tested category, search, cart and palette changes.
 - `apps/mobile`: Expo React Native iOS/Android app. Both debug Android APK and iOS Simulator .app compile.
@@ -29,7 +31,7 @@ pnpm test:e2e
 - [Web tests + builds](https://github.com/wopee-io-demos/tazumo/actions/runs/44767554583), green.
 - [Android debug APK and iOS Simulator app](https://github.com/wopee-io-demos/tazumo/actions/runs/44767543758), green. Development artifacts expire November 27, 2026.
 
-Not verified: native device launch, signed distribution, web deployment. No accounts, real merchant inventory, payments, courier tracking, or production checkout. Catalogue/prices are illustrative. Trademark, domain and mascot rights not cleared.
+Not verified: native device launch, signed distribution. No accounts, real merchant inventory, payments, courier tracking, or production checkout. Catalogue/prices are illustrative. Trademark, domain and mascot rights not cleared.
 
 ## Screenshots
 

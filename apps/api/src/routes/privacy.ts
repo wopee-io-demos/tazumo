@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type pg from 'pg';
+import { rateLimitTier } from '../rate-limit.ts';
 import { can } from '../auth/policy.ts';
 import type { Pseudonymizer } from '../auth/pseudonym.ts';
 import { routeSchema, toFastifyPath } from '../contract.ts';
@@ -51,7 +52,7 @@ function send(request: FastifyRequest, reply: FastifyReply, outcome: ErasureOutc
 export async function privacyRoutes(app: FastifyInstance, options: PrivacyOptions) {
   const { pool } = options;
 
-  app.post('/v1/me/erasure', { schema: routeSchema('post', '/v1/me/erasure') }, async (request, reply) => {
+  app.post('/v1/me/erasure', { schema: routeSchema('post', '/v1/me/erasure'), config: { rateLimit: rateLimitTier.authenticated } }, async (request, reply) => {
     const principal = request.principal!;
     const outcome = await eraseUser(options, {
       targetId: principal.userId,
@@ -63,7 +64,7 @@ export async function privacyRoutes(app: FastifyInstance, options: PrivacyOption
   });
 
   const adminPath = '/v1/admin/users/{userId}/erasure';
-  app.post<{ Params: { userId: string } }>(toFastifyPath(adminPath), { schema: routeSchema('post', adminPath) }, async (request, reply) => {
+  app.post<{ Params: { userId: string } }>(toFastifyPath(adminPath), { schema: routeSchema('post', adminPath), config: { rateLimit: rateLimitTier.authenticated } }, async (request, reply) => {
     const principal = request.principal!;
     const decision = can(principal, 'user:erase', { type: 'user', id: request.params.userId });
     if (!decision.allowed) {
@@ -82,7 +83,7 @@ export async function privacyRoutes(app: FastifyInstance, options: PrivacyOption
     return send(request, reply, outcome);
   });
 
-  app.get('/v1/me/export', { schema: routeSchema('get', '/v1/me/export') }, async (request) => {
+  app.get('/v1/me/export', { schema: routeSchema('get', '/v1/me/export'), config: { rateLimit: rateLimitTier.authenticated } }, async (request) => {
     const userId = request.principal!.userId;
     const client = await pool.connect();
     try {
