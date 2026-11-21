@@ -18,7 +18,7 @@ This is a proposed dependency remediation. CI audit, JS bundles and native build
 - **Secret-scan ranges:** a PR scans its commit range (`base..head`), a push to `main` scans the pushed range, and the weekly run scans the full history. Logs are redacted and nothing is uploaded.
 - **Dependabot (`.github/dependabot.yml`):**
   - npm is checked weekly with a 5-day cooldown and at most 5 PRs. Updates are grouped as `expo-sdk`, `npm-minor-and-patch` and `npm-security`, one PR per group per run across the workspace directories.
-  - Major version updates are not proposed automatically, for npm or github-actions. Each major is a deliberate PR with a changelog review and green CI (ADR-0020, 2026-11-21 update).
+  - Major version updates are not proposed automatically, for npm or github-actions. Each major is a deliberate PR with a changelog review and green CI (ADR-0020, 2026-11-21 update). `@types/node` stays on the runtime major (22) until the Node runtime moves.
   - Expo, React and React Native majors and minors are left to the Expo SDK upgrade (#14).
   - github-actions is checked weekly as one group, at most 3 PRs. SHA pins are updated with their version comments.
   - With the committed `pnpm-lock.yaml` (#14), Dependabot updates the lockfile together with the manifests and can raise transitive security fixes. `pnpm audit` and `pnpm.overrides` remain the backstop.

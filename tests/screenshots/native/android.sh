@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Runs inside android-emulator-runner: installs the release-variant APK and captures catalogue and cart.
+# Runs inside android-emulator-runner: installs the release-variant APK and captures catalogue, product screen, inline basket and cart screen.
 # Usage: android.sh <path/to/app.apk> <out-dir>
 set -euo pipefail
 apk="$1" out="$2"
@@ -27,11 +27,14 @@ capture(){
   adb shell am force-stop io.wopee.demos.tazumo
   adb shell monkey -p io.wopee.demos.tazumo -c android.intent.category.LAUNCHER 1 >/dev/null
   flow wait-catalogue && shoot catalogue &&
-  flow fill-cart && shoot cart
+  flow product-detail && shoot product &&
+  flow back-to-catalogue &&
+  flow fill-cart && shoot cart &&
+  flow cart-screen && shoot cart-screen
 }
 capture || { echo "Capture attempt 1 failed; relaunching the app for one retry" >&2; rm -f "$out"/*.png; capture; }
 bash "$here/optimise.sh" "$out"
 device="$(adb shell getprop ro.product.model | tr -d '\r') emulator"
 os="Android $(adb shell getprop ro.build.version.release | tr -d '\r') (API $(adb shell getprop ro.build.version.sdk | tr -d '\r'))"
-bash "$here/provenance.sh" "$out/provenance.json" android "$device" "$os" "release-variant APK (JS bundle embedded) signed with the debug keystore, x86_64"
+bash "$here/provenance.sh" "$out/provenance.json" android "$device" "$os" "JDK $(java -version 2>&1 | head -1 | cut -d\" -f2), Gradle wrapper, emulator image google_apis x86_64" "release-variant APK (JS bundle embedded) signed with the debug keystore, x86_64"
 ls -l "$out"

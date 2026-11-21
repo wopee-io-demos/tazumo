@@ -1,6 +1,6 @@
 # ADR-0027: Customer sign-in on web and native clients
 
-Status: Accepted (web in slice 1; the native part is confirmed with slice 2)
+Status: Accepted
 Date: 2026-11-21
 Tracking: issue [#88](https://github.com/wopee-io-demos/tazumo/issues/88), OpenSpec `client-sign-in`, builds on ADR-0016 (API token verification) and ADR-0017 (Keycloak)
 
@@ -26,13 +26,13 @@ Constraints:
 
 `oauth4webapi` keeps the storage rule explicit and adds the checks the hand-written back-office flow lacks. `oidc-client-ts` would work, but its defaults put the user (tokens included) in `sessionStorage`, its silent renew depends on third-party cookies for iframes, and most of its surface would be unused.
 
-## Options for the native client (slice 2)
+## Options for the native client
 
-- **`expo-auth-session` (chosen):** Expo's maintained OAuth helper. It opens the system browser (`ASWebAuthenticationSession` on iOS, Custom Tabs on Android), generates PKCE, reads discovery with `useAutoDiscovery(issuer)`, and works in Expo Go and dev builds. Tokens go to `expo-secure-store`.
+- **`expo-auth-session` (chosen):** Expo's maintained OAuth helper. It opens the system browser (`ASWebAuthenticationSession` on iOS, Custom Tabs on Android), generates PKCE, reads discovery with `fetchDiscoveryAsync(issuer)`, and works in Expo Go and dev builds. Tokens go to `expo-secure-store`.
 - **`react-native-app-auth`:** wraps AppAuth-iOS/Android, which is mature, but it needs a config plugin and native rebuilds and does not run in Expo Go.
 - **Embedded WebView:** rejected. RFC 8252 forbids it for OAuth, the app could read credentials, and passkeys and password managers break.
 
-The redirect is the app scheme `tazumo://auth/callback` plus the Expo development URLs already in the realm. Adding the scheme to `tazumo-native` means extending the realm lint on purpose, because it accepts only loopback URIs today.
+The redirect is the app scheme `tazumo://auth/callback` plus the Expo development URLs already in the realm. The realm lint allows that one exact URI, on `tazumo-native` only, as a redirect and post-logout URI. Any other path, a wildcard or the scheme on another client still fails.
 
 ## Decision
 
@@ -44,7 +44,11 @@ The redirect is the app scheme `tazumo://auth/callback` plus the Expo developmen
 6. **Storage:** `sessionStorage` holds only the sign-in transaction (`state`, `nonce`, PKCE verifier, return route) between the redirect and the callback, and the callback deletes it before using it. No access, refresh or ID token is ever written to browser storage.
 7. **Unconfigured builds:** without `VITE_OIDC_ISSUER` and `VITE_OIDC_CLIENT_ID` the control states that sign-in isn't available in this build. No discovery request is made, and callback parameters are ignored.
 8. **API calls** go to same-origin `/v1`. Vite's dev and preview servers proxy it to `TAZUMO_API_URL`. A deployed web app needs the same reverse proxy, or CORS on the API.
-9. **Native (slice 2):** `expo-auth-session` with the system browser, PKCE, discovery from the issuer, refresh with the refresh-token grant, and tokens in `expo-secure-store`.
+9. **Native:** `expo-auth-session` (`AuthRequest.promptAsync`) in the system browser, with PKCE `S256`, `state` (checked by the library), and `nonce`. The issuer, client ID, scope and API URL come from the bundle (`EXPO_PUBLIC_OIDC_ISSUER`, `EXPO_PUBLIC_OIDC_CLIENT_ID`, `EXPO_PUBLIC_OIDC_SCOPE`, `EXPO_PUBLIC_API_URL`). The app checks the discovery `issuer`, the callback `iss`, and the ID token's `iss`, `aud` and `nonce`. The app also checks the ID token's `exp`. The ID token comes straight from the token endpoint over TLS, so no signature check is done (OIDC Core 3.1.3.7); with the plain-http development issuer that argument does not hold, which is acceptable only for local development. The API verifies the access token itself. When the discovery document advertises `authorization_response_iss_parameter_supported`, the callback must carry `iss`.
+   - **Storage:** `expo-secure-store` (Keychain, Android Keystore) holds the refresh token and the ID token under separate keys, each below the 2048-byte limit. The ID token is kept for `id_token_hint`. The access token stays in memory.
+   - **Start-up:** the app restores the session with a refresh, then calls `/v1/me`. The stored tokens are deleted only when the provider refuses the refresh (an OAuth error response) or `/v1/me` answers 401. If the network is down or the API fails, the app shows that the account is unavailable and keeps the tokens for the next start. A scheduled refresh that hits a network error retries after 30 s.
+   - **Sign-out:** the app deletes the stored tokens, then opens the end-session URL in an auth session with `post_logout_redirect_uri` set to the app redirect. On iOS this auth session shows the system "wants to use … to sign in" prompt. If the user cancels it, the provider session survives, and the next sign-in completes through SSO as the same user.
+   - **Unconfigured builds:** they show the same "not available in this build" text as web.
 
 ## Consequences
 
@@ -53,5 +57,7 @@ The redirect is the app scheme `tazumo://auth/callback` plus the Expo developmen
 - Each reload or new tab starts signed out locally. This is the price of memory-only tokens. Revisit if customers find it disruptive (for example with a backend-for-frontend holding an HTTP-only session cookie).
 - The refresh token is as exposed to injected script as the access token. The content security policy and dependency audit are the defences; a backend-for-frontend would remove it from the browser altogether.
 - Slice 1 sends the bearer token only on `GET /v1/me`. The first other protected call (the account screens, #89) adds an authorised fetch to the same module, which ends the session on a 401.
+- iOS Keychain entries survive an uninstall, so a reinstalled app can restore the previous session. On Android, auto-backup is not yet excluded for secure-store data (the `expo-secure-store` config plugin's backup option). A restore onto a new device leaves entries that cannot be decrypted; the app then treats the session as ended.
+- Sign-in failures are not logged, to keep tokens and codes out of device logs. The notice on screen is the only signal.
 - `apps/backoffice` keeps its hand-written flow for now. Moving it to `oauth4webapi` would add the `iss` and nonce checks.
 - E2E runs against the real realm and API in `.github/workflows/idp.yml` (`tests/web-auth/`).

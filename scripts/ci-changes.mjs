@@ -20,7 +20,7 @@ export function classify(files,{event='pull_request',base='main'}={}){
     full,
     docs_only:code.length===0,
     code:code.length>0,
-    web:full||any(code,/^apps\/web\//,/^packages\//,/^tests\/e2e\//,/^contracts\//,/^playwright\.config\.ts$/),
+    web:full||any(code,/^apps\/web\//,/^packages\//,/^tests\/e2e\//,/^contracts\//,/^scripts\/build-info\.mjs$/,/^playwright\.config\.ts$/),
     mobile:full||any(code,/^apps\/mobile\//,/^packages\/(core|brand)\//),
     deps:full||any(code,/(^|\/)package\.json$/,/^pnpm-lock\.yaml$/,/^pnpm-workspace\.yaml$/,/^\.npmrc$/),
     guard:full||any(code,/^\.github\/workflows\//,/^scripts\/check-runner-guard\.mjs$/),

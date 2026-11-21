@@ -19,7 +19,7 @@
     "@tazumo/commerce": "workspace:*",
     "@tazumo/core": "workspace:*",
     "fastify": "5.12.8",
-    "jose": "6.2.15",
+    "jose": "6.2.17",
     "node-pg-migrate": "9.0.0",
     "pg": "8.23.1"
   },

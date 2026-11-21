@@ -1,0 +1,16 @@
+# Tasks
+
+- [x] Issue #159 filed (status:ready, acceptance criteria), claimed; #120 marked as absorbed.
+- [x] ADR-0028 and `docs/RELEASING.md`.
+- [x] release-please config, manifest (`0.1.0`), `CHANGELOG.md`, `release.yml` pinned to `45996ed1f6d02564a971a2fa1b5860e934307cf7` (v5.0.0). Config validates against the release-please v17.6.0 schema with Ajv. `node scripts/check-runner-guard.mjs`: 24 jobs verified. `actionlint` clean on `release.yml`, `pages.yml`, `ci.yml`.
+- [x] `pnpm check:openapi --base origin/main` passes; with the description edited and the version kept it fails with "changed but info.version is still 0.7.0-draft". Replayed over all 7 historical `contracts/openapi.json` commits: every one passes.
+- [x] Local: `pnpm typecheck && pnpm test && pnpm build` green (contract tests 37 pass, including 8 in `versioning.test.mts`); `PLAYWRIGHT_PORT=4520 pnpm test:e2e` 51 passed, including both `build-identity.spec.ts` tests; `pnpm bundle:mobile` green.
+- [x] API: `pnpm --filter @tazumo/api test` against a disposable postgres:16-alpine, 123 pass. Mutation: dropping `...build` from the 200 response fails the `/health` test.
+- [x] Expo config: `TAZUMO_BUILD_NUMBER=4217 expo config --type public` gives `ios.buildNumber` `4217` and `android.versionCode` `4217`; unset gives `1` and `1`; `abc` exits 1.
+- [x] Pages smoke against a local static server at `http://127.0.0.1:4521/tazumo/` (Pages base build): 4/4 pass; with `EXPECTED_COMMIT` set to another SHA the version test fails.
+- [x] Independent review on `9767da1` (no blockers): labels `autorelease: pending`/`autorelease: tagged` created up front (job keeps `contents` + `pull-requests` only); commit order changed to `TAZUMO_COMMIT` > this checkout's HEAD > `GITHUB_SHA` only in `wopee-io-demos/tazumo` (a consumer building a pinned checkout no longer reports its own SHA; tested with an enclosing repository and a foreign `GITHUB_REPOSITORY`); `native-builds.yml` sets `TAZUMO_BUILD_NUMBER: ${{ github.run_number }}`, checks `versionCode` after Android prebuild and treats `app.config.*` as native-relevant; extra-files test derives the app list from `apps/`; OpenAPI check keeps the change rule for a non-semver base and compares integers with BigInt; docs: `Release-As` via the squash message, PR titles not linted yet, `/health` fields informal, PR builds report the merge commit.
+- [x] Re-review on `e2ac206`: no code findings; RELEASING squash-title line corrected in `d5330b7`. The "Allow GitHub Actions to create and approve pull requests" setting is the owner's decision, so `release.yml` runs only when the repository variable `RELEASE_PLEASE` is `enabled` (skipped, not red, until then); both owner commands are in `docs/RELEASING.md`.
+- [ ] Current-head CI on the PR.
+- [x] `v0.1.0` GitHub Release on `c7514b0`; labels `autorelease: pending` and `autorelease: tagged` created.
+- [ ] After merge: Pages live smoke checks the deployed `version.json`; native build on `main` passes the `versionCode` check.
+- [ ] After the owner enables releases: first `release.yml` run opens `chore(main): release 0.2.0`.
