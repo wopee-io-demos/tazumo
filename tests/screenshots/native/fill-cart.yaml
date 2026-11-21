@@ -1,0 +1,26 @@
+appId: io.wopee.demos.tazumo
+---
+- scrollUntilVisible:
+    element: "Add Margherita pizza"
+    direction: DOWN
+- tapOn: "Add Margherita pizza"
+- tapOn: "Add Margherita pizza"
+- scrollUntilVisible:
+    element: "Add Sourdough loaf"
+    direction: DOWN
+- tapOn: "Add Sourdough loaf"
+- scrollUntilVisible:
+    element: "Add Fresh flowers"
+    direction: DOWN
+- tapOn: "Add Fresh flowers"
+- scrollUntilVisible:
+    element: "Cart, 4"
+    direction: UP
+- tapOn: "Cart, 4"
+- scrollUntilVisible:
+    element: "Subtotal €46.20"
+    direction: DOWN
+    centerElement: true
+- assertVisible: "Your basket"
+- assertVisible: "Margherita pizza × 2"
+- waitForAnimationToEnd
