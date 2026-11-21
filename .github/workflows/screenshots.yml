@@ -80,7 +80,7 @@ jobs:
   ios:
     name: iOS simulator
     if: github.event_name != 'pull_request'
-    runs-on: ${{ (vars.RUNNER_MODE == 'hosted' && vars.IOS_RUNNER != 'self-hosted') && 'macos-15' || fromJSON('["self-hosted","macOS","mac-ios"]') }}
+    runs-on: ${{ ((vars.RUNNER_MODE == 'hosted' && vars.IOS_RUNNER != 'self-hosted') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository)) && 'macos-15' || fromJSON('["self-hosted","macOS","mac-ios"]') }}
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
