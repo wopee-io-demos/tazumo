@@ -16,6 +16,7 @@
     "db:forget-erased": "node --experimental-strip-types src/maintenance.ts"
   },
   "dependencies": {
+    "@tazumo/commerce": "workspace:*",
     "@tazumo/core": "workspace:*",
     "fastify": "5.12.8",
     "jose": "6.2.15",

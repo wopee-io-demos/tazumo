@@ -4,6 +4,7 @@ type JsonSchema = Record<string, unknown>;
 type Parameter = { name: string; in: 'query' | 'path' | 'header'; required?: boolean; schema: JsonSchema };
 type Operation = {
   parameters?: Parameter[];
+  requestBody?: { content?: Record<string, { schema: JsonSchema }> };
   responses: Record<string, { content?: Record<string, { schema: JsonSchema }> }>;
 };
 export type Contract = {
@@ -25,8 +26,14 @@ function rewriteRefs<T>(value: T): T {
   );
 }
 
+function strictUuids<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value), (_key, v) =>
+    v && typeof v === 'object' && !Array.isArray(v) && v.format === 'uuid' && !v.pattern ? { ...v, pattern: uuidPattern } : v
+  );
+}
+
 export function componentSchemas(): JsonSchema[] {
-  return Object.entries(contract.components.schemas).map(([name, schema]) => ({ $id: name, ...rewriteRefs(schema) }));
+  return Object.entries(contract.components.schemas).map(([name, schema]) => ({ $id: name, ...strictUuids(rewriteRefs(schema)) }));
 }
 
 export const toFastifyPath = (path: string) => path.replace(/\{(\w+)\}/g, ':$1');
@@ -68,5 +75,7 @@ export function routeSchema(method: string, path: string, overrides: Record<stri
   );
   const querystring = parameterSchema(op, 'query', overrides);
   const params = parameterSchema(op, 'path', overrides);
-  return { response, ...(querystring ? { querystring } : {}), ...(params ? { params } : {}) };
+  const bodySchema = op.requestBody?.content?.['application/json']?.schema;
+  const body = bodySchema ? rewriteRefs(bodySchema) : undefined;
+  return { response, ...(querystring ? { querystring } : {}), ...(params ? { params } : {}), ...(body ? { body } : {}) };
 }

@@ -37,12 +37,12 @@ export async function seed(pool: pg.Pool) {
     }
     for (const p of data.products) {
       await client.query(
-        `INSERT INTO products (id, slug, merchant_id, category_code, name, description, price_minor, currency, available, synthetic)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true, true)
+        `INSERT INTO products (id, slug, merchant_id, category_code, vat_category, name, description, price_minor, currency, available, synthetic)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true, true)
          ON CONFLICT (id) DO UPDATE SET slug = EXCLUDED.slug, merchant_id = EXCLUDED.merchant_id, category_code = EXCLUDED.category_code,
-           name = EXCLUDED.name, description = EXCLUDED.description, price_minor = EXCLUDED.price_minor, currency = EXCLUDED.currency,
-           available = true, synthetic = true, updated_at = now()`,
-        [p.id, p.slug, p.merchantId, p.categoryCode, p.name, p.description, p.priceMinor, p.currency]
+           vat_category = EXCLUDED.vat_category, name = EXCLUDED.name, description = EXCLUDED.description,
+           price_minor = EXCLUDED.price_minor, currency = EXCLUDED.currency, available = true, synthetic = true, updated_at = now()`,
+        [p.id, p.slug, p.merchantId, p.categoryCode, p.vatCategory, p.name, p.description, p.priceMinor, p.currency]
       );
     }
     await client.query('COMMIT');
