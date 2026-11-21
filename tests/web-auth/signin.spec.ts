@@ -241,6 +241,43 @@ test('Keycloak refuses a redirect URI outside the client allowlist', async ({ pa
   expect(page.url().startsWith(issuer)).toBe(true);
 });
 
+test('the transient signing-in and signing-out states are announced', async ({ browser }) => {
+  const users: { name: string; email: string; password: string }[] = JSON.parse(
+    readFileSync(join(__dirname, '../../infra/idp/.local/test-users.json'), 'utf8'),
+  );
+  const customer = users.find((user) => user.name === 'customer')!;
+  const { page } = await open(browser);
+  const held: Promise<void>[] = [];
+  const slow = (route: Route) => {
+    const release = new Promise((resolve) => setTimeout(resolve, 1500)).then(() => route.continue());
+    held.push(release);
+    return release;
+  };
+  await page.route(oidc.token, slow);
+  await page.getByTestId('sut-auth-sign-in').click();
+  await fillLogin(page, customer.email, customer.password);
+  await expect(page.getByTestId('sut-auth-pending')).toHaveAttribute('role', 'status');
+  await recordSelectors(page);
+  await Promise.all(held);
+  await page.unroute(oidc.token, slow);
+  await expectSignedIn(page, customer.email);
+
+  await page.route((url) => url.href.startsWith(`${issuer}/protocol/openid-connect/logout?`), slow);
+  await page.getByTestId('sut-auth-account').click();
+  // Locators wait for the logout navigation to finish, so a page-side observer records the transient state in this tab's sessionStorage.
+  await page.evaluate(() => {
+    new MutationObserver(() => {
+      const status = document.querySelector('[data-testid="sut-auth-signing-out"]');
+      if (status?.getAttribute('role') === 'status' && status.checkVisibility()) sessionStorage.setItem('test.signing-out', status.textContent ?? '');
+    }).observe(document.body, { subtree: true, childList: true });
+  });
+  await page.getByTestId('sut-auth-sign-out').click();
+  await expect(page.getByTestId('sut-auth-sign-in')).toBeVisible();
+  expect(await page.evaluate(() => sessionStorage.getItem('test.signing-out'))).toBe('Signing you out…');
+  seenSelectors.add('authSigningOut');
+  await page.unrouteAll({ behavior: 'wait' });
+});
+
 // Relies on the serial tests above having run in this worker (workers: 1, retries: 0).
 test('every contract selector that needs a provider was visible in at least one state', () => {
   expect(providerSelectors.filter((key) => !seenSelectors.has(key))).toEqual([]);

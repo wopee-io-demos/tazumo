@@ -49,3 +49,27 @@ A web build without `VITE_OIDC_ISSUER` and `VITE_OIDC_CLIENT_ID` SHALL state tha
 #### Scenario: Public preview
 - WHEN the app is built without auth configuration and opened, even with `code` and `state` in the URL
 - THEN the control says sign-in isn't available, offers no sign-in button and makes no discovery, token or `/v1/me` request.
+
+### Requirement: Native sign-in in the system browser
+The native app SHALL sign customers in and up with OIDC Authorization Code + PKCE in the system browser through `expo-auth-session`, redirecting to `tazumo://auth/callback`. It SHALL keep the refresh token and ID token only in `expo-secure-store` and the access token in memory. It SHALL take the signed-in state from `GET /v1/me` and SHALL NOT use an embedded WebView or render a password field.
+
+#### Scenario: Native client against the realm
+- WHEN the native client completes Authorization Code + PKCE on `tazumo://auth/callback` with a nonce
+- THEN the callback carries the same `state` and the realm's `iss`, the tokens reach `GET /v1/me`, refresh works, and RP-initiated logout redirects back to the app scheme.
+
+#### Scenario: Other app-scheme paths
+- WHEN an authorization or logout request names `tazumo://` with another path
+- THEN the provider refuses it.
+
+#### Scenario: Rejected native responses
+- WHEN discovery names another issuer, the callback `iss` differs, or the ID token's `iss`, `aud` or `nonce` does not match
+- THEN the app stays signed out with an error, stores nothing and does not call the API.
+
+#### Scenario: Restart
+- WHEN the app starts with a stored refresh token
+- THEN it refreshes, calls `/v1/me` and shows the signed-in state; if the refresh fails it deletes the stored tokens.
+
+#### Scenario: Native build without a provider
+- WHEN the app is bundled without `EXPO_PUBLIC_OIDC_ISSUER`, `EXPO_PUBLIC_OIDC_CLIENT_ID` and `EXPO_PUBLIC_API_URL`
+- THEN the catalogue says sign-in isn't available in this build.
+

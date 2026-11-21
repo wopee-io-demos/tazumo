@@ -63,11 +63,12 @@
       "directAccessGrantsEnabled": false,
       "serviceAccountsEnabled": false,
       "consentRequired": false,
-      "redirectUris": ["exp://127.0.0.1:8081/--/auth/callback", "exp://localhost:8081/--/auth/callback"],
+      "redirectUris": ["tazumo://auth/callback", "exp://127.0.0.1:8081/--/auth/callback", "exp://localhost:8081/--/auth/callback"],
       "webOrigins": [],
       "attributes": {
         "pkce.code.challenge.method": "S256",
-        "access.token.header.type.rfc9068": "true"
+        "access.token.header.type.rfc9068": "true",
+        "post.logout.redirect.uris": "tazumo://auth/callback##exp://127.0.0.1:8081/--/auth/callback##exp://localhost:8081/--/auth/callback"
       },
       "protocolMappers": [
         {

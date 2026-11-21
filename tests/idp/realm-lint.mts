@@ -10,6 +10,8 @@ const loopbackHosts = new Set(['localhost', '127.0.0.1', '[::1]']);
 const sensitiveKey = /secret|password|credential|private.?key|certificate|token$/i;
 const allowedKeys = new Set(['resetPasswordAllowed', 'passwordPolicy']);
 const audienceProbe = 'tazumo-audience-probe';
+/** The only non-loopback URIs: the native app's own scheme, exact match, on the native client only (#88). */
+export const appRedirects: Record<string, string[]> = { 'tazumo-native': ['tazumo://auth/callback'] };
 
 function sensitivePaths(value: Json, path: string, out: string[]) {
   if (Array.isArray(value)) value.forEach((item, i) => sensitivePaths(item, `${path}[${i}]`, out));
@@ -51,14 +53,15 @@ export function lintRealm(realm: Record<string, any>): string[] {
     for (const grant of ['oauth2.device.authorization.grant.enabled', 'oidc.ciba.grant.enabled', 'standard.token.exchange.enabled']) {
       if ((client.attributes?.[grant] ?? 'false') !== 'false') failures.push(`${name}: ${grant} must be off`);
     }
-    const uris = [
-      ...(client.redirectUris ?? []),
+    const redirects = [...(client.redirectUris ?? []), ...String(client.attributes?.['post.logout.redirect.uris'] ?? '').split('##').filter(Boolean)];
+    const others = [
       ...(client.webOrigins ?? []).filter((origin: string) => origin !== '+'),
-      ...String(client.attributes?.['post.logout.redirect.uris'] ?? '').split('##').filter(Boolean),
       ...['rootUrl', 'baseUrl', 'adminUrl'].map((key) => client[key]).filter(Boolean),
       ...['frontchannel.logout.url', 'backchannel.logout.url'].map((key) => client.attributes?.[key]).filter(Boolean),
     ];
-    for (const uri of uris) if (!isLoopback(uri)) failures.push(`${name}: ${uri} is not a localhost URI`);
+    const appScheme = Object.hasOwn(appRedirects, client.clientId) ? appRedirects[client.clientId] : [];
+    for (const uri of redirects) if (!isLoopback(uri) && !appScheme.includes(uri)) failures.push(`${name}: ${uri} is not a localhost URI`);
+    for (const uri of others) if (!isLoopback(uri)) failures.push(`${name}: ${uri} is not a localhost URI`);
     const audienceMapper = (client.protocolMappers ?? []).find(
       (mapper: Client) => mapper.protocolMapper === 'oidc-audience-mapper' && mapper.config?.['included.custom.audience'] === apiAudience,
     );
@@ -78,5 +81,5 @@ if (entry === fileURLToPath(import.meta.url)) {
     console.error(failures.join('\n'));
     process.exit(1);
   }
-  console.log(`${file}: public PKCE clients only, localhost redirects, no secrets or credentials`);
+  console.log(`${file}: public PKCE clients only, localhost or app-scheme redirects, no secrets or credentials`);
 }

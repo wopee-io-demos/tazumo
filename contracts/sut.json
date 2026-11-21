@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "version": "0.4.0",
+  "version": "0.5.0",
   "app": "Tazumo",
   "status": "synthetic-only",
   "repo": "https://github.com/wopee-io-demos/tazumo",
@@ -56,7 +56,9 @@
       "authUser": "[data-testid=\"sut-auth-user\"]",
       "authSignOut": "[data-testid=\"sut-auth-sign-out\"]",
       "favouritesFilter": "[data-testid=\"sut-favourites-filter\"]",
-      "favouritePiazza": "[data-testid=\"sut-favourite-piazza-local\"]"
+      "favouritePiazza": "[data-testid=\"sut-favourite-piazza-local\"]",
+      "authPending": "[data-testid=\"sut-auth-pending\"]",
+      "authSigningOut": "[data-testid=\"sut-auth-signing-out\"]"
     },
     "requiresAuth": [
       "authSignIn",
@@ -65,7 +67,9 @@
       "authAccount",
       "authAccountMenu",
       "authUser",
-      "authSignOut"
+      "authSignOut",
+      "authPending",
+      "authSigningOut"
     ],
     "selectorTemplates": {
       "product": "[data-testid=\"sut-product-{productId}\"]",
@@ -151,8 +155,25 @@
       "cartQuantityPizza": "sut-cart-quantity-pizza",
       "cartSubtotal": "sut-cart-subtotal",
       "cartPrototypeNote": "sut-cart-prototype-note",
-      "cartCheckoutDisabled": "sut-cart-checkout-disabled"
+      "cartCheckoutDisabled": "sut-cart-checkout-disabled",
+      "authUnavailable": "sut-auth-unavailable",
+      "authSignIn": "sut-auth-sign-in",
+      "authSignUp": "sut-auth-sign-up",
+      "authNotice": "sut-auth-notice",
+      "authPending": "sut-auth-pending",
+      "authSigningOut": "sut-auth-signing-out",
+      "authUser": "sut-auth-user",
+      "authSignOut": "sut-auth-sign-out"
     },
+    "requiresAuth": [
+      "authSignIn",
+      "authSignUp",
+      "authNotice",
+      "authPending",
+      "authSigningOut",
+      "authUser",
+      "authSignOut"
+    ],
     "selectorTemplates": {
       "product": "sut-product-{productId}",
       "add": "sut-add-{productId}",
