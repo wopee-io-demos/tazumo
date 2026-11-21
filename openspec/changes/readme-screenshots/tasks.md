@@ -16,10 +16,10 @@
 - [x] Current-head CI green ([run 44824056454](https://github.com/wopee-io-demos/tazumo/actions/runs/44824056454)), two independent review passes, merged in #57 as `cdf4c54`.
 
 ## Gallery refresh after #45, #50, #80, #81 (PR #127)
-- [x] Web gallery recaptured on branch commit `bfffa0e` (base `cdf4c54`, web SUT `f9616f7`) with merchant-detail and product-detail captures added; 12/12 captures passed; every PNG opened.
+- [x] Web gallery recaptured on capture commit `1863730` (web SUT `be970e2`) with merchant-detail and product-detail captures added, including the sign-in notice and Favourites; 12/12 captures passed; every PNG opened.
 - [x] Native flows extended to the product screen and the cart screen from #45 (`product-detail.yaml`, `back-to-catalogue.yaml`, `cart-screen.yaml`), using canonical `sut-*` testIDs.
 - [x] Android PNGs from [run 44902715301](https://github.com/wopee-io-demos/tazumo/actions/runs/44902715301) on `7e629c3` (SUT `be970e2`) committed byte-identical with `SHA256SUMS` (matches `pngSha256` in provenance); all four opened: catalogue, product, inline basket, cart screen, clean 9:41 status bar.
-- [ ] iOS product and cart-screen PNGs: blocked by the iOS 27 launch crash (#171) until #172 pins the capture to iOS 26.x; iOS gallery stays on run 44817080915 (pre-#45) and says so.
+- [ ] iOS product and cart-screen PNGs (iOS flow code unverified until the first green iOS run): blocked by the iOS 27 launch crash (#171) until #172 pins the capture to iOS 26.x; iOS gallery stays on run 44817080915 (pre-#45) and says so.
 - [x] README regenerate block removes old files before `gh run download` and rebuilds `SHA256SUMS`; provenance splits `os` and `toolchain`.
 - [ ] Current-head CI green, independent review recorded, merged; merge SHA on #37.
 

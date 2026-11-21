@@ -45,7 +45,7 @@ SUT reference imagery captured from the real app. These are not Wopee or Appium 
 | Category: Groceries | <img src="docs/screenshots/web/desktop-category-groceries.png" width="420" alt="Groceries category selected, showing Sourdough loaf and Local apples"> | <img src="docs/screenshots/web/mobile-category-groceries.png" width="200" alt="Groceries category selected on mobile"> |
 | Search: "fresh" | <img src="docs/screenshots/web/desktop-search-fresh.png" width="420" alt="Search for fresh returns three products"> | <img src="docs/screenshots/web/mobile-search-fresh.png" width="200" alt="Search for fresh on mobile"> |
 | Cart with items | <img src="docs/screenshots/web/desktop-cart.png" width="420" alt="Basket dialog with two pizzas, a loaf and flowers, line totals, subtotal 46.20 euro, checkout disabled"> | <img src="docs/screenshots/web/mobile-cart.png" width="200" alt="Basket dialog on mobile"> |
-| Merchant detail | <img src="docs/screenshots/web/desktop-merchant-detail.png" width="420" alt="Piazza Local merchant page with breadcrumb, description and its Margherita pizza"> | <img src="docs/screenshots/web/mobile-merchant-detail.png" width="200" alt="Piazza Local merchant page on mobile"> |
+| Merchant detail | <img src="docs/screenshots/web/desktop-merchant-detail.png" width="420" alt="Piazza Local merchant page with breadcrumb, favourite (heart) button, description and its Margherita pizza"> | <img src="docs/screenshots/web/mobile-merchant-detail.png" width="200" alt="Piazza Local merchant page on mobile"> |
 | Product detail | <img src="docs/screenshots/web/desktop-product-detail.png" width="420" alt="Margherita pizza product page: sold by Piazza Local, 11.90 euro, Add button"> | <img src="docs/screenshots/web/mobile-product-detail.png" width="200" alt="Margherita pizza product page on mobile"> |
 
 | Provenance | Web |
@@ -81,14 +81,18 @@ SUT reference imagery captured from the real app. These are not Wopee or Appium 
 
 The iOS gallery still shows the app before #45. iOS captures no longer run on pull requests: they run on `main`, nightly and on dispatch. On the iOS 27 simulator the app currently crashes at launch because it does not adopt the UIScene lifecycle ([#171](https://github.com/wopee-io-demos/tazumo/issues/171)). The iOS product-screen and cart-screen captures will be added from the first green iOS run after [#172](https://github.com/wopee-io-demos/tazumo/pull/172) pins the capture to an iOS 26.x runtime.
 
-The PNGs and `provenance.json` are the exact files from the run's `tazumo-screenshots-ios` and `tazumo-screenshots-android` artifacts, optimised in CI with pngquant; `SHA256SUMS` was computed from the downloaded artifacts, so the match stays checkable after the artifacts expire (newer runs also write the checksums into `provenance.json`). To regenerate, run the [SUT screenshots workflow](.github/workflows/screenshots.yml) (`workflow_dispatch`, or any PR touching `apps/mobile/**`, `packages/**` or the capture files), then:
+The PNGs and `provenance.json` in each platform folder are the exact files from that platform's artifact (`tazumo-screenshots-ios` or `tazumo-screenshots-android`) of the run named in the table; iOS and Android can come from different runs. They were optimised in CI with pngquant. `SHA256SUMS` was computed from the downloaded artifact, so the match stays checkable after the artifacts expire; newer runs also write the checksums into `provenance.json`.
+
+To regenerate, use the [SUT screenshots workflow](.github/workflows/screenshots.yml). Android runs on pull requests that touch `apps/mobile/**` or `tests/screenshots/native/**`. iOS runs only on pushes to `main`, nightly and on `workflow_dispatch`, so take iOS from one of those runs. For each platform whose artifact the run has:
 
 ```sh
-for p in ios android; do
-  rm -f docs/screenshots/$p/*.png docs/screenshots/$p/provenance.json docs/screenshots/$p/SHA256SUMS
-  gh run download <run-id> -n tazumo-screenshots-$p -D docs/screenshots/$p
-  (cd docs/screenshots/$p && shasum -a 256 *.png > SHA256SUMS)
-done
+p=android   # or ios
+run=<run-id>
+tmp="$(mktemp -d)"
+gh run download "$run" -n "tazumo-screenshots-$p" -D "$tmp"
+rm -f docs/screenshots/$p/*.png docs/screenshots/$p/provenance.json docs/screenshots/$p/SHA256SUMS
+cp "$tmp"/* docs/screenshots/$p/
+(cd docs/screenshots/$p && shasum -a 256 *.png > SHA256SUMS)
 ```
 
 Release builds are used because debug builds need a running Metro dev server.
