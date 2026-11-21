@@ -1,0 +1,22 @@
+{
+  "name": "@tazumo/payments",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "node --experimental-strip-types --test src/*.test.ts",
+    "test:stripe-mock": "node --experimental-strip-types --test test/*.it.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@tazumo/commerce": "workspace:*",
+    "stripe": "23.1.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3",
+    "@types/node": "^22.15.0"
+  }
+}
