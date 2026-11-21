@@ -1,10 +1,11 @@
 {
   "id": "tazumo-android-smoke",
-  "intent": "Browse the catalogue, open the pizza, add it, open the cart and see the subtotal with checkout disabled.",
+  "intent": "See that this build has no sign-in, browse the catalogue, open the pizza, add it, open the cart and see the subtotal with checkout disabled.",
   "platforms": {
     "android": {
       "app": "io.wopee.demos.tazumo",
       "steps": [
+        {"action": "see", "by": "xpath", "value": "//*[@resource-id=\"sut-auth-unavailable\" and @text=\"Sign-in isn’t available in this build.\"]"},
         {"action": "see", "by": "id", "value": "sut-open-product-pizza"},
         {"action": "tap", "by": "id", "value": "sut-open-product-pizza"},
         {"action": "see", "by": "id", "value": "sut-detail-screen"},

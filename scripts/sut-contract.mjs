@@ -180,16 +180,19 @@ export function checkFixtures(contract,core){
   return errors;
 }
 
-/** `web.requiresAuth` names web.selectors keys that appear only in builds with an identity provider configured. */
+/** `<platform>.requiresAuth` names that platform's selectors keys that appear only in builds with an identity provider configured. */
 export function checkRequiresAuth(contract){
-  const list=contract.web?.requiresAuth;
-  if(list===undefined)return [];
-  if(!Array.isArray(list))return ['web.requiresAuth: must be an array of web.selectors keys'];
-  const errors=[],seen=new Set();
-  for(const key of list){
-    if(typeof key!=='string'||!Object.hasOwn(contract.web.selectors??{},key))errors.push(`web.requiresAuth: ${JSON.stringify(key)} is not a web.selectors key`);
-    else if(seen.has(key))errors.push(`web.requiresAuth: ${key} is listed twice`);
-    seen.add(key);
+  const errors=[];
+  for(const platform of PLATFORMS){
+    const list=contract[platform]?.requiresAuth;
+    if(list===undefined)continue;
+    if(!Array.isArray(list)){errors.push(`${platform}.requiresAuth: must be an array of ${platform}.selectors keys`);continue}
+    const seen=new Set();
+    for(const key of list){
+      if(typeof key!=='string'||!Object.hasOwn(contract[platform].selectors??{},key))errors.push(`${platform}.requiresAuth: ${JSON.stringify(key)} is not a ${platform}.selectors key`);
+      else if(seen.has(key))errors.push(`${platform}.requiresAuth: ${key} is listed twice`);
+      seen.add(key);
+    }
   }
   return errors;
 }
@@ -227,8 +230,8 @@ export function checkCompatibility(base,next){
   for(const path of after.keys())if(!before.has(path))(prose(path)?edited:added).push(path);
   const filled=path=>['{}','[]'].includes(before.get(path))&&[...after.keys()].some(p=>p.startsWith(path+'.')||p.startsWith(path+'['));
   for(let i=removed.length-1;i>=0;i--)if(filled(removed[i]))removed.splice(i,1);
-  const gate=/^web\.requiresAuth\[/,gated=path=>JSON.parse(path.slice('web.requiresAuth['.length,-1));
-  for(let i=added.length-1;i>=0;i--)if(gate.test(added[i])&&Object.hasOwn(base.web?.selectors??{},gated(added[i])))changed.push(...added.splice(i,1));
+  const gate=/^(\w+)\.requiresAuth\[(.*)\]$/,existed=path=>{const [,platform,key]=gate.exec(path);return Object.hasOwn(base[platform]?.selectors??{},JSON.parse(key))};
+  for(let i=added.length-1;i>=0;i--)if(gate.test(added[i])&&existed(added[i]))changed.push(...added.splice(i,1));
   for(let i=removed.length-1;i>=0;i--)if(gate.test(removed[i]))added.push(...removed.splice(i,1));
   const level=removed.length||changed.length?'major':added.length?'minor':edited.length?'patch':'none';
   const a=parseVersion(base.version),b=parseVersion(next.version);

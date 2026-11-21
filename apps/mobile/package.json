@@ -8,12 +8,17 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-strip-types --test src/*.test.ts tests/*.test.mjs"
+    "test": "node --experimental-strip-types --test src/*.test.ts tests/*.test.mjs",
+    "bundle:dev": "expo export --dev --platform ios --output-dir dist/dev-ios && expo export --dev --platform android --output-dir dist/dev-android"
   },
   "dependencies": {
-    "@tazumo/core": "workspace:*",
     "@tazumo/brand": "workspace:*",
+    "@tazumo/core": "workspace:*",
     "expo": "~53.0.0",
+    "expo-auth-session": "~6.2.1",
+    "expo-crypto": "~14.1.5",
+    "expo-secure-store": "~14.2.4",
+    "expo-web-browser": "~14.2.0",
     "react": "19.0.0",
     "react-native": "0.79.2",
     "react-native-safe-area-context": "5.4.0"

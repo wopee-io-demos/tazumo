@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { Writable } from 'node:stream';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -75,18 +76,26 @@ test('a terminated idle database connection does not crash the service', async (
   }
 });
 
-test('/health reports database reachability', async () => {
+test('/health reports database reachability and the build identity', async () => {
+  const commit = 'c7514b0a1b2c3d4e5f60718293a4b5c6d7e8f901';
+  const { version } = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { version: string };
   const db = await createTestDb();
+  const previous = process.env.TAZUMO_COMMIT;
+  process.env.TAZUMO_COMMIT = commit;
   const app = buildApp({ pool: db.pool });
+  process.env.TAZUMO_COMMIT = 'main; rm -rf /';
   const down = createPool({ databaseUrl: 'postgres://nobody:nothing@127.0.0.1:1/none' });
   const downApp = buildApp({ pool: down });
+  if (previous === undefined) delete process.env.TAZUMO_COMMIT;
+  else process.env.TAZUMO_COMMIT = previous;
   try {
     const ok = await app.inject({ method: 'GET', url: '/health' });
     assert.equal(ok.statusCode, 200);
-    assert.deepEqual(ok.json(), { status: 'ok', database: 'ok' });
+    assert.match(version, /^\d+\.\d+\.\d+$/);
+    assert.deepEqual(ok.json(), { status: 'ok', database: 'ok', version, commit });
     const unavailable = await downApp.inject({ method: 'GET', url: '/health' });
     assert.equal(unavailable.statusCode, 503);
-    assert.deepEqual(unavailable.json(), { status: 'unavailable', database: 'unavailable' });
+    assert.deepEqual(unavailable.json(), { status: 'unavailable', database: 'unavailable', version, commit: 'unknown' });
     assert.equal(ok.headers['x-content-type-options'], 'nosniff');
   } finally {
     await app.close();

@@ -8,6 +8,21 @@ Catalogue (search, categories, inline mini-cart) -> product detail -> cart. Navi
 
 Stable `testID`s (iOS accessibility id, Android resource id) are listed in [the OpenSpec design](../../openspec/changes/native-shopping/design.md). Never rename or remove one without a versioned contract change.
 
+## Sign-in
+
+Customers sign in, sign up and sign out on the identity provider's pages in the system browser ([ADR-0027](../../docs/adr/0027-client-auth.md)). Without the variables below, the catalogue says sign-in isn't available in this build. Set them when you bundle:
+
+```sh
+EXPO_PUBLIC_OIDC_ISSUER=http://127.0.0.1:48180/realms/tazumo \
+EXPO_PUBLIC_OIDC_CLIENT_ID=tazumo-native \
+EXPO_PUBLIC_API_URL=http://127.0.0.1:3001 \
+pnpm --filter @tazumo/mobile start
+```
+
+- **Redirect:** `tazumo://auth/callback` in builds, and `exp://…/--/auth/callback` in Expo Go. The development realm (`infra/idp`) allows Expo Go only on `127.0.0.1` or `localhost`, so start it with `expo start --localhost`. The default LAN address is refused.
+- **Storage:** the refresh token and ID token are kept in `expo-secure-store`. The access token stays in memory.
+- **Plain http:** an emulator or device needs a reachable host instead of `127.0.0.1`. Release builds block plain http on Android.
+
 ## Local checks
 
 ```sh

@@ -16,3 +16,4 @@ ADRs are short decision documents with context, options, consequences and status
 - [0025: Public web preview on GitHub Pages](0025-web-preview-github-pages.md)
 - [0026: Stripe in test mode as the payment provider](0026-payment-provider.md)
 - [0027: Customer sign-in on web and native clients](0027-client-auth.md)
+- [0028: One product version, independently versioned contracts](0028-versioning-model.md)
