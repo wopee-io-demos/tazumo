@@ -9,3 +9,4 @@ ADRs are short decision documents with context, options, consequences and status
 - [0016: Bearer JWT verification, database-held roles](0016-api-authentication.md)
 - [0017: OIDC provider for EU data residency (accepted)](0017-oidc-provider-eu-residency.md)
 - [0025: Public web preview on GitHub Pages](0025-web-preview-github-pages.md)
+- [0027: Customer sign-in on web and native clients](0027-client-auth.md)
