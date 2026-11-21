@@ -25,6 +25,13 @@ These limits apply to every tier:
 - **Behind a reverse proxy:** set `TRUST_PROXY` to a comma-separated list of proxy IP addresses or CIDRs. Otherwise all clients share the proxy's bucket.
 - **Deploy probes:** point them at the instance directly, not through the proxy, so probe traffic is not counted together with client traffic.
 
+Quotes: `POST /v1/order-quotes` prices a basket with `@tazumo/commerce` rules for the market's country (SK, CZ, DE, AT), using server-side prices and product VAT categories.
+
+- The seeded IE demo market has no rules and returns 422 `unsupported_market`.
+- Fees and the distance (derived from the postal code) are synthetic. VAT rates are research data to re-verify.
+- `total` is exact. `payable` differs from it only for cash payments in CZK.
+- Quotes are not stored yet.
+
 GDPR: `POST /v1/me/erasure` (self-service) and `POST /v1/admin/users/{userId}/erasure` (admin or support) pseudonymise the user, delete their grants and audit the erasure. Tokens issued before the erasure are rejected afterwards. `GET /v1/me/export` returns the caller's data. Deleting the account at the identity provider is a separate operator step until a provider is wired in. Erasure recognition depends on `AUTH_LOG_SALT`, so rotate it deliberately. Schedule `pnpm db:forget-erased` daily with owner credentials; it replaces keyed-hash tombstones older than 24 h 2 min with random ones.
 
 In production, run the server as a login role that is a member of `tazumo_api` (created by migration `0003`, with append-only access to `audit_events`), and run `db:migrate`/`db:seed` as the schema owner. The owner needs CREATEROLE unless `tazumo_api` already exists. Use one PostgreSQL cluster per environment, because roles are cluster-wide.

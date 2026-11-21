@@ -4,6 +4,7 @@ type JsonSchema = Record<string, unknown>;
 type Parameter = { name: string; in: 'query' | 'path' | 'header'; required?: boolean; schema: JsonSchema };
 type Operation = {
   parameters?: Parameter[];
+  requestBody?: { content?: Record<string, { schema: JsonSchema }> };
   responses: Record<string, { content?: Record<string, { schema: JsonSchema }> }>;
 };
 export type Contract = {
@@ -68,5 +69,7 @@ export function routeSchema(method: string, path: string, overrides: Record<stri
   );
   const querystring = parameterSchema(op, 'query', overrides);
   const params = parameterSchema(op, 'path', overrides);
-  return { response, ...(querystring ? { querystring } : {}), ...(params ? { params } : {}) };
+  const bodySchema = op.requestBody?.content?.['application/json']?.schema;
+  const body = bodySchema ? rewriteRefs(bodySchema) : undefined;
+  return { response, ...(querystring ? { querystring } : {}), ...(params ? { params } : {}), ...(body ? { body } : {}) };
 }

@@ -33,8 +33,8 @@ test('database rejects invalid money and identifiers', async () => {
     await db.pool.query(`INSERT INTO merchants (id, slug, market_code, name) VALUES ('00000000-0000-4000-8000-000000000001', 'm', 'm1', 'M')`);
     const product = (price: number, currency: string) =>
       db.pool.query(
-        `INSERT INTO products (id, slug, merchant_id, category_code, name, price_minor, currency)
-         VALUES (gen_random_uuid(), 'p' || floor(random() * 1e9)::text, '00000000-0000-4000-8000-000000000001', 'food', 'P', $1, $2)`,
+        `INSERT INTO products (id, slug, merchant_id, category_code, vat_category, name, price_minor, currency)
+         VALUES (gen_random_uuid(), 'p' || floor(random() * 1e9)::text, '00000000-0000-4000-8000-000000000001', 'food', 'food', 'P', $1, $2)`,
         [price, currency]
       );
     await product(1190, 'CZK');
