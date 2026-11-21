@@ -70,11 +70,35 @@ export function requiredChecks(contract){
 
 /** The attributes of the UiAutomator node with this resource-id, or null. */
 const decode=v=>v.replace(/&(#x[0-9a-f]+|#\d+|amp|lt|gt|quot|apos);/gi,(_,e)=>e[0]==='#'?String.fromCodePoint(Number(e[1].toLowerCase()==='x'?'0'+e.slice(1):e.slice(1))):({amp:'&',lt:'<',gt:'>',quot:'"',apos:"'"})[e.toLowerCase()]);
-export function nodeAttributes(xml,id){
- for(const tag of xml.match(/<[\w.:-]+(?:\s+[\w:.-]+="[^"]*")*\s*\/?>/g)??[]){
-  const attrs=Object.fromEntries([...tag.matchAll(/([\w:.-]+)="([^"]*)"/g)].map(m=>[m[1],decode(m[2])]));
-  if(attrs['resource-id']===id)return attrs;
+export const MAX_TREE_CHARS=20_000_000;
+
+/** Linear scan of XML start tags into attribute maps; values keep any raw `>` and are entity-decoded. */
+export function* xmlTags(xml){
+ if(xml.length>MAX_TREE_CHARS)throw new Error(`UiAutomator tree larger than ${MAX_TREE_CHARS} characters`);
+ const space=c=>c===' '||c==='\n'||c==='\t'||c==='\r';
+ let i=0;
+ while((i=xml.indexOf('<',i))!==-1){
+  i++;
+  if(xml[i]==='/'||xml[i]==='?'||xml[i]==='!')continue;
+  while(i<xml.length&&!space(xml[i])&&xml[i]!=='>'&&xml[i]!=='/')i++;
+  const attrs={};
+  while(i<xml.length){
+   while(i<xml.length&&space(xml[i]))i++;
+   if(xml[i]==='>'||xml[i]==='/'||xml[i]==='<')break;
+   let eq=i;
+   while(eq<xml.length&&xml[eq]!=='='&&xml[eq]!=='<'&&xml[eq]!=='>'&&!space(xml[eq]))eq++;
+   if(xml[eq]!=='='||xml[eq+1]!=='"'||eq===i)break;
+   const end=xml.indexOf('"',eq+2);
+   if(end===-1)break;
+   attrs[xml.slice(i,eq)]=decode(xml.slice(eq+2,end));
+   i=end+1;
+  }
+  yield attrs;
  }
+}
+
+export function nodeAttributes(xml,id){
+ for(const attrs of xmlTags(xml))if(attrs['resource-id']===id)return attrs;
  return null;
 }
 

@@ -6,7 +6,7 @@ import {spawn} from 'node:child_process';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {PLAN,expectedIds,loadCore,nodeAttributes,placeholderValues,requiredChecks,verifyWalk,walk} from './contract-walk.mjs';
+import {MAX_TREE_CHARS,PLAN,expectedIds,loadCore,nodeAttributes,placeholderValues,requiredChecks,verifyWalk,walk} from './contract-walk.mjs';
 
 const here=fileURLToPath(new URL('.',import.meta.url));
 const contract=JSON.parse(readFileSync(join(here,'../../../contracts/sut.json'),'utf8'));
@@ -175,8 +175,9 @@ test('the verifier fails closed on a missing, foreign, empty or tampered report'
 const serve=app=>new Promise(resolve=>{
  const server=createServer(async(req,res)=>{
   let body='';for await(const chunk of req)body+=chunk;
-  try{const value=await app.call(req.method,req.url,body?JSON.parse(body):undefined);res.end(JSON.stringify({value}))}
-  catch(e){res.statusCode=500;res.end(JSON.stringify({value:{error:e.message}}))}
+  const send=(status,value)=>{res.writeHead(status,{'content-type':'application/json; charset=utf-8'});res.end(JSON.stringify({value}))};
+  try{send(200,await app.call(req.method,req.url,body?JSON.parse(body):undefined))}
+  catch{send(500,{error:'unknown error',message:'fake device error'})}
  });
  server.listen(0,'127.0.0.1',()=>resolve(server));
 });
@@ -271,4 +272,24 @@ test('text that updates a few polls after a tap is waited for',async()=>{
  const {report:slow}=await run({textLag:1000});
  assert.equal(slow.outcome,'failed');
  assert.match(slow.error,/text sut-detail-quantity on product-detail/);
+});
+
+test('the tree scanner is linear on pathological input and keeps raw > in values',()=>{
+ const spaces=' '.repeat(200000);
+ const hostile=`<a${spaces}x<a${spaces}`.repeat(20)+'<n resource-id="sut-x" text="a > b"/>';
+ const started=Date.now();
+ assert.equal(nodeAttributes(hostile,'sut-x').text,'a > b');
+ assert.equal(nodeAttributes('<'.repeat(500000),'sut-x'),null);
+ assert.equal(nodeAttributes('<n a="'+'"'.repeat(300000),'sut-x'),null);
+ assert.ok(Date.now()-started<2000,`took ${Date.now()-started} ms`);
+ assert.throws(()=>nodeAttributes('x'.repeat(MAX_TREE_CHARS+1),'sut-x'),/larger than/);
+});
+
+test('the fake Appium answers errors as JSON without echoing exception text',async()=>{
+ const server=await serve({call:async()=>{throw new Error('<img src=x onerror=alert(1)>')}});
+ const res=await fetch(`http://127.0.0.1:${server.address().port}/status`);
+ server.close();
+ assert.equal(res.status,500);
+ assert.match(res.headers.get('content-type'),/^application\/json/);
+ assert.doesNotMatch(await res.text(),/onerror/);
 });

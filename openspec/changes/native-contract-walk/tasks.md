@@ -11,7 +11,7 @@ Issue #32 (slice), branch `test/32-android-contract-walker`.
   - each verifier guard: wrong text in the tree, a line still in the tree, evidence from another screen, evidence errors, an assertion count off by one, a tampered tree, a foreign report
   - XML entity decoding, and both CLIs over a fake HTTP Appium
 
-  `pnpm --filter @tazumo/mobile test` passes 33/33 locally on Node 22.19.
+  `pnpm --filter @tazumo/mobile test` passes 35/35 locally on Node 22.19, including a linear-time check of the XML tree scanner on pathological input.
 - [x] Mutation runs: removing the anchor wait, the tree-based gone check, the scroll to the pill list, the text polling, the checkout guard, or any of the verifier's tree, screen, evidence or count guards each makes at least one test fail.
 - [x] Independent review, two passes (683ad3a, e2e68f0): no blockers. The code findings are fixed; the emulator run (below) is still open.
 - [ ] Add one step to the android-smoke job after #128 merges (coordinate with A3 on #128 or #64), and upload the per-screen XML trees.
