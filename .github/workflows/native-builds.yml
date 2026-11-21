@@ -154,3 +154,17 @@ jobs:
           name: tazumo-ios-simulator-app
           path: tazumo-ios-simulator.zip
           retention-days: 7
+      - name: Launch smoke on iOS 27 and 26 simulators (app must stay up, no crash report)
+        run: bash apps/mobile/tests/ios-launch-smoke.sh "$RUNNER_TEMP/tazumo-ios/Build/Products/Debug-iphonesimulator/Tazumo.app" "$RUNNER_TEMP/ios-launch"
+      - name: Delete this run's launch-smoke simulators
+        if: always()
+        run: |
+          xcrun simctl list devices -j | node -e "const p=process.argv[1];for(const l of Object.values(JSON.parse(require('fs').readFileSync(0)).devices))for(const d of l)if(d.name.startsWith(p))console.log(d.udid)" "tazumo-launch-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" |
+            while read -r udid; do xcrun simctl shutdown "$udid" 2>/dev/null || true; xcrun simctl delete "$udid" || true; done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: tazumo-ios-launch-smoke
+          path: ${{ runner.temp }}/ios-launch/
+          if-no-files-found: ignore
+          retention-days: 7

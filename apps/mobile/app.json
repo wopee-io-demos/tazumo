@@ -14,7 +14,8 @@
       "package": "io.wopee.demos.tazumo"
     },
     "plugins": [
-      "./plugins/with-fmt-cxx17"
+      "./plugins/with-fmt-cxx17",
+      "./plugins/with-ui-scene"
     ]
   }
 }

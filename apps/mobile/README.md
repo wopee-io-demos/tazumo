@@ -46,6 +46,17 @@ end
 
 If the Hermes download stalls during `pod install`, download `react-native-artifacts-0.79.2-hermes-ios-release.tar.gz` from Maven Central and set `HERMES_ENGINE_TARBALL_PATH` to the local file. Drive the simulator with [mobilecli](https://github.com/mobile-next/mobilecli) (`npx --yes mobilecli@1.0.24 agent install --device "$UDID"` once, then `dump ui`, `io tap x,y`, `screenshot`). Smoke path: open a product -> Add to cart -> cart icon -> increase/decrease/remove -> checkout stays disabled. Delete the simulator (`xcrun simctl delete "$UDID"`) and the DerivedData folder afterwards.
 
+## iOS 27: UIScene life cycle
+
+Apps built with the iOS 27 SDK must adopt the UIScene life cycle, or UIKit stops them at launch with `EXC_BREAKPOINT` in `_UIApplicationEvaluateRuntimeIssueForNoSceneLifecycleAdoption` (#171). Expo SDK 53's template has no scene. `plugins/with-ui-scene.js` (registered in `app.json`) does three things:
+- adds a single-scene `UIApplicationSceneManifest`;
+- keeps the React Native factory in `AppDelegate`;
+- starts React Native from a `SceneDelegate` in the window scene, including URL and user-activity handling.
+
+The plugin fails prebuild if Expo's `AppDelegate.swift` template changes, so a template change can't silently ship without a scene. Remove it once the Expo SDK upgrade (#100) brings a scene-based template.
+
+`native-builds.yml` runs `tests/ios-launch-smoke.sh` after the iOS build. It installs the app on the newest iOS 27.x and 26.x simulators (or the newest available runtime) and fails if the app isn't running after 20 seconds or a `Tazumo-*.ips` crash report appears.
+
 ## Android emulator smoke (CI)
 
 The `Android emulator smoke` job in `native-builds.yml` builds a release-variant x86_64 APK (debug keystore, JavaScript embedded), boots an API 34 emulator and runs [`tests/android-smoke.case.json`](tests/android-smoke.case.json) with Appium UiAutomator2 ([ADR-0010](../../docs/adr/0010-test-pyramid-native-automation.md)). Steps address elements by `sut-` IDs with the Android `id` strategy. React Native exposes `testID` as a bare resource-id (`sut-…`, no `io.wopee.demos.tazumo:id/` prefix), so the runner sets the UiAutomator2 setting `disableIdLocatorAutocompletion: true` after creating the session. Other Appium clients need the same setting, for example the capability `appium:settings[disableIdLocatorAutocompletion]: true`. The text and enabled-state checks use XPath on `@resource-id`. `tests/run-case.mjs` mirrors the report shape and step semantics of mobile-agent's `native.py` (private repo, so it is not fetched in this public CI). A negative case with a missing ID must fail on its last step. Screenshots, UiAutomator XML per step, `report.json`, the Appium log and the APK are uploaded as the `tazumo-android-smoke` artifact.
