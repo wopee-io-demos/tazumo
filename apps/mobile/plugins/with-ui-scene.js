@@ -13,30 +13,52 @@ ${MARKER}
 class SceneDelegate: UIResponder, UIWindowSceneDelegate {
   var window: UIWindow?
 
+  private var appDelegate: AppDelegate? { UIApplication.shared.delegate as? AppDelegate }
+
   func scene(
     _ scene: UIScene,
     willConnectTo session: UISceneSession,
     options connectionOptions: UIScene.ConnectionOptions
   ) {
     guard let windowScene = scene as? UIWindowScene,
-          let appDelegate = UIApplication.shared.delegate as? AppDelegate,
+          let appDelegate = appDelegate,
           let factory = appDelegate.reactNativeFactory else { return }
+    var launchOptions = appDelegate.launchOptions ?? [:]
+    if let url = connectionOptions.urlContexts.first?.url {
+      launchOptions[.url] = url
+    }
     let window = UIWindow(windowScene: windowScene)
     self.window = window
     appDelegate.window = window
-    factory.startReactNative(withModuleName: "main", in: window, launchOptions: appDelegate.launchOptions)
-    if let url = connectionOptions.urlContexts.first?.url {
-      _ = RCTLinkingManager.application(UIApplication.shared, open: url, options: [:])
+    factory.startReactNative(withModuleName: "main", in: window, launchOptions: launchOptions)
+    if let activity = connectionOptions.userActivities.first {
+      _ = appDelegate.application(UIApplication.shared, continue: activity, restorationHandler: { _ in })
     }
   }
 
   func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
     guard let url = URLContexts.first?.url else { return }
-    _ = RCTLinkingManager.application(UIApplication.shared, open: url, options: [:])
+    _ = appDelegate?.application(UIApplication.shared, open: url, options: [:])
   }
 
   func scene(_ scene: UIScene, continue userActivity: NSUserActivity) {
-    _ = RCTLinkingManager.application(UIApplication.shared, continue: userActivity, restorationHandler: { _ in })
+    _ = appDelegate?.application(UIApplication.shared, continue: userActivity, restorationHandler: { _ in })
+  }
+
+  func sceneDidBecomeActive(_ scene: UIScene) {
+    appDelegate?.applicationDidBecomeActive(UIApplication.shared)
+  }
+
+  func sceneWillResignActive(_ scene: UIScene) {
+    appDelegate?.applicationWillResignActive(UIApplication.shared)
+  }
+
+  func sceneWillEnterForeground(_ scene: UIScene) {
+    appDelegate?.applicationWillEnterForeground(UIApplication.shared)
+  }
+
+  func sceneDidEnterBackground(_ scene: UIScene) {
+    appDelegate?.applicationDidEnterBackground(UIApplication.shared)
   }
 }
 `;

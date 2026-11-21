@@ -55,7 +55,7 @@ Apps built with the iOS 27 SDK must adopt the UIScene life cycle, or UIKit stops
 
 The plugin fails prebuild if Expo's `AppDelegate.swift` template changes, so a template change can't silently ship without a scene. Remove it once the Expo SDK upgrade (#100) brings a scene-based template.
 
-`native-builds.yml` runs `tests/ios-launch-smoke.sh` after the iOS build. It installs the app on the newest iOS 27.x and 26.x simulators (or the newest available runtime) and fails if the app isn't running after 20 seconds or a `Tazumo-*.ips` crash report appears.
+`native-builds.yml` runs `tests/ios-launch-smoke.sh` after the iOS build. It installs the app on the newest iOS 27.x and 26.x simulators and fails if the launched process isn't alive after 20 seconds, or if it wrote a `Tazumo-*.ips` crash report. On mac-ios-1 an iOS 27 runtime is required (`REQUIRE_IOS=27`). Hosted runners use the newest runtime they have. The smoke checks native launch only, because the Debug build has no embedded JS bundle.
 
 ## Android emulator smoke (CI)
 

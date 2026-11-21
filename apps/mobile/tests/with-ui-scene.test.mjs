@@ -13,7 +13,9 @@ test('the Expo 53 AppDelegate starts React Native from a SceneDelegate instead o
   assert.match(patched,/self\.launchOptions = launchOptions/);
   assert.match(patched,/class SceneDelegate: UIResponder, UIWindowSceneDelegate/);
   assert.match(patched,/UIWindow\(windowScene: windowScene\)/);
-  assert.match(patched,/factory\.startReactNative\(withModuleName: "main", in: window, launchOptions: appDelegate\.launchOptions\)/);
+  assert.match(patched,/factory\.startReactNative\(withModuleName: "main", in: window, launchOptions: launchOptions\)/);
+  assert.match(patched,/launchOptions\[\.url\] = url/);
+  assert.match(patched,/appDelegate\?\.applicationDidBecomeActive\(UIApplication\.shared\)/);
   assert.equal(patchAppDelegate(patched),patched,'patching twice changes nothing');
 });
 

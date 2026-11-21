@@ -35,7 +35,7 @@ jobs:
         run: |
           changed="$(git diff --name-only HEAD^1 HEAD)"
           printf '%s\n' "$changed" | sed 's/^/  /'
-          native='^(apps/mobile/(app\.json|package\.json|eas\.json|(babel|metro)\.config\.[^/]+)$|apps/mobile/(assets|plugins)/|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|\.npmrc$|\.github/workflows/native-builds\.yml$)'
+          native='^(apps/mobile/(app\.json|package\.json|eas\.json|(babel|metro)\.config\.[^/]+|tests/ios-launch-smoke\.sh)$|apps/mobile/(assets|plugins)/|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|\.npmrc$|\.github/workflows/native-builds\.yml$)'
           smoke='^(apps/mobile/(src|tests)/|apps/mobile/index\.ts$|packages/core/)'
           if printf '%s\n' "$changed" | grep -Eq "$native"; then n=true; else n=false; fi
           if [ "$n" = true ] || printf '%s\n' "$changed" | grep -Eq "$smoke"; then m=true; else m=false; fi
@@ -155,6 +155,9 @@ jobs:
           path: tazumo-ios-simulator.zip
           retention-days: 7
       - name: Launch smoke on iOS 27 and 26 simulators (app must stay up, no crash report)
+        timeout-minutes: 15
+        env:
+          REQUIRE_IOS: ${{ runner.environment == 'self-hosted' && '27' || '' }}
         run: bash apps/mobile/tests/ios-launch-smoke.sh "$RUNNER_TEMP/tazumo-ios/Build/Products/Debug-iphonesimulator/Tazumo.app" "$RUNNER_TEMP/ios-launch"
       - name: Delete this run's launch-smoke simulators
         if: always()
