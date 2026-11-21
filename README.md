@@ -50,7 +50,7 @@ SUT reference imagery captured from the real app. These are not Wopee or Appium 
 
 | Provenance | Web |
 | --- | --- |
-| SUT commit | [`f9616f7`](https://github.com/wopee-io-demos/tazumo/commit/f9616f7a981b015e2d3a4d8061e3c8d9e456cd9c), the last change to `apps/web`, `packages` and workspace config at capture time |
+| SUT commit | [`c8169ee`](https://github.com/wopee-io-demos/tazumo/commit/c8169eeb56c4935489944ec6962aefc7f9233f43), the last change to `apps/web`, `packages` and workspace config at capture time; the PNGs are byte-identical to the capture on `f9616f7`, so nothing visible changed in between |
 | Fixture data | Synthetic catalogue and merchants in `packages/core`; cart = 2x Margherita pizza, 1x Sourdough loaf, 1x Fresh flowers; detail pages for `piazza-local` and `pizza` |
 | Capture command | `bash scripts/capture-web-screenshots.sh` after `pnpm install` and `pnpm exec playwright install chromium`; needs `pngquant` and network access for Google Fonts. It runs `pnpm build`, serves `vite preview`, runs `tests/screenshots/capture.spec.ts` and replaces the gallery only when every capture passes |
 | Browser | Playwright 1.65.1, Chromium 159.0.8154.6, macOS arm64 host |
