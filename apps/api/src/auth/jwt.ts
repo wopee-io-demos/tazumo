@@ -1,4 +1,5 @@
 import { createLocalJWKSet, createRemoteJWKSet, errors, jwksCache, jwtVerify, type JSONWebKeySet, type JWTVerifyGetKey } from 'jose';
+import { erasedPrefix } from './pseudonym.ts';
 
 export type AuthConfig = {
   issuer: string;
@@ -12,7 +13,7 @@ export type AuthConfig = {
   maxTokenLifetimeSeconds?: number;
 };
 
-export type VerifiedToken = { issuer: string; subject: string };
+export type VerifiedToken = { issuer: string; subject: string; issuedAt: number };
 
 export class AuthError extends Error {
   readonly status: 401 | 503;
@@ -92,9 +93,11 @@ export function createVerifier(config: AuthConfig) {
       throw error;
     }
     const { sub, exp, iat } = payload;
-    if (typeof sub !== 'string' || sub.length < 1 || sub.length > 255) throw new AuthError(401, 'invalid_sub');
+    if (typeof sub !== 'string' || sub.length < 1 || sub.length > 255 || sub.startsWith(erasedPrefix)) {
+      throw new AuthError(401, 'invalid_sub');
+    }
     if ((exp as number) - (iat as number) > maxLifetime) throw new AuthError(401, 'lifetime_too_long');
     if ((iat as number) > Date.now() / 1000 + clockToleranceSeconds) throw new AuthError(401, 'issued_in_future');
-    return { issuer: config.issuer, subject: sub };
+    return { issuer: config.issuer, subject: sub, issuedAt: iat as number };
   };
 }

@@ -3,7 +3,7 @@ export type Role = (typeof roles)[number];
 export type Grant = { role: Role; merchantId: string | null };
 export type Principal = { userId: string; grants: Grant[] };
 
-export type Action = 'user:read' | 'merchant_staff:list' | 'role:manage';
+export type Action = 'user:read' | 'merchant_staff:list' | 'role:manage' | 'user:erase';
 export type Resource = { type: 'user'; id: string } | { type: 'merchant'; id: string; exists: boolean };
 
 export type Decision = { allowed: true; audit: boolean } | { allowed: false; status: 403 | 404 };
@@ -23,6 +23,11 @@ export function can(principal: Principal, action: Action, resource: Resource): D
       if (resource.id === principal.userId) return { allowed: true, audit: false };
       if (isPrivileged(principal)) return { allowed: true, audit: true };
       return deny(principal, true);
+    case 'user:erase':
+      if (resource.type !== 'user') return { allowed: false, status: 403 };
+      if (resource.id === principal.userId) return { allowed: true, audit: true };
+      if (isPrivileged(principal)) return { allowed: true, audit: true };
+      return { allowed: false, status: 403 };
     case 'role:manage':
       if (!has(principal, 'admin') || resource.type !== 'user' || resource.id === principal.userId) {
         return { allowed: false, status: 403 };

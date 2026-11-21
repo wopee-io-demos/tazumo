@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Tazumo Marketplace API",
-    "version": "0.4.0-draft",
-    "description": "Contract proposal. The read-only Discovery operations and the Identity and Admin role-grant operations have a reference implementation in apps/api (synthetic fixture data, not deployed). All prices are server-calculated. Checkout is disabled in the current clients."
+    "version": "0.5.0-draft",
+    "description": "Contract proposal. The read-only Discovery operations and the Identity, Admin role-grant and Privacy (erasure, export) operations have a reference implementation in apps/api (synthetic fixture data, not deployed). All prices are server-calculated. Checkout is disabled in the current clients."
   },
   "servers": [
     {
@@ -23,6 +23,9 @@
     },
     {
       "name": "Admin"
+    },
+    {
+      "name": "Privacy"
     }
   ],
   "paths": {
@@ -815,6 +818,16 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Target user has been erased",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
           }
         }
       },
@@ -908,6 +921,297 @@
           },
           "404": {
             "description": "Unknown user or merchant",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded (per client IP before authentication, per principal after)",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the current window resets",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication not configured or identity provider keys unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Target user has been erased",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/erasure": {
+      "post": {
+        "tags": [
+          "Privacy"
+        ],
+        "summary": "Erase the authenticated user (GDPR Art. 17)",
+        "description": "Pseudonymises the user record (the subject is replaced by a keyed hash), deletes all role grants and writes an audit event without personal data, in one transaction. Tokens issued before the erasure are rejected afterwards; deleting the account at the identity provider is a separate operator step.",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User erased",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErasureResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Bearer challenge (RFC 6750)",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Erasure blocked by dependent records (details.blockers lists them)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded (per client IP before authentication, per principal after)",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the current window resets",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication not configured or identity provider keys unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/users/{userId}/erasure": {
+      "post": {
+        "tags": [
+          "Privacy",
+          "Admin"
+        ],
+        "summary": "Erase a user on their behalf (admin or support)",
+        "description": "Idempotent: erasing an erased user returns the original erasedAt without a new audit event.",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User erased (now or earlier)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErasureResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Bearer challenge (RFC 6750)",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is neither admin nor support",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Erasure blocked by dependent records (details.blockers lists them)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded (per client IP before authentication, per principal after)",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the current window resets",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication not configured or identity provider keys unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/export": {
+      "get": {
+        "tags": [
+          "Privacy"
+        ],
+        "summary": "Export the personal data Tazumo holds about the authenticated user (GDPR Art. 15/20)",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Personal data export",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonalDataExport"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Bearer challenge (RFC 6750)",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -1408,6 +1712,115 @@
               "support",
               "admin"
             ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "ErasureResult": {
+        "type": "object",
+        "required": [
+          "userId",
+          "erasedAt"
+        ],
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "erasedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PersonalDataExport": {
+        "type": "object",
+        "required": [
+          "userId",
+          "issuer",
+          "subject",
+          "createdAt",
+          "roles",
+          "auditEvents"
+        ],
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "issuer": {
+            "type": "string"
+          },
+          "subject": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RoleGrant"
+            }
+          },
+          "auditEvents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "occurredAt",
+                "action",
+                "resourceType",
+                "resourceId",
+                "initiatedBy",
+                "details"
+              ],
+              "properties": {
+                "occurredAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "action": {
+                  "type": "string"
+                },
+                "resourceType": {
+                  "type": "string"
+                },
+                "resourceId": {
+                  "type": "string"
+                },
+                "initiatedBy": {
+                  "type": "string",
+                  "enum": [
+                    "self",
+                    "staff"
+                  ]
+                },
+                "details": {
+                  "type": "object",
+                  "description": "Whitelisted event details (role, merchantId, initiator); never personal data of other people",
+                  "properties": {
+                    "role": {
+                      "type": "string"
+                    },
+                    "merchantId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "format": "uuid"
+                    },
+                    "initiator": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "additionalProperties": false
+            }
           }
         },
         "additionalProperties": false

@@ -75,6 +75,34 @@ Two fixed-window limiters (`src/rate-limit.ts`) are attached by the same contrac
 - A pre-existing `tazumo_api` role with LOGIN, SUPERUSER, BYPASSRLS, CREATEROLE, CREATEDB or REPLICATION, or with any role membership, aborts the migration. The migration needs CREATEROLE unless the role already exists. Use one cluster per environment, or restrict CONNECT per database.
 - Migration `0003` also adds `audit_events.details jsonb`.
 
+## Slice 3: GDPR erasure and export
+
+- **Endpoints:**
+  - `POST /v1/me/erasure`: self-service.
+  - `POST /v1/admin/users/{userId}/erasure`: admin or support; others get 403.
+  - `GET /v1/me/export`.
+- **Erasure:** the app computes the pseudonym (HMAC with an HKDF-derived erasure key, length-prefixed input) and calls `erase_user(target, pseudonym, actor, initiator, request_id)`. This `SECURITY DEFINER` function does everything in one transaction:
+  1. Checks that the actor holds the initiator role, or is the target for `self`, then locks the user row.
+  2. If the user is already erased, returns the original `erased_at` (idempotent).
+  3. Checks blockers: an `admin` grant, or a staff grant when support initiates. Either gives 409 with `details.blockers`.
+  4. Re-tombstones any older record holding the same pseudonym with a random value.
+  5. Sets `subject` to the pseudonym and records `erased_at`.
+  6. Deletes all grants and inserts the audit row `user:erase` with `{initiator}`.
+  7. Forgets keyed-hash tombstones older than the fixed recognition window (24 h 2 min). Operators also schedule `db:forget-erased` as the owner.
+- **Supporting guarantees:**
+  - A CHECK keeps `erased_at` and the `erased:` prefix consistent.
+  - Tokens whose `sub` starts with `erased:` are rejected.
+  - A `SECURITY DEFINER` trigger (`FOR SHARE` on the user row) refuses grants to erased users, even while an erasure is running. The admin API answers 409 `user_erased`.
+- **Authentication after erasure:** `resolvePrincipal` checks the hashed subject both before and after its upsert, closing the race with a concurrent erasure. A token whose `iat` is at most `erased_at` + 60 s gets 401. Later tokens re-provision a new, unlinked user.
+- **Export:**
+  - one `REPEATABLE READ`, read-only transaction: identity, grants, and audit events from `export_audit_events(uuid)`, with whitelisted `details` (role, merchantId, initiator);
+  - the runtime role can call this function for any ID; that limit is documented in ADR-0016;
+  - logs (HMAC tag, request IDs) and the Art. 15(1) metadata (purposes, recipients, retention, source = identity provider) belong to the privacy notice, not this endpoint.
+- **Privileges (migration `0004`):** no new table privileges for `tazumo_api`, only EXECUTE on `erase_user`, `export_audit_events` and `forget_erased_subjects`. The row-level security policies from `0003` are unchanged.
+- **Issuer:** `users.issuer` stays in clear text. It is the identity provider's tenant URL, not personal data.
+- **Provider side:** deleting the account at the identity provider stays an operator step until ADR-0017 is decided.
+- **Integration points for other packages:** order and commerce data must add erasure blockers or pseudonymisation steps when they are wired into the API.
+
 ## Next slices
 - Accept or amend ADR-0017 (OIDC provider), then run the Keycloak spike it proposes.
 - Use a shared rate-limit store for multi-instance deployments.

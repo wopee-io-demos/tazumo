@@ -12,7 +12,8 @@
     "db:rollback": "node --experimental-strip-types src/migrate.ts down",
     "db:seed": "node --experimental-strip-types src/seed.ts",
     "test": "node --experimental-strip-types --test --test-concurrency=1 test/*.test.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "db:forget-erased": "node --experimental-strip-types src/maintenance.ts"
   },
   "dependencies": {
     "@tazumo/core": "workspace:*",
