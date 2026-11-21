@@ -26,6 +26,6 @@ Configuration happens at build time: `VITE_OIDC_ISSUER`, `VITE_OIDC_CLIENT_ID`, 
 `tests/backoffice/stack.mts` starts:
 - a loopback OIDC provider with discovery, `/authorize` (one link per seeded principal), `/token` (checks the PKCE verifier, client and redirect URI, single-use codes), `/jwks.json` and a test-only `/test-token` used by specs for direct API calls;
 - the real `apps/api` twice (with auth, and without auth for the 503 case), migrated and seeded;
-- principals `bo-admin`, `bo-support`, `bo-short-session` (support, `expires_in: 1`), `bo-staff-a` (staff of the first merchant), `bo-customer` and `bo-target`, inserted with their grants as the schema owner and reset on every start. Each test also revokes `bo-target`'s grants first, so retries start clean.
+- principals `bo-admin`, `bo-support`, `bo-staff-a` (staff of the first merchant), `bo-customer` and `bo-target`, inserted with their grants as the schema owner and reset on every start. Each test also revokes `bo-target`'s grants first, so retries start clean.
 
 Playwright starts the web servers in order: the stack (ready once the IdP listens, after both APIs), then the build plus a preview proxied to the authenticated API, then a second preview of the same build proxied to the API without auth. Ports start at `BACKOFFICE_E2E_PORT_BASE` (default 47310).

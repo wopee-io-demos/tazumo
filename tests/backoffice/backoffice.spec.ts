@@ -40,8 +40,8 @@ async function expectNoSeriousAxe(page: Page) {
 test.beforeEach(async () => {
   const target = await userIdOf('bo-target');
   const { own } = await merchants();
-  await apiAs('bo-admin', `/v1/admin/users/${target}/roles/support`, 'DELETE');
-  await apiAs('bo-admin', `/v1/admin/users/${target}/roles/merchant_staff?merchantId=${own.id}`, 'DELETE');
+  expect((await apiAs('bo-admin', `/v1/admin/users/${target}/roles/support`, 'DELETE')).status).toBe(204);
+  expect((await apiAs('bo-admin', `/v1/admin/users/${target}/roles/merchant_staff?merchantId=${own.id}`, 'DELETE')).status).toBe(204);
 });
 
 test('signed-out page is labelled as a prototype and accessible', async ({ page }) => {
@@ -206,9 +206,10 @@ test('tokens are kept in memory only', async ({ page }) => {
 
 test('an expired session returns to sign-in with a notice', async ({ page }) => {
   const { own } = await merchants();
-  await signIn(page, 'bo-short-session');
+  await page.clock.install();
+  await signIn(page, 'bo-support');
   await expect(tid(page, 'nav-lookup')).toBeVisible();
-  await page.waitForTimeout(1_200);
+  await page.clock.fastForward('06:00');
   await page.evaluate((id) => (location.hash = `#/merchants/${id}/staff`), own.id);
   await expect(tid(page, 'auth-error')).toHaveText('Your session has expired. Please sign in again.');
   await expect(tid(page, 'sign-in')).toBeVisible();

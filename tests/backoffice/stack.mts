@@ -21,7 +21,8 @@ export function mint(sub: string) {
   return `${input}.${sign('sha256', Buffer.from(input), privateKey).toString('base64url')}`;
 }
 
-type Pending = { sub?: string; redirectUri: string; challenge: string; state: string };
+type Pending = { redirectUri: string; challenge: string; state: string };
+const allowedRedirects = previewOrigins.map((origin) => `${origin}/`);
 const authorizations = new Map<string, Pending>();
 const codes = new Map<string, Pending & { sub: string }>();
 
@@ -46,11 +47,11 @@ const idp = createServer(async (req, res) => {
   if (url.pathname === '/jwks.json') return send(res, 200, { keys: [jwk] });
   if (url.pathname === '/test-token') return send(res, 200, { access_token: mint(q.get('sub') ?? '') });
   if (url.pathname === '/authorize') {
-    const redirectUri = q.get('redirect_uri') ?? '';
+    const redirectUri = allowedRedirects.find((allowed) => allowed === q.get('redirect_uri'));
     const valid =
       q.get('response_type') === 'code' && q.get('client_id') === clientId && q.get('code_challenge_method') === 'S256' &&
-      !!q.get('code_challenge') && !!q.get('state') && previewOrigins.some((o) => redirectUri === `${o}/`);
-    if (!valid) return send(res, 400, 'invalid authorization request', 'text/plain');
+      !!q.get('code_challenge') && !!q.get('state');
+    if (!valid || !redirectUri) return send(res, 400, 'invalid authorization request', 'text/plain');
     const id = randomBytes(12).toString('hex');
     authorizations.set(id, { redirectUri, challenge: q.get('code_challenge')!, state: q.get('state')! });
     const buttons = Object.keys(principals)
@@ -65,7 +66,10 @@ const idp = createServer(async (req, res) => {
     authorizations.delete(q.get('request')!);
     const code = randomBytes(16).toString('hex');
     codes.set(code, { ...pending, sub });
-    res.writeHead(302, { location: `${pending.redirectUri}?code=${code}&state=${encodeURIComponent(pending.state)}` });
+    const location = new URL(pending.redirectUri);
+    location.searchParams.set('code', code);
+    location.searchParams.set('state', pending.state);
+    res.writeHead(302, { location: location.toString() });
     return res.end();
   }
   if (url.pathname === '/token' && req.method === 'POST') {
@@ -77,8 +81,7 @@ const idp = createServer(async (req, res) => {
       grant && form.get('grant_type') === 'authorization_code' && form.get('client_id') === clientId &&
       form.get('redirect_uri') === grant.redirectUri && createHash('sha256').update(verifier).digest('base64url') === grant.challenge;
     if (!ok) return send(res, 400, { error: 'invalid_grant' });
-    const expiresIn = grant.sub === 'bo-short-session' ? 1 : 300;
-    return send(res, 200, { access_token: mint(grant.sub), token_type: 'Bearer', expires_in: expiresIn });
+    return send(res, 200, { access_token: mint(grant.sub), token_type: 'Bearer', expires_in: 300 });
   }
   return send(res, 404, 'not found', 'text/plain');
 });

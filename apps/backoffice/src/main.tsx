@@ -43,10 +43,11 @@ function Shell({ auth, api, me, onSignOut }: { auth: AuthProvider; api: Api; me:
   const merchants = useMerchants(api, true);
   const nameOf = (id: string) => merchants.data?.find((m) => m.id === id)?.name ?? id;
   const main = useRef<HTMLElement>(null);
-  const first = useRef(true);
+  const shownHash = useRef(location.hash);
   useEffect(() => {
-    if (first.current) first.current = false;
-    else main.current?.focus();
+    if (shownHash.current === location.hash) return;
+    shownHash.current = location.hash;
+    main.current?.focus();
   }, [route]);
 
   let page: React.ReactNode;

@@ -14,18 +14,18 @@ export default defineConfig({
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   // Playwright starts these in order, so the third preview serves the build made by the second.
   webServer: [
-    { command: 'node --experimental-strip-types tests/backoffice/stack.mts', url: `${issuer}/health`, cwd: '../..', timeout: 120_000 },
+    { command: 'node --experimental-strip-types tests/backoffice/stack.mts', url: `${issuer}/health`, cwd: '../..', timeout: 240_000 },
     {
       command: `${buildEnv} ${app} build && BACKOFFICE_API_URL=http://127.0.0.1:${ports.api} ${app} preview --port ${ports.preview} --strictPort`,
       url: `http://127.0.0.1:${ports.preview}`,
       cwd: '../..',
-      timeout: 120_000,
+      timeout: 240_000,
     },
     {
       command: `BACKOFFICE_API_URL=http://127.0.0.1:${ports.apiNoAuth} ${app} preview --port ${ports.previewNoAuth} --strictPort`,
       url: `http://127.0.0.1:${ports.previewNoAuth}`,
       cwd: '../..',
-      timeout: 60_000,
+      timeout: 120_000,
     },
   ],
 });
