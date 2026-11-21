@@ -33,7 +33,7 @@ jobs:
         with:
           version: 10.11.0
       - if: steps.changes.outputs.code == 'true'
-        run: pnpm install --no-frozen-lockfile
+        run: pnpm install --frozen-lockfile
       - name: SUT contract (IDs in both apps, semantic version against the previous contract)
         if: steps.changes.outputs.code == 'true'
         env:
