@@ -17,7 +17,7 @@ Hoisting improves SDK 53 native autolinking but weakens dependency isolation. Ex
 
 ## Update 2026-11-20: lockfile and Expo SDK evaluation ([#14](https://github.com/wopee-io-demos/tazumo/issues/14))
 
-**Lockfile.** `pnpm-lock.yaml` is committed. It was generated with pnpm 10.11.0 (the `packageManager` pin) and `nodeLinker: hoisted`. Every workflow installs with `pnpm install --frozen-lockfile`, and `actions/setup-node` caches the pnpm store (`cache: pnpm`). A PR that changes dependencies (any dependency field or override in a `package.json`) must run `pnpm install` and commit the updated lockfile, or CI fails at install. The lockfile is platform-neutral: it was generated on macOS, and CI verifies it by installing frozen on Linux and macOS runners. With `RUNNER_MODE` set to self-hosted, `cache: pnpm` still uses the GitHub cache. That is harmless but redundant with the runner's local store.
+**Lockfile.** `pnpm-lock.yaml` is committed. It was generated with pnpm 10.11.0 (the `packageManager` pin) and `nodeLinker: hoisted`. Every workflow installs with `pnpm install --frozen-lockfile`. The API and native-build jobs cache the pnpm store through `actions/setup-node` (`cache: pnpm`). A PR that changes dependencies (any dependency field or override in a `package.json`) must run `pnpm install` and commit the updated lockfile, or CI fails at install. The lockfile is platform-neutral: it was generated on macOS, and CI verifies it by installing frozen on Linux and macOS runners. With `RUNNER_MODE` set to self-hosted, `cache: pnpm` still uses the GitHub cache. That is harmless but redundant with the runner's local store.
 
 **Expo SDK evaluation (no upgrade made).** Versions observed on npm and docs.expo.dev on 2026-11-20:
 
