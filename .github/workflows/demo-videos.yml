@@ -5,11 +5,12 @@ on:
     paths:
       - '.github/workflows/demo-videos.yml'
       - 'tests/demo/**'
+      - '!tests/demo/**/*.md'
 permissions:
   contents: read
 concurrency:
-  group: demo-videos-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: demo-videos-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 env:
   MOBILECLI_VERSION: 1.0.24
 jobs:

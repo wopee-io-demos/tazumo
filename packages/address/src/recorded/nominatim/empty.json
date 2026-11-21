@@ -1,0 +1,11 @@
+{
+  "recordedFrom": "Local Nominatim 5.3.3 (mediagis/nominatim:5.3.3@sha256:168c30e2, infra/geocoding/compose.yaml), Geofabrik Bremen extract 2026-11-20, recorded 2026-11-21. OSM data (c) OpenStreetMap contributors, ODbL 1.0.",
+  "query": {
+    "street": "Erfundene Straße 5",
+    "city": "Beispielstadt",
+    "postalcode": "28195",
+    "countrycodes": "de"
+  },
+  "status": 200,
+  "body": []
+}

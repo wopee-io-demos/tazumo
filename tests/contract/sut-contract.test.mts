@@ -149,3 +149,25 @@ test('a prop-bound test ID only takes values passed to that component',()=>{
   const errors=mutate('web','MerchantDetail.tsx','<NotFound lang={lang} routeKey={id} message={t(lang,\'merchantNotFound\')} testId="sut-merchant-not-found"/>','<p testId="sut-merchant-not-found"/>');
   assert.ok(errors.some(e=>e.startsWith('web.selectors.merchantNotFound:')));
 });
+
+test('web.requiresAuth may only name web.selectors keys, once each',()=>{
+  for(const [list,expected] of [[['noSuchKey'],/"noSuchKey" is not a web\.selectors key/],[['authSignIn','authSignIn'],/authSignIn is listed twice/],['authSignIn',/must be an array/]] as const){
+    const c=clone(repo.contract);
+    c.web.requiresAuth=list;
+    assert.ok(checkRepo({...repo,contract:c}).some(e=>expected.test(e)),String(list));
+  }
+});
+
+test('semantic version: gating an existing selector behind a provider is major, lifting the gate is minor',()=>{
+  const base=clone(repo.contract);
+  const gated=clone(base);
+  gated.web.requiresAuth=[...gated.web.requiresAuth,'search'];
+  assert.equal(checkCompatibility(base,gated).level,'major');
+  const lifted=clone(base);
+  lifted.web.requiresAuth=lifted.web.requiresAuth.filter((key:string)=>key!=='authSignIn');
+  assert.equal(checkCompatibility(base,lifted).level,'minor');
+  const fresh=clone(base);
+  fresh.web.selectors.authExtra='[data-testid="sut-auth-extra"]';
+  fresh.web.requiresAuth=[...fresh.web.requiresAuth,'authExtra'];
+  assert.equal(checkCompatibility(base,fresh).level,'minor');
+});
