@@ -10,7 +10,7 @@ The system SHALL accept a delivery address only for a supported market (SK, CZ, 
 - THEN the result is `ok` with the normalized address, and diacritics are unchanged.
 
 #### Scenario: Invalid address
-- WHEN the postal code has the wrong format for the market, the country is unsupported or differs from the market, `city` or `addressLine1` is missing or blank, a field is over its length limit, a field is unknown or not a string, or a field contains control characters, zero-width characters or bidirectional formatting characters (instructions may contain tab and line breaks)
+- WHEN the postal code has the wrong format for the market, the country is unsupported or differs from the market, `city` or `addressLine1` is missing or blank, a field is over its length limit, a field is unknown or not a string, or a field contains control characters or invisible format characters (zero-width, bidirectional, soft hyphen, blank fillers) (instructions may contain tab and line breaks)
 - THEN the result lists one error per problem, each with the field path and a code, and nothing is geocoded.
 
 ### Requirement: Idempotent normalization

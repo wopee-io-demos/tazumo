@@ -43,9 +43,9 @@ const postalPatterns: Readonly<Record<AddressMarket, RegExp>> = {
   AT: /^\d{4}$/,
 };
 
-/** C0/C1 controls plus zero-width and bidirectional formatting characters. Instructions may contain tab and line breaks. */
-const forbiddenInLine = /[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2060-\u2069\ufeff]/;
-const forbiddenInInstructions = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2060-\u2069\ufeff]/;
+/** C0/C1 controls, format characters (zero-width, bidi, soft hyphen) and blank fillers. Instructions may contain tab and line breaks. */
+const forbiddenInLine = /[\p{Cc}\p{Cf}\u034f\u115f\u1160\u3164\uffa0]/u;
+const forbiddenInInstructions = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f\p{Cf}\u034f\u115f\u1160\u3164\uffa0]/u;
 
 export const isAddressMarket = (value: unknown): value is AddressMarket =>
   typeof value === 'string' && (addressMarkets as readonly string[]).includes(value);
