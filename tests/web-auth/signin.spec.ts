@@ -15,6 +15,13 @@ const secondPassword = `Second-${randomBytes(12).toString('base64url')}`;
 const jwt = /eyJ[\w-]+\.[\w-]+\.[\w-]+/;
 let userId: string;
 
+const contract = JSON.parse(readFileSync(join(__dirname, '../../contracts/sut.json'), 'utf8'));
+const providerSelectors: string[] = contract.web.requiresAuth;
+const seenSelectors = new Set<string>();
+async function recordSelectors(page: Page) {
+  for (const key of providerSelectors) if (await page.locator(contract.web.selectors[key]).first().isVisible()) seenSelectors.add(key);
+}
+
 type Watched = { page: Page; tokens: string[]; console: string[]; meCalls: number; tokenCalls: number; expiresIn: number };
 
 async function open(browser: Browser, setup?: (page: Page) => Promise<void>): Promise<Watched> {
@@ -58,6 +65,7 @@ async function fillLogin(page: Page, user: string, password: string) {
 async function expectSignedIn(page: Page, user: string) {
   await page.getByTestId('sut-auth-account').click();
   await expect(page.getByTestId('sut-auth-user')).toContainText(user);
+  await recordSelectors(page);
   await expect(page.getByTestId('sut-auth-account')).toHaveAttribute('aria-expanded', 'true');
   await page.keyboard.press('Escape');
   await expect(page.getByTestId('sut-auth-account-menu')).toBeHidden();
@@ -85,6 +93,8 @@ test('sign-up on the hosted page with e-mail verification ends signed in, with t
   shared = await open(browser);
   const { page } = shared;
   await expect(page.locator('input[type=password]')).toHaveCount(0);
+  await expect(page.getByTestId('sut-auth-sign-up')).toBeVisible();
+  await recordSelectors(page);
   await page.getByTestId('sut-auth-sign-up').click();
   await page.waitForURL((url) => url.href.startsWith(issuer));
   await page.locator('#email').fill(email);
@@ -203,6 +213,7 @@ test('a tampered state, a wrong issuer, a nonce mismatch and missing PKCE are re
       await page.route((url) => url.href.startsWith(oidc.authorize), intercept);
       await page.getByTestId('sut-auth-sign-in').click();
       await expect(page.getByTestId('sut-auth-notice')).toHaveText(notice);
+      await recordSelectors(page);
       await page.unrouteAll();
       await expect(page.getByTestId('sut-auth-sign-in')).toBeVisible();
       await expect(page.getByTestId('sut-auth-account')).toHaveCount(0);
@@ -227,4 +238,8 @@ test('Keycloak refuses a redirect URI outside the client allowlist', async ({ pa
   await page.goto(url.href);
   await expect(page.getByText(/invalid parameter: redirect_uri/i)).toBeVisible();
   expect(page.url().startsWith(issuer)).toBe(true);
+});
+
+test('every contract selector that needs a provider was visible in at least one state', () => {
+  expect(providerSelectors.filter((key) => !seenSelectors.has(key))).toEqual([]);
 });

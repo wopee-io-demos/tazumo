@@ -15,3 +15,9 @@ Read [docs/START-HERE.md](docs/START-HERE.md) before any new work, then [docs/IS
 
 ## Mandatory shared engineering policy
 Read [docs/ENGINEERING-POLICY.md](docs/ENGINEERING-POLICY.md) for issue-first parallel agents, independent PR branches, OpenSpec/ADR, proactive review, genuine CI gates, merge and handoff. [Fresh-start entry](docs/START-HERE.md).
+
+## Agent Skills standard
+Follow [docs/AGENT-SKILLS.md](docs/AGENT-SKILLS.md), based on https://agentskills.io/specification (adoption tracked in #35). Skills are folders containing `SKILL.md` with valid YAML `name` and task-triggering `description`, kebab-case names matching the folder, concise progressive-disclosure instructions, and relative `references/`, `scripts/`, `assets/` when useful. Keep `AGENTS.md` for repo-wide policy; it is not a skill. Validate with `skills-ref validate <skill-folder>` where available, plus behavior and negative tests. Update the upstream `mobile-agent` skills first, then version and synchronize copies to `mobile-demo` with the lockfile. Never claim Wopee MCP or native device validation from mocked results.
+
+## SUT contract
+`contracts/sut.json` is the versioned automation API for the demo repositories ([SUT-CONTRACT](docs/SUT-CONTRACT.md)). Never rename or remove a `sut-*` ID without a major version bump and downstream migration; register new IDs with a minor bump. Run `pnpm check:sut` before pushing UI changes.

@@ -11,7 +11,7 @@
 - [x] `.github/workflows/idp.yml` runs `tests/web-auth/` after the IdP suite.
 - [ ] `idp.yml`, `check` and `evidence` green on the PR head.
 - [x] Independent review (fresh reviewer agent, head `7a18f48`): no blockers. Fixed: a failed discovery is no longer cached; sign-out shows "Signing you out…" until the end-session redirect, and a session generation counter drops late refresh results; the tests wait for the end-session request and the redirect back; the tests count token requests per rejected callback (0 for state, `iss` and PKCE, 1 for the nonce); the refresh fast-forward is derived from `expires_in`; a leak check runs after sign-out; `authConfig` reads `BASE_URL` from its `env`. Deferred to #89: an authorised fetch for further protected calls (recorded in ADR-0027). Evidence after the fixes: `tests/web-auth/` 6/6 three runs in a row, `pnpm test:e2e` 39/39.
-- [ ] Selectors registered: listed on #32 while contract v0.2.0 (#90) is unmerged.
+- [x] Selectors registered in `contracts/sut.json` v0.3.0 (minor: eight `auth*` selectors plus `web.requiresAuth`), after #90 merged. Evidence: `pnpm check:sut --base origin/main` reports a minor change, v0.3.0; the contract coverage e2e skips `requiresAuth` keys, and `tests/web-auth/` asserts that each of them is visible against the real realm. `sut-auth-pending` is transient and stays unregistered.
 
 ## Slice 2: native (separate PR)
 
