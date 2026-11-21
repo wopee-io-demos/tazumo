@@ -156,7 +156,15 @@ export async function quoteRoutes(app: FastifyInstance, { pool }: { pool: pg.Poo
           return reply.code(500).send(apiError(request, 'internal_error', 'Internal server error'));
         }
         const errors = priced.errors.map(({ code, path }) => ({ code, path }));
-        if (errors.every((e) => e.code === 'option_unavailable')) {
+        const sent = item.selectedOptions ?? {};
+        const unavailableDefault = (groupId: unknown) =>
+          typeof groupId === 'string' &&
+          !Object.hasOwn(sent, groupId) &&
+          definition.groups.some((g) => g.id === groupId && g.options.some((o) => o.isDefault === true && !o.available));
+        const availabilityOnly = errors.every(
+          (e) => e.code === 'option_unavailable' || ((e.code === 'missing_required_group' || e.code === 'too_few_options') && unavailableDefault(e.path[1]))
+        );
+        if (availabilityOnly) {
           return reply.code(409).send(apiError(request, 'option_unavailable', 'A selected option is not available', { productId: item.productId, errors }));
         }
         return reply.code(400).send(apiError(request, 'invalid_options', 'The selected options are not valid for this product', { productId: item.productId, errors }));
@@ -192,7 +200,13 @@ export async function quoteRoutes(app: FastifyInstance, { pool }: { pool: pg.Poo
           );
         }
         if (error.code === 'duplicate_line') {
-          return reply.code(400).send(apiError(request, error.code, 'The same product with the same options appears on more than one line'));
+          const line = lines.find((l) => lineKey(l.productId, l.selection) === error.details.lineId);
+          return reply.code(400).send(
+            apiError(request, error.code, 'The same product with the same options appears on more than one line', {
+              productId: line?.productId,
+              selectedOptions: line?.selection
+            })
+          );
         }
         if (status) return reply.code(status).send(apiError(request, error.code, error.message));
         request.log.error({ commerceError: error.code }, 'pricing failed on server data');

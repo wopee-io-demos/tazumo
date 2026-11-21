@@ -2250,7 +2250,14 @@
             "minimum": 1
           },
           "selectedOptions": {
-            "$ref": "#/components/schemas/OptionSelection"
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "description": "Resolved selection: every option group of the product with its chosen option IDs"
           },
           "options": {
             "type": "array",

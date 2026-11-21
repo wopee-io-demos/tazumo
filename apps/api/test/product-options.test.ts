@@ -12,6 +12,7 @@ const pizza = id(601);
 const bread = id(602);
 const salad = id(603);
 const broken = id(604);
+const soup = id(605);
 const postalCode = (() => {
   for (let code = 10000; code <= 99999; code++) if (syntheticDistanceMeters(String(code)) <= 2000) return String(code);
   throw new Error('no postal code found');
@@ -34,12 +35,14 @@ describe('product options in the catalogue and the quote', () => {
     await db.pool.query(product, [bread, 'opt-bread', merchant, 'groceries', 'Bread', 450]);
     await db.pool.query(product, [salad, 'opt-salad', merchant, 'food', 'Salad', 800]);
     await db.pool.query(product, [broken, 'opt-broken', merchant, 'food', 'Broken', 500]);
+    await db.pool.query(product, [soup, 'opt-soup', merchant, 'food', 'Soup', 400]);
     const group = `INSERT INTO product_option_groups (product_id, id, label_key, selection, min_choices, max_choices, required, sort_order)
                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`;
     await db.pool.query(group, [pizza, 'size', 'options.size', 'single', 1, 1, true, 0]);
     await db.pool.query(group, [pizza, 'extras', 'options.extras', 'multiple', 0, 2, false, 1]);
     await db.pool.query(group, [salad, 'dressing', 'options.dressing', 'single', 1, 1, true, 0]);
     await db.pool.query(group, [broken, 'empty', 'options.empty', 'single', 0, 1, false, 0]);
+    await db.pool.query(group, [soup, 'portion', 'options.portion', 'single', 1, 1, true, 0]);
     const option = `INSERT INTO product_options (product_id, group_id, id, label_key, price_delta_minor, availability, is_default, sort_order)
                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`;
     const rows: Array<[string, string, string, number, object, boolean]> = [
@@ -51,7 +54,9 @@ describe('product options in the catalogue and the quote', () => {
       [pizza, 'extras', 'chilli-oil', 60, { status: 'scheduled', from: past }, false],
       [pizza, 'extras', 'basil', 30, { status: 'scheduled', from: future }, false],
       [pizza, 'extras', 'truffle', 400, { status: 'out_of_stock' }, false],
-      [salad, 'dressing', 'lemon', 0, { status: 'in_stock' }, false]
+      [salad, 'dressing', 'lemon', 0, { status: 'in_stock' }, false],
+      [soup, 'portion', 'cup', 0, { status: 'out_of_stock' }, true],
+      [soup, 'portion', 'bowl', 150, { status: 'in_stock' }, false]
     ];
     for (const [order, [productId, groupId, optionId, delta, availability, isDefault]] of rows.entries()) {
       await db.pool.query(option, [productId, groupId, optionId, `options.${optionId}`, delta, availability, isDefault, order]);
@@ -86,6 +91,12 @@ describe('product options in the catalogue and the quote', () => {
     assert.deepEqual(extras, { olives: true, mushrooms: true, 'chilli-oil': true, basil: false, truffle: false });
     assert.equal(groups[0].options.find((o) => o.id === 'small')!.priceDeltaMinor, -200);
     assert.equal('optionGroups' in byId.get(bread)!, false);
+  });
+
+  test('a definition that fails validation is served as unavailable without option groups', async () => {
+    const product = (await products()).get(broken) as { optionGroups?: OptionGroup[]; available: boolean };
+    assert.equal(product.available, false);
+    assert.equal('optionGroups' in product, false);
   });
 
   test('defaults apply when no options are sent, and the line snapshot matches the contract', async () => {
@@ -158,7 +169,9 @@ describe('product options in the catalogue and the quote', () => {
     ['a required group without a default left out', [{ productId: salad, quantity: 1 }], 400, 'invalid_options', ['missing_required_group']],
     ['options on a product without options', [{ productId: bread, quantity: 1, selectedOptions: { size: ['large'] } }], 400, 'invalid_options', ['unknown_group']],
     ['an out-of-stock option', [{ productId: pizza, quantity: 1, selectedOptions: { extras: ['truffle'] } }], 409, 'option_unavailable', ['option_unavailable']],
-    ['an option scheduled later', [{ productId: pizza, quantity: 1, selectedOptions: { extras: ['basil'] } }], 409, 'option_unavailable', ['option_unavailable']]
+    ['an option scheduled later', [{ productId: pizza, quantity: 1, selectedOptions: { extras: ['basil'] } }], 409, 'option_unavailable', ['option_unavailable']],
+    ['a required group left out whose default is out of stock', [{ productId: soup, quantity: 1 }], 409, 'option_unavailable', ['missing_required_group']],
+    ['none chosen for that group explicitly', [{ productId: soup, quantity: 1, selectedOptions: { portion: [] } }], 400, 'invalid_options', ['too_few_options']]
   ];
   for (const [name, items, status, code, errorCodes] of invalid) {
     test(`rejects ${name} with ${status} ${code}`, async () => {
@@ -180,6 +193,7 @@ describe('product options in the catalogue and the quote', () => {
     ]);
     assert.equal(res.statusCode, 400, res.body);
     assert.equal(res.json().code, 'duplicate_line');
+    assert.deepEqual(res.json().details, { productId: pizza, selectedOptions: { size: ['medium'], extras: [] } });
     assert.doesNotMatch(res.json().message, /\[/);
   });
 

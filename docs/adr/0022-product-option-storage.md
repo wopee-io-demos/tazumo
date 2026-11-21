@@ -26,4 +26,5 @@ Tracking: issue #82 (slice 2), OpenSpec `product-options`, builds on ADR-0009, A
 - Catalogue reads add one query per page of products; the quote adds one query per request.
 - Merchant editing (#92) can change one option at a time, and the database rejects inconsistent rows early.
 - A snapshot can hold a label key that a later client version no longer translates. Clients show the key's fallback text, and order history never re-prices.
-- When #75 moves product availability to the same `Availability` model, product and option availability share one resolution path.
+- A definition that fails `validateOptionGroups` is logged and its product is served with `available: false` and no `optionGroups`, so the catalogue never offers what the quote would refuse.
+- `Product.available` does not yet account for a required group with no available option; the quote answers 409 for it. When #75 moves product availability to the same `Availability` model, product and option availability share one resolution path.

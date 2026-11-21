@@ -13,5 +13,5 @@
 - [x] `GET /v1/merchants/{merchantId}/products` returns `optionGroups` with availability resolved per request.
 - [x] `POST /v1/order-quotes` prices `selectedOptions` through `priceSelection`, keys commerce lines by `lineKey` and returns `Quote.lines`; OpenAPI `0.8.0-draft`.
 - [x] ADR-0022 (option storage and the line snapshot).
-- [x] `apps/api/test/product-options.test.ts`: 23 tests against PostgreSQL 16 (catalogue, defaults, package parity, two configurations, every selection error code, 409 availability, duplicate configuration, schema rejections, ignored client price, 500 on a broken definition, runtime-role grants, database constraints). Local run: `apps/api` 146/146, root `pnpm test` pass, `pnpm typecheck` and `pnpm build` pass.
+- [x] `apps/api/test/product-options.test.ts`: 26 tests against PostgreSQL 16 (catalogue, invalid definition served unavailable, defaults, package parity, two configurations, every selection error code, 409 availability including an out-of-stock required default, duplicate configuration, schema rejections, ignored client price, 500 on a broken definition, runtime-role grants, database constraints). Local run: `apps/api` 149/149, root `pnpm test` pass, `pnpm typecheck` and `pnpm build` pass.
 - [ ] Current-head CI green on the slice 2 PR.

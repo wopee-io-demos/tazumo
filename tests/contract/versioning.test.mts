@@ -117,7 +117,7 @@ test('the OpenAPI version must change, and increase, whenever the contract chang
   assert.match(checkOpenapiVersion(spec,edit(spec.info.version)).join(),/changed but info.version is still/);
   assert.deepEqual(checkOpenapiVersion(spec,edit(v(minor+1,'-draft'))),[]);
   assert.deepEqual(checkOpenapiVersion(spec,edit(v(minor),false)),[]);
-  assert.match(checkOpenapiVersion(spec,edit(v(minor-1,'-draft'))).join(),/must be greater than/);
+  assert.match(checkOpenapiVersion(spec,edit(minor>0?v(minor-1,'-draft'):`${major-1}.0.0-draft`)).join(),/must be greater than/);
   assert.match(checkOpenapiVersion(spec,edit(v(minor,'-alpha'),false)).join(),/must be greater than/);
   const legacy=edit('draft-7',false);
   assert.match(checkOpenapiVersion(legacy,edit('draft-7')).join(),/is not a semantic version/);

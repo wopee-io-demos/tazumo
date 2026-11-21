@@ -4,6 +4,7 @@ import { rateLimitTier } from '../rate-limit.ts';
 import { apiError } from '../errors.ts';
 import { routeSchema, toFastifyPath } from '../contract.ts';
 import { loadOptionGroups } from '../product-options.ts';
+import { validateOptionGroups } from '@tazumo/product-options';
 
 const marketCode = { pattern: '^[a-z0-9-]{1,64}$' };
 
@@ -53,7 +54,14 @@ export async function catalogueRoutes(app: FastifyInstance, { pool }: { pool: pg
         [request.params.merchantId]
       );
       const optionGroups = await loadOptionGroups(pool, rows.map((row) => row.id));
-      return rows.map((row) => (optionGroups.has(row.id) ? { ...row, optionGroups: optionGroups.get(row.id) } : row));
+      return rows.map((row) => {
+        const groups = optionGroups.get(row.id);
+        if (!groups) return row;
+        const errors = validateOptionGroups({ productId: row.id, currency: row.price.currency, groups });
+        if (errors.length === 0) return { ...row, optionGroups: groups };
+        request.log.error({ productId: row.id, codes: errors.map((e) => e.code) }, 'invalid product option definition');
+        return { ...row, available: false };
+      });
     }
   );
 }
