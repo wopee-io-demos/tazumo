@@ -15,6 +15,8 @@ docker compose -f infra/idp/compose.yml down -v          # stop and delete all d
 
 Set `IDP_PORT`, `IDP_MAIL_PORT` or `IDP_PROJECT` (container name prefix) to change the defaults. Every port binds to 127.0.0.1.
 
+`--import-realm` skips a realm that already exists, so after editing `realm.json` run `down -v` and `up.sh` again. Run `down -v` too before deleting `.env`, because the PostgreSQL volume keeps the old password.
+
 ## Credentials
 
 Nothing secret is committed. On first run `up.sh` writes `infra/idp/.env` (gitignored, mode 0600) with a random PostgreSQL password and a random password for the `dev-only-admin` bootstrap admin. The admin is reachable only on loopback.
@@ -51,7 +53,7 @@ BACKOFFICE_API_URL=http://127.0.0.1:3001 \
 pnpm --filter @tazumo/backoffice dev --port 5174 --strictPort
 ```
 
-Leave `VITE_OIDC_RESOURCE` unset: Keycloak ignores the RFC 8707 `resource` parameter, and the audience comes from the client's mapper. Wiring web, native and the back office into their sign-in screens is #88.
+For the preview build use `preview --port 4174 --strictPort` (the realm allows 5174 and 4174, not Vite's default 4173). The IdP suite builds and serves the unchanged app exactly this way and signs a seeded user in through it. Leave `VITE_OIDC_RESOURCE` unset: Keycloak refuses `resource=tazumo-api` with `invalid_target` (and ignores absolute-URI resources), and the audience comes from the client's mapper. Wiring web, native and the back office into their sign-in screens is #88.
 
 ## Tests
 

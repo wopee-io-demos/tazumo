@@ -48,11 +48,15 @@ export function lintRealm(realm: Record<string, any>): string[] {
     if (client.attributes?.['pkce.code.challenge.method'] !== 'S256') failures.push(`${name}: PKCE S256 must be required`);
     if (client.directAccessGrantsEnabled !== false) failures.push(`${name}: the password grant must be disabled`);
     if (client.implicitFlowEnabled || client.serviceAccountsEnabled) failures.push(`${name}: implicit flow and service accounts must be off`);
+    for (const grant of ['oauth2.device.authorization.grant.enabled', 'oidc.ciba.grant.enabled', 'standard.token.exchange.enabled']) {
+      if ((client.attributes?.[grant] ?? 'false') !== 'false') failures.push(`${name}: ${grant} must be off`);
+    }
     const uris = [
       ...(client.redirectUris ?? []),
       ...(client.webOrigins ?? []).filter((origin: string) => origin !== '+'),
       ...String(client.attributes?.['post.logout.redirect.uris'] ?? '').split('##').filter(Boolean),
       ...['rootUrl', 'baseUrl', 'adminUrl'].map((key) => client[key]).filter(Boolean),
+      ...['frontchannel.logout.url', 'backchannel.logout.url'].map((key) => client.attributes?.[key]).filter(Boolean),
     ];
     for (const uri of uris) if (!isLoopback(uri)) failures.push(`${name}: ${uri} is not a localhost URI`);
     const audienceMapper = (client.protocolMappers ?? []).find(

@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { expect, test, type Page } from '@playwright/test';
 import { audience, clients, oidc, tokenType } from './env.mts';
-import { authorizeUrl, callApi, callbackParams, completeSignIn, decode, exchange, watchCallbacks, mailedLink, startSignIn, visit, type Tokens } from './oidc.mts';
+import { authorizeUrl, callApi, callbackParams, completeSignIn, decode, exchange, watchCallbacks, mailedLink, pkce, startSignIn, visit, type Tokens } from './oidc.mts';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -27,11 +27,10 @@ test('registration on the Keycloak page, e-mail verification, password set after
   await page.locator('#firstName').fill('Test');
   await page.locator('#lastName').fill('Registrant');
   await expect(page.locator('#password')).toHaveCount(0);
-  const sent = Date.now() - 2000;
   await page.getByRole('button', { name: /register/i }).click();
   await expect(page.getByText(/verify your email/i).first()).toBeVisible();
 
-  await visit(page, await mailedLink(email, /verify email/i, sent));
+  await visit(page, await mailedLink(email, /verify email/i));
   await page.locator('#password-new').fill(firstPassword);
   await page.locator('#password-confirm').fill(firstPassword);
   await page.locator('[type=submit]').click();
@@ -51,12 +50,20 @@ test('registration on the Keycloak page, e-mail verification, password set after
   userId = body.userId;
 });
 
-test('the API refuses a token for another audience, the ID token and a missing token', async ({ page }) => {
-  const flow = await startSignIn(page, clients.probe);
+test('the API refuses a token for another audience, the ID token and a missing token; RFC 8707 resource does not set the audience', async ({ page }) => {
+  watchCallbacks(page);
+  await visit(page, authorizeUrl(clients.probe, { state: 'resource', code_challenge: pkce().challenge, code_challenge_method: 'S256', resource: audience }));
+  expect((await callbackParams(page, clients.probe)).get('error')).toBe('invalid_target');
+
+  const resource = 'https://api.tazumo.test';
+  const flow = await startSignIn(page, clients.probe, { resource });
   await signInWithPassword(page, firstPassword);
   const probe = await completeSignIn(page, clients.probe, flow);
   expect(decode(probe.access_token, 0).typ).toBe(tokenType);
   expect([decode(probe.access_token, 1).aud].flat()).not.toContain(audience);
+  expect([decode(probe.access_token, 1).aud].flat()).not.toContain(resource);
+  expect(decode(registered.id_token, 0).typ).toBe('JWT');
+  expect(decode(registered.id_token, 1).aud).toBe(clients.web.id);
 
   for (const token of [probe.access_token, registered.id_token]) {
     const response = await callApi('/v1/me', token);
@@ -92,11 +99,10 @@ test('forgot password: the Mailpit reset link sets a new password on the Keycloa
   const flow = await startSignIn(reset, clients.web);
   await reset.getByRole('link', { name: /forgot password/i }).click();
   await reset.locator('#username').fill(email);
-  const sent = Date.now() - 2000;
   await reset.locator('[type=submit]').click();
   await expect(reset.getByText(/you should receive an email/i)).toBeVisible();
 
-  await visit(reset, await mailedLink(email, /reset password/i, sent));
+  await visit(reset, await mailedLink(email, /reset password/i));
   await reset.locator('#password-new').fill(secondPassword);
   await reset.locator('#password-confirm').fill(secondPassword);
   await reset.locator('[type=submit]').click();
@@ -119,18 +125,17 @@ test('forgot password: the Mailpit reset link sets a new password on the Keycloa
   await fresh.close();
 });
 
-test('a user seeded with a generated password signs in through the back-office client', async ({ page }) => {
+test('a seeded user with a generated password signs in to the unchanged back-office app built for this realm', async ({ page }) => {
   const users: { name: string; email: string; password: string }[] = JSON.parse(
     readFileSync(join(__dirname, '../../infra/idp/.local/test-users.json'), 'utf8'),
   );
   const customer = users.find((user) => user.name === 'customer')!;
-  const flow = await startSignIn(page, clients.backoffice);
+  await page.goto(clients.backoffice.redirectUri);
+  await page.getByTestId('sut-backoffice-sign-in').click();
   await page.locator('#username').fill(customer.email);
   await page.locator('#password').fill(customer.password);
   await page.locator('#kc-login').click();
-  const tokens = await completeSignIn(page, clients.backoffice, flow);
-  expect(decode(tokens.access_token, 1).azp).toBe(clients.backoffice.id);
-  expect((await callApi('/v1/me', tokens.access_token)).status).toBe(200);
+  await expect(page.getByTestId('sut-backoffice-no-access')).toHaveText('No back-office access');
 });
 
 test('the registration access token is refused once it has expired', async () => {

@@ -30,7 +30,7 @@ function sourceFiles(dir: string, out: string[] = []): string[] {
     if (['node_modules', 'dist', '.expo', 'ios', 'android', 'migrations'].includes(name)) continue;
     const path = join(dir, name);
     if (statSync(path).isDirectory()) sourceFiles(path, out);
-    else if (/\.(tsx?|jsx?|html)$/.test(name)) out.push(path);
+    else if (/\.([cm]?[jt]sx?|html)$/.test(name)) out.push(path);
   }
   return out;
 }

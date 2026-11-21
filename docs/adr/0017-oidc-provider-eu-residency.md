@@ -106,7 +106,7 @@ No deployed environment is wired to a provider yet. Outside development and CI, 
 Consequence 1 is done: `infra/idp` (Keycloak 26.8.2, Mailpit, PostgreSQL 17, pinned by digest) and `.github/workflows/idp.yml`, which runs the real `apps/api` server against it.
 
 - **Access token `typ`:** `at+jwt`. Keycloak sets the RFC 9068 header per client with the attribute `access.token.header.type.rfc9068`, so `AUTH_TOKEN_TYPE=at+jwt` is enforced in CI. ID tokens keep `typ: JWT` and their `aud` is the client ID, and the API rejects them.
-- **Audience:** Keycloak ignores the RFC 8707 `resource` parameter. An `oidc-audience-mapper` on each app client adds `tazumo-api` to access tokens only. A token from a client without the mapper gets 401 from the API.
+- **Audience:** Keycloak 26.8 does not derive the audience from the RFC 8707 `resource` parameter: it refuses a non-URI value such as `tazumo-api` with `invalid_target` and ignores an absolute URI. An `oidc-audience-mapper` on each app client adds `tazumo-api` to access tokens only. A token from a client without the mapper gets 401 from the API.
 - **Lifetime:** realm access token lifespan 300 s. A real token is refused with 401 once `exp` plus the API's 60 s tolerance has passed.
 - **Issuer:** `KC_HOSTNAME` pins the issuer (`http://127.0.0.1:48180/realms/tazumo` locally and in CI), whichever URL the browser used.
 - **Registration:** with e-mail verification on, Keycloak 26.8 asks for the password only after the verification link is opened, so no password exists for an unproven address.

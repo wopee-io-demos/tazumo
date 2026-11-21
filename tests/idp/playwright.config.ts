@@ -1,8 +1,10 @@
 import { randomBytes } from 'node:crypto';
 import { defineConfig, devices } from '@playwright/test';
-import { apiBase, audience, issuer, oidc, tokenType } from './env.mts';
+import { apiBase, audience, clients, issuer, oidc, tokenType } from './env.mts';
 
 const node = 'node --experimental-strip-types apps/api/src';
+const backoffice = 'pnpm --filter @tazumo/backoffice';
+const backofficePort = new URL(clients.backoffice.redirectUri).port;
 
 export default defineConfig({
   testDir: '.',
@@ -14,7 +16,7 @@ export default defineConfig({
   reporter: [process.env.CI ? ['github'] : ['list'], ['html', { open: 'never', outputFolder: '../../playwright-report/idp' }]],
   use: { trace: 'retain-on-failure', screenshot: 'only-on-failure' },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
-  webServer: {
+  webServer: [{
     command: `${node}/migrate.ts up && ${node}/server.ts`,
     cwd: '../..',
     url: `${apiBase}/health`,
@@ -28,5 +30,11 @@ export default defineConfig({
       AUTH_MAX_TOKEN_LIFETIME: '900',
       AUTH_LOG_SALT: randomBytes(24).toString('hex'),
     },
-  },
+  }, {
+    command: `${backoffice} build && ${backoffice} preview --port ${backofficePort} --strictPort`,
+    cwd: '../..',
+    url: clients.backoffice.redirectUri,
+    timeout: 240_000,
+    env: { VITE_OIDC_ISSUER: issuer, VITE_OIDC_CLIENT_ID: clients.backoffice.id, VITE_OIDC_SCOPE: 'openid', BACKOFFICE_API_URL: apiBase },
+  }],
 });

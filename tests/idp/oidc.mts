@@ -74,10 +74,10 @@ export const callApi = (path: string, token?: string) =>
   fetch(`${apiBase}${path}`, { headers: token ? { authorization: `Bearer ${token}` } : {} });
 
 /** Polls Mailpit for the newest message to `to` whose subject matches, and returns its Keycloak action link. */
-export async function mailedLink(to: string, subject: RegExp, after: number) {
+export async function mailedLink(to: string, subject: RegExp) {
   for (let attempt = 0; attempt < 40; attempt++) {
     const search = await fetch(`${mailpit}/api/v1/search?query=${encodeURIComponent(`to:"${to}"`)}`).then((r) => r.json());
-    const message = search.messages.find((m: { Subject: string; Created: string }) => subject.test(m.Subject) && Date.parse(m.Created) >= after);
+    const message = search.messages.find((m: { Subject: string }) => subject.test(m.Subject));
     if (message) {
       const { Text } = await fetch(`${mailpit}/api/v1/message/${message.ID}`).then((r) => r.json());
       const link = Text.match(/https?:\/\/\S+\/login-actions\/action-token\?\S+/)?.[0];

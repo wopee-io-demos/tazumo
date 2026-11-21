@@ -12,7 +12,7 @@ const env = Object.fromEntries(
     .filter((line) => line.includes('='))
     .map((line) => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)]),
 );
-const base = `http://127.0.0.1:${process.env.IDP_PORT ?? 48180}`;
+const base = `http://127.0.0.1:${process.env.IDP_PORT ?? env.IDP_PORT ?? 48180}`;
 const realm = 'tazumo';
 const users = ['customer', 'merchant-staff', 'support', 'admin'].map((name) => ({ name, email: `dev-${name}@tazumo.test` }));
 
