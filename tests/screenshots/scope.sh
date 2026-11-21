@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Prints web=<bool> and native=<bool>: which captures a change needs.
-# Usage: scope.sh <base-sha>; an empty base (push to main, dispatch) selects both.
+# Usage: scope.sh <base-sha>; an empty base (push to main, schedule, dispatch) selects both.
+# On pull requests native=true runs Android only; iOS runs on main, nightly and dispatch.
 set -euo pipefail
 base="${1:-}"
 if [[ -z "$base" ]]; then echo web=true; echo native=true; exit 0; fi
