@@ -35,7 +35,7 @@ jobs:
         run: |
           changed="$(git diff --name-only HEAD^1 HEAD)"
           printf '%s\n' "$changed" | sed 's/^/  /'
-          native='^(apps/mobile/(app\.json|package\.json|eas\.json|(babel|metro)\.config\.[^/]+)$|apps/mobile/(assets|plugins)/|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|\.npmrc$|\.github/workflows/native-builds\.yml$)'
+          native='^(apps/mobile/(app\.json|package\.json|eas\.json|(babel|metro)\.config\.[^/]+|tests/ios-launch-smoke\.sh)$|apps/mobile/(assets|plugins)/|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|\.npmrc$|\.github/workflows/native-builds\.yml$)'
           smoke='^(apps/mobile/(src|tests)/|apps/mobile/index\.ts$|packages/core/)'
           if printf '%s\n' "$changed" | grep -Eq "$native"; then n=true; else n=false; fi
           if [ "$n" = true ] || printf '%s\n' "$changed" | grep -Eq "$smoke"; then m=true; else m=false; fi
@@ -153,4 +153,21 @@ jobs:
         with:
           name: tazumo-ios-simulator-app
           path: tazumo-ios-simulator.zip
+          retention-days: 7
+      - name: Launch smoke on iOS 27 and 26 simulators (app must stay up, no crash report)
+        timeout-minutes: 15
+        env:
+          REQUIRE_IOS: ${{ runner.environment == 'self-hosted' && '27' || '' }}
+        run: bash apps/mobile/tests/ios-launch-smoke.sh "$RUNNER_TEMP/tazumo-ios/Build/Products/Debug-iphonesimulator/Tazumo.app" "$RUNNER_TEMP/ios-launch"
+      - name: Delete this run's launch-smoke simulators
+        if: always()
+        run: |
+          xcrun simctl list devices -j | node -e "const p=process.argv[1];for(const l of Object.values(JSON.parse(require('fs').readFileSync(0)).devices))for(const d of l)if(d.name.startsWith(p))console.log(d.udid)" "tazumo-launch-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" |
+            while read -r udid; do xcrun simctl shutdown "$udid" 2>/dev/null || true; xcrun simctl delete "$udid" || true; done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: tazumo-ios-launch-smoke
+          path: ${{ runner.temp }}/ios-launch/
+          if-no-files-found: ignore
           retention-days: 7

@@ -101,12 +101,11 @@ jobs:
       - name: Create and boot a dedicated iPhone simulator
         id: sim
         run: |
-          # TEMP(#171): remove when #173 lands (iOS 27 crashes at launch until the app adopts UIScene)
           sel="$(xcrun simctl list runtimes available -j | node -e "
             const r=JSON.parse(require('fs').readFileSync(0)).runtimes.filter(x=>x.platform==='iOS');
             r.sort((a,b)=>b.version.localeCompare(a.version,undefined,{numeric:true}));
-            const rt=r.find(x=>Number(x.version.split('.')[0])<27);
-            if(!rt){console.error('no iOS <27 runtime; iOS 27 crashes at launch until #173 lands (see #171)');process.exit(1)}
+            const rt=r[0];
+            if(!rt){console.error('no iOS simulator runtime available');process.exit(1)}
             const types=(rt.supportedDeviceTypes||[]).filter(t=>t.productFamily==='iPhone');
             const t=types.find(t=>t.name==='iPhone 16 Pro')||types[types.length-1];
             console.log(rt.identifier,t?t.identifier:'com.apple.CoreSimulator.SimDeviceType.iPhone-16-Pro',rt.version)")"
