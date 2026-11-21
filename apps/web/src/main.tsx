@@ -9,6 +9,7 @@ import {MerchantList} from './discovery/MerchantList';
 import {MerchantDetail} from './discovery/MerchantDetail';
 import {ProductDetail} from './discovery/ProductDetail';
 import {productHref,useHashRoute} from './discovery/route';
+import {useDocumentTitle} from './discovery/documentTitle';
 import './i18n/i18n.css';
 import {LanguageSwitcher} from './i18n/LanguageSwitcher';
 import {useLanguage} from './i18n/useLanguage';
@@ -21,6 +22,7 @@ function App(){
  const visible=useMemo(()=>filterProducts(products,query,category),[query,category]);
  const itemCount=cartCount(cart);
  const route=useHashRoute();
+ useDocumentTitle(route,lang);
  return <div className="app" style={{'--primary':theme.primary,'--accent':theme.accent,'--tint':theme.background,'--ink':theme.ink} as React.CSSProperties}>
   <header className="top"><a href="#/" className="logo" aria-label="Tazumo home"><span className="logo-mark">✦</span>{brandName.toLowerCase()}<span className="dot">.</span></a><div className="delivery">📍 <span>{t(lang,'city')}</span></div><div className="headerActions"><button ref={cartOpener} className="cartButton" onClick={()=>setCartOpen(true)} aria-label={`${t(lang,'cart')}, ${itemCount}`}>🛍️ {t(lang,'cart')} <span className="counter">{itemCount}</span></button><AccountControl lang={lang}/><LanguageSwitcher lang={lang} onChange={setLang}/></div></header>
   <main>{route.name==='merchant'?<MerchantDetail lang={lang} id={route.id} cart={cart} onAdd={id=>setCart(c=>changeQuantity(c,id,1))}/>:route.name==='product'?<ProductDetail lang={lang} id={route.id} cart={cart} onCartChange={setCart}/>:<><section className="hero"><div className="heroContent"><div className="eyebrow">{t(lang,'eyebrow')}</div><h1>{t(lang,'heroStart')}<br/><em>{t(lang,'heroEnd')}</em></h1><p>{t(lang,'intro')}</p><div className="search"><span>⌕</span><input aria-label={t(lang,'search')} value={query} onChange={e=>setQuery(e.target.value)} placeholder={t(lang,'search')}/></div><small>{t(lang,'demo')}</small></div><div className="heroArt" aria-hidden="true"><span className="fox">🦊</span><div className="bubble">Hello, neighbour! ✨</div></div></section>
