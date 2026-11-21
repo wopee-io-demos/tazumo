@@ -17,4 +17,4 @@ Dependabot SHALL propose grouped weekly npm and github-actions updates with open
 
 #### Scenario: Node type definitions ahead of the runtime
 - **WHEN** a newer `@types/node` major than the Node 22 runtime is published
-- **THEN** no pull request is opened for it, including a minor or patch release of that newer major
+- **THEN** no version update or security update pull request is opened for it

@@ -1,5 +1,5 @@
 /** Pure validation of contracts/sut.json against app sources, fixtures and a previously published contract. */
-import ts from 'typescript';
+import ts from '@typescript/typescript6';
 
 export const ID_PATTERN=/^sut-[a-z0-9]+(?:-[a-z0-9]+)*$/;
 export const TEST_ID_ATTRIBUTE={web:'data-testid',native:'testID'};
