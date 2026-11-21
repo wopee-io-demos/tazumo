@@ -53,6 +53,8 @@ Web and native differ in places; do not share one locator table across platforms
 
 Assert on contains-text for amounts, not on the whole element text.
 
+Web `language` (`sut-language`) is the header language select on every route (#81). A `?lang=` URL parameter sets the language and stores it in `localStorage` (`tazumo.language`), so start each independent test in a fresh browser context.
+
 ## Versioning
 
 The contract version is checked by `pnpm check:sut --base <ref>`. CI compares a pull request with its base branch and a push to `main` with the previous `main` commit. The new version must be exactly the next one for the kind of change:
