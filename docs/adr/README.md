@@ -8,6 +8,7 @@ ADRs are short decision documents with context, options, consequences and status
 - [0007: Tazumo as the canonical cross-platform SUT](0007-canonical-sut.md)
 - [0008: Hetzner self-hosted Linux runners for demo CI (proposed)](0008-self-hosted-ci-runners.md)
 - [0009: Fastify HTTP service and node-pg-migrate SQL migrations](0009-api-framework-and-migrations.md)
+- [0011: Semantic design tokens with tested contrast](0011-design-system-tokens.md)
 - [0016: Bearer JWT verification, database-held roles](0016-api-authentication.md)
 - [0017: OIDC provider for EU data residency (accepted)](0017-oidc-provider-eu-residency.md)
 - [0023: Geocoding provider for delivery addresses (accepted)](0023-geocoding.md)
