@@ -1,14 +1,25 @@
 {
   "platform": "android",
-  "sutCommit": "3354ab63930c56ff8fb138e55c1682c54029a04c",
-  "captureCommit": "b9252256571d4cd2d1cac3b172f773c28ad1f64f",
-  "workflowRun": "https://github.com/wopee-io-demos/tazumo/actions/runs/44817080915",
+  "sutCommit": "be970e26633469e94876c5740051fcb1ed082179",
+  "captureCommit": "7e629c321185bcb501bd39bdb0407334d1cfc871",
+  "workflowRun": "https://github.com/wopee-io-demos/tazumo/actions/runs/44902715301",
   "runner": "Linux ubuntu26 20261116.202.1",
   "device": "sdk_gphone64_x86_64 emulator",
   "os": "Android 14 (API 34)",
+  "toolchain": "JDK 17.0.21, Gradle wrapper, emulator image google_apis x86_64",
   "build": "release-variant APK (JS bundle embedded) signed with the debug keystore, x86_64",
-  "fixtureData": "packages/core/src/index.ts products (synthetic, illustrative); cart = 2x Margherita pizza, 1x Sourdough loaf, 1x Fresh flowers",
+  "resolved": {
+    "expo": "53.0.27",
+    "reactNative": "0.79.2"
+  },
+  "pngSha256": {
+    "cart-screen.png": "d947d346aeb3bda56760c3298c21dc52b776207ccdad60c0f0491ecb13884b94",
+    "cart.png": "d523f793ee7f2cd448cc25cba7d11a51a9b9907e3022fddf841a9e21bcc52eef",
+    "catalogue.png": "fa1e482d865e2f472a79408fab7106a69998a7be6a496c3fe7fe8ead0d99612e",
+    "product.png": "23198fd6450e4dc45bf6033da8688eb1c525b294022577aa4002aa93d4b38aa5"
+  },
+  "fixtureData": "packages/core products (synthetic, illustrative); product screen = Margherita pizza; cart = 2x Margherita pizza, 1x Sourdough loaf, 1x Fresh flowers",
   "optimiser": "pngquant 4.0.3 (January 2023)",
   "driver": "Maestro 1.41.0 for taps; screenshots taken by the platform tool",
-  "capturedAt": "2026-11-20T21:21:18Z"
+  "capturedAt": "2026-11-21T12:21:40Z"
 }
