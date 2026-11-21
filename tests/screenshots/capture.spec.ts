@@ -7,15 +7,17 @@ const fixedTime=new Date(process.env.SCREENSHOT_CLOCK??'2026-11-20T09:41:00+01:0
 
 const pageErrors=new WeakMap<Page,string[]>();
 
-async function open(page:Page){
+async function open(page:Page,path='/'){
   const errors:string[]=[];
   page.on('pageerror',e=>errors.push(e.message));
   page.on('console',m=>{if(m.type()==='error')errors.push(m.text())});
   pageErrors.set(page,errors);
   await page.clock.setFixedTime(fixedTime);
-  await page.goto('/');
-  await expect(page.getByRole('heading',{name:'What are you craving?'})).toBeVisible();
-  await expect(page.getByRole('heading',{name:'Margherita pizza'})).toBeVisible();
+  await page.goto(path);
+  if(path==='/'){
+    await expect(page.getByRole('heading',{name:'What are you craving?'})).toBeVisible();
+    await expect(page.getByRole('heading',{name:'Margherita pizza'})).toBeVisible();
+  }
   await page.evaluate(()=>document.fonts.ready);
   const loaded=await page.evaluate(()=>[...document.fonts].filter(f=>f.status==='loaded').map(f=>f.family.replace(/"/g,'')));
   expect(loaded,'web fonts loaded (needs network access to Google Fonts)').toEqual(expect.arrayContaining(['Plus Jakarta Sans','DM Sans']));
@@ -64,4 +66,22 @@ test('cart with items',async({page})=>{
   await expect(dialog.getByRole('button',{name:'Checkout coming later'})).toBeDisabled();
   await page.locator('[data-cart-close]').blur();
   await shot(page,'cart',false);
+});
+
+test('merchant detail',async({page})=>{
+  await open(page,'/#/merchant/piazza-local');
+  await expect(page.getByTestId('sut-merchant-detail')).toBeVisible();
+  await expect(page.getByRole('heading',{level:1,name:'Piazza Local'})).toBeVisible();
+  await expect(page.getByTestId('sut-merchant-product-pizza')).toBeVisible();
+  await page.evaluate(()=>(document.activeElement as HTMLElement|null)?.blur());
+  await shot(page,'merchant-detail',false);
+});
+
+test('product detail',async({page})=>{
+  await open(page,'/#/product/pizza');
+  await expect(page.getByTestId('sut-detail-product')).toBeVisible();
+  await expect(page.getByRole('heading',{level:1,name:'Margherita pizza'})).toBeVisible();
+  await expect(page.getByTestId('sut-detail-price')).toHaveText('€11.90');
+  await page.evaluate(()=>(document.activeElement as HTMLElement|null)?.blur());
+  await shot(page,'product-detail',false);
 });

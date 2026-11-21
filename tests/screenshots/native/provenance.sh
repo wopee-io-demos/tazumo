@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Usage: provenance.sh <out.json> <platform> <device> <os> <build>
+# Usage: provenance.sh <out.json> <platform> <device> <os> <toolchain> <build>
 set -euo pipefail
 node - "$@" <<'JS'
-const [out,platform,device,os,build]=process.argv.slice(2);
+const [out,platform,device,os,toolchain,build]=process.argv.slice(2);
 const {execSync}=require('node:child_process');
 const sh=c=>execSync(c,{encoding:'utf8'}).trim();
 const env=process.env;
@@ -18,7 +18,7 @@ require('node:fs').writeFileSync(out,JSON.stringify({
   captureCommit:sh("git rev-parse HEAD"),
   workflowRun:run,
   runner:`${env.RUNNER_OS??''} ${env.ImageOS??''} ${env.ImageVersion??''}`.trim(),
-  device,os,build,
+  device,os,toolchain,build,
   resolved:{expo:pkg('expo'),reactNative:pkg('react-native')},
   pngSha256,
   fixtureData:'packages/core/src/index.ts products (synthetic, illustrative); cart = 2x Margherita pizza, 1x Sourdough loaf, 1x Fresh flowers',

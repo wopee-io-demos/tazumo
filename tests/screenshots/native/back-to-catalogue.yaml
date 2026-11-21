@@ -1,0 +1,7 @@
+appId: io.wopee.demos.tazumo
+---
+- tapOn:
+    id: "sut-nav-back"
+- extendedWaitUntil:
+    visible: "Preview catalogue.*"
+    timeout: 10000

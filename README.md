@@ -76,8 +76,11 @@ SUT reference imagery captured from the real app. These are not Wopee or Appium 
 The PNGs and `provenance.json` are the exact files from the run's `tazumo-screenshots-ios` and `tazumo-screenshots-android` artifacts, optimised in CI with pngquant; `SHA256SUMS` was computed from the downloaded artifacts, so the match stays checkable after the artifacts expire (newer runs also write the checksums into `provenance.json`). To regenerate, run the [SUT screenshots workflow](.github/workflows/screenshots.yml) (`workflow_dispatch`, or any PR touching `apps/mobile/**`, `packages/**` or the capture files), then:
 
 ```sh
-gh run download <run-id> -n tazumo-screenshots-ios -D docs/screenshots/ios
-gh run download <run-id> -n tazumo-screenshots-android -D docs/screenshots/android
+for p in ios android; do
+  rm -f docs/screenshots/$p/*.png docs/screenshots/$p/provenance.json docs/screenshots/$p/SHA256SUMS
+  gh run download <run-id> -n tazumo-screenshots-$p -D docs/screenshots/$p
+  (cd docs/screenshots/$p && shasum -a 256 *.png > SHA256SUMS)
+done
 ```
 
 Release builds are used because debug builds need a running Metro dev server.

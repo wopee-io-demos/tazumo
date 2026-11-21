@@ -1,0 +1,11 @@
+appId: io.wopee.demos.tazumo
+---
+- tapOn:
+    id: "sut-open-product-pizza"
+- extendedWaitUntil:
+    visible:
+      id: "sut-detail-screen"
+    timeout: 10000
+- assertVisible: "€11.90"
+- assertVisible: "Add to cart"
+- waitForAnimationToEnd

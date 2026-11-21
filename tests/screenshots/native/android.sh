@@ -21,13 +21,17 @@ adb shell cmd uimode night no
 adb install -r "$apk"
 adb shell monkey -p io.wopee.demos.tazumo -c android.intent.category.LAUNCHER 1 >/dev/null
 maestro test "$here/wait-catalogue.yaml"
-statusbar
-adb exec-out screencap -p > "$out/catalogue.png"
+shoot(){ statusbar; adb exec-out screencap -p > "$out/$1.png"; }
+shoot catalogue
+maestro test "$here/product-detail.yaml"
+shoot product
+maestro test "$here/back-to-catalogue.yaml"
 maestro test "$here/fill-cart.yaml"
-statusbar
-adb exec-out screencap -p > "$out/cart.png"
+shoot cart
+maestro test "$here/cart-screen.yaml"
+shoot cart-screen
 bash "$here/optimise.sh" "$out"
 device="$(adb shell getprop ro.product.model | tr -d '\r') emulator"
 os="Android $(adb shell getprop ro.build.version.release | tr -d '\r') (API $(adb shell getprop ro.build.version.sdk | tr -d '\r'))"
-bash "$here/provenance.sh" "$out/provenance.json" android "$device" "$os" "release-variant APK (JS bundle embedded) signed with the debug keystore, x86_64"
+bash "$here/provenance.sh" "$out/provenance.json" android "$device" "$os" "JDK $(java -version 2>&1 | head -1 | cut -d\" -f2), Gradle wrapper, emulator image google_apis x86_64" "release-variant APK (JS bundle embedded) signed with the debug keystore, x86_64"
 ls -l "$out"
