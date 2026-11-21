@@ -247,16 +247,19 @@ test('the transient signing-in and signing-out states are announced', async ({ b
   );
   const customer = users.find((user) => user.name === 'customer')!;
   const { page } = await open(browser);
-  const slow = async (route: Route) => {
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    await route.continue();
+  const held: Promise<void>[] = [];
+  const slow = (route: Route) => {
+    const release = new Promise((resolve) => setTimeout(resolve, 1500)).then(() => route.continue());
+    held.push(release);
+    return release;
   };
   await page.route(oidc.token, slow);
   await page.getByTestId('sut-auth-sign-in').click();
   await fillLogin(page, customer.email, customer.password);
   await expect(page.getByTestId('sut-auth-pending')).toHaveAttribute('role', 'status');
   await recordSelectors(page);
-  await page.unroute(oidc.token);
+  await Promise.all(held);
+  await page.unroute(oidc.token, slow);
   await expectSignedIn(page, customer.email);
 
   await page.route((url) => url.href.startsWith(`${issuer}/protocol/openid-connect/logout?`), slow);
@@ -264,7 +267,9 @@ test('the transient signing-in and signing-out states are announced', async ({ b
   await page.getByTestId('sut-auth-sign-out').click();
   await expect(page.getByTestId('sut-auth-signing-out')).toHaveAttribute('role', 'status');
   await recordSelectors(page);
+  await Promise.all(held);
   await expect(page.getByTestId('sut-auth-sign-in')).toBeVisible();
+  await page.unrouteAll({ behavior: 'wait' });
 });
 
 // Relies on the serial tests above having run in this worker (workers: 1, retries: 0).
