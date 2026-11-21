@@ -16,8 +16,8 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: native-builds-${{ github.event.pull_request.number || github.ref }}${{ github.event_name == 'schedule' && '-nightly' || '' }}
-  cancel-in-progress: true
+  group: native-builds-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   changes:
     name: Native-relevant changes
