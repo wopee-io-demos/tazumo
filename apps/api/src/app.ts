@@ -58,9 +58,14 @@ export function buildApp({ pool, logger = false, auth, rateLimits, trustProxy = 
   const authenticate = createAuthenticate(pool, auth, pseudonymizer);
   const limits = createRateLimits(rateLimits);
   app.addHook('onRoute', (route) => {
-    if (requiresBearer(route.method, route.url)) {
-      route.onRequest = [limits.byIp, authenticate, limits.byPrincipal, ...[route.onRequest ?? []].flat()];
+    const tier = route.config?.rateLimit?.tier;
+    const bearer = requiresBearer(route.method, route.url);
+    if (!tier) throw new Error(`Route ${route.method} ${route.url} declares no rate-limit tier`);
+    if (bearer !== (tier === 'authenticated')) {
+      throw new Error(`Route ${route.method} ${route.url}: tier ${tier} does not match the contract's BearerAuth requirement`);
     }
+    const hooks = { public: [limits.publicByIp], health: [limits.healthByIp], authenticated: [limits.byIp, authenticate, limits.byPrincipal] }[tier];
+    route.onRequest = [...hooks, ...[route.onRequest ?? []].flat()];
   });
 
   app.addHook('preHandler', async (request) => {

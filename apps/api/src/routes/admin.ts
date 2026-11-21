@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type pg from 'pg';
+import { rateLimitTier } from '../rate-limit.ts';
 import { can } from '../auth/policy.ts';
 import { routeSchema, toFastifyPath } from '../contract.ts';
 import { inTransaction } from '../db-tx.ts';
@@ -67,7 +68,7 @@ export async function adminRoutes(app: FastifyInstance, { pool }: { pool: pg.Poo
     });
   }
 
-  app.put<GrantRequest>(toFastifyPath(rolePath), { schema: routeSchema('put', rolePath) }, async (request, reply) => {
+  app.put<GrantRequest>(toFastifyPath(rolePath), { schema: routeSchema('put', rolePath), config: { rateLimit: rateLimitTier.authenticated } }, async (request, reply) => {
     const rejected = precheck(request, reply);
     if (rejected) return rejected;
     const outcome = await change(request, 'role:grant').catch((error: { code?: string; message?: string }) => {
@@ -81,7 +82,7 @@ export async function adminRoutes(app: FastifyInstance, { pool }: { pool: pg.Poo
     return reply.code(outcome.status).send({ role: request.params.role, merchantId: request.query.merchantId ?? null });
   });
 
-  app.delete<GrantRequest>(toFastifyPath(rolePath), { schema: routeSchema('delete', rolePath) }, async (request, reply) => {
+  app.delete<GrantRequest>(toFastifyPath(rolePath), { schema: routeSchema('delete', rolePath), config: { rateLimit: rateLimitTier.authenticated } }, async (request, reply) => {
     const rejected = precheck(request, reply);
     if (rejected) return rejected;
     const outcome = await change(request, 'role:revoke');
