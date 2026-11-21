@@ -91,13 +91,13 @@ Agents must not change rulesets. The repository owner applies the command in `do
 
 By 2026-11-21 Dependabot had opened 15 PRs: one per directory for each major (TypeScript 7, Vite 8, `@types/node` 26), the same patch groups again from a second run, and none with a lockfile. Majors that change compilers, bundlers or runtime types need a changelog review and code changes, which a bot PR cannot carry.
 
-Decision: both ecosystems ignore `version-update:semver-major`. Patch and minor updates stay in their groups (`expo-sdk` and `npm-minor-and-patch` for npm, `github-actions` for actions), one PR per group per run, spanning every directory with an update. A major update is a deliberate PR with a changelog review, the code changes it needs, a regenerated lockfile and green CI, including native builds. Security updates keep their own group and limit.
+Decision: both ecosystems ignore `version-update:semver-major`. Patch and minor updates stay in their groups (`expo-sdk` and `npm-minor-and-patch` for npm, `github-actions` for actions), one PR per group per run, spanning every directory with an update. A major update is a deliberate PR with a changelog review, the code changes it needs, a regenerated lockfile and green CI, including native builds. Security updates keep their own group and limit; `update-types` ignores do not apply to them.
 
 Alternatives:
 - Keep one PR per major and close the unwanted ones by hand: the backlog grows every week, and each PR runs the full CI matrix.
 - `group-by: dependency-name`: one PR per dependency across directories, which removes the per-directory duplicates but still opens majors automatically.
 - Group majors with minor and patch updates: one breaking change blocks every safe update in the group.
 
-`@types/node` also ignores every version from 23 up (`versions: ['>=23']`), because its major must follow the Node 22 runtime that CI and the API run. Change that rule together with the runtime.
+`@types/node` also ignores every version from 23 up (`versions: ['>=23']`), because its major must follow the Node 22 runtime that CI and the API run. Unlike `update-types` ignores, a `versions` ignore also applies to security updates; for a types-only package that is acceptable. Change the rule together with the runtime.
 
 Consequence: nothing announces a new major. It is noticed through `pnpm outdated`, security advisories or upstream deprecations, such as an action's Node.js runtime moving.
