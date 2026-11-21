@@ -1,0 +1,73 @@
+name: Payments (Stripe test mode)
+on:
+  pull_request:
+    paths:
+      - 'packages/payments/**'
+      - 'packages/commerce/**'
+      - 'packages/orders/**'
+      - 'contracts/openapi.json'
+      - 'package.json'
+      - 'pnpm-workspace.yaml'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/payments.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'packages/payments/**'
+      - 'packages/commerce/**'
+      - 'packages/orders/**'
+      - 'contracts/openapi.json'
+      - 'package.json'
+      - 'pnpm-workspace.yaml'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/payments.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: payments-${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+jobs:
+  stripe-mock:
+    name: Payments against stripe-mock
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      stripemock:
+        # stripe/stripe-mock v0.206.0
+        image: stripe/stripe-mock@sha256:aeb96b83e87a893d2ac005e363ac01ffa6e59a5ad85b49c155dfc9129de02e78
+        ports:
+          - 12111/tcp
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          version: 10.11.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+      - run: pnpm install --no-frozen-lockfile
+      - run: pnpm --filter @tazumo/payments typecheck
+      - name: Unit tests (webhook signatures, key guard, money, drift)
+        run: pnpm --filter @tazumo/payments test
+      - name: Wait for stripe-mock
+        run: |
+          url="http://127.0.0.1:${{ job.services.stripemock.ports['12111'] }}"
+          echo "STRIPE_MOCK_URL=$url" >> "$GITHUB_ENV"
+          for _ in $(seq 1 30); do
+            curl -s -o /dev/null "$url/v1/payment_intents" && exit 0
+            sleep 1
+          done
+          echo "stripe-mock did not start"; exit 1
+      - name: Adapter tests against stripe-mock
+        run: pnpm --filter @tazumo/payments test:stripe-mock
+      - name: Evidence summary
+        if: always()
+        run: |
+          {
+            echo "### Payments evidence for ${GITHUB_SHA}"
+            echo "Stripe adapter against the official stripe/stripe-mock image (pinned by digest) on a GitHub-hosted runner, with webhook secrets generated per run."
+            echo "No Stripe account, keys or network calls to api.stripe.com: this is mocked-provider evidence, not Stripe test-mode evidence."
+          } >> "$GITHUB_STEP_SUMMARY"

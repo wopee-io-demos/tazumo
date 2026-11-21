@@ -14,6 +14,11 @@
   - remove -> `sut-cart-empty` with €0.00;
   - back -> detail with quantity 0; back -> catalogue "Cart, 0";
   - catalogue add -> mini-cart -> `sut-cart-screen-open` -> cart screen with quantity 1.
-- [ ] CI `Native development builds` (Android APK + iOS simulator .app) green on the PR head.
-- [ ] Android device/emulator smoke (no local Android SDK; follow-up needed).
-- [ ] Merge SHA recorded on #4.
+- [x] CI on PR #45 head e7d2d8d: Quality checks [run 44813014525](https://github.com/wopee-io-demos/tazumo/actions/runs/44813014525), Dependency security review [run 44813014455](https://github.com/wopee-io-demos/tazumo/actions/runs/44813014455) and Native development builds (Android debug APK + iOS simulator `.app`) [run 44813014529](https://github.com/wopee-io-demos/tazumo/actions/runs/44813014529) all succeeded.
+- [x] Merged as f0896d83bec2045a13d443f608e7bfd1b75e02e5 (squash, 2026-11-20 22:29 CET); merge SHA recorded on #4.
+- [x] Main after merge:
+  - e8d4776 (#45 + web fix #73): Quality checks [44821188031](https://github.com/wopee-io-demos/tazumo/actions/runs/44821188031), Test evidence and dependency review succeeded. Its native run was cancelled by a later push (concurrency group from #68).
+  - First completed native run on main that includes #45: 4ad2bf3, [run 44825216479](https://github.com/wopee-io-demos/tazumo/actions/runs/44825216479), success.
+- [x] Android emulator smoke: #59, merged in #79 as bcd0104. The CI smoke passed on head 0fdfd6e ([run 44823399084](https://github.com/wopee-io-demos/tazumo/actions/runs/44823399084)).
+- [ ] Contract selectors for the new screens in `contracts/sut.json`: #53 (SUT contract v2).
+- [ ] Shared cart helpers and copy in `@tazumo/core`, mobile tests in required CI: #54.

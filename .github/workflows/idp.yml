@@ -4,6 +4,8 @@ on:
     paths:
       - 'infra/idp/**'
       - 'tests/idp/**'
+      - 'tests/web-auth/**'
+      - 'contracts/sut.json'
       - 'apps/**'
       - 'contracts/openapi.json'
       - 'package.json'
@@ -14,6 +16,8 @@ on:
     paths:
       - 'infra/idp/**'
       - 'tests/idp/**'
+      - 'tests/web-auth/**'
+      - 'contracts/sut.json'
       - 'apps/**'
       - 'contracts/openapi.json'
       - 'package.json'
@@ -22,8 +26,8 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: idp-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: idp-${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   keycloak:
     runs-on: ubuntu-latest
@@ -66,6 +70,8 @@ jobs:
       - run: pnpm exec playwright install --with-deps chromium
       - name: Real Keycloak against the real API
         run: pnpm exec playwright test -c tests/idp/playwright.config.ts
+      - name: Web sign-in against the real Keycloak and API
+        run: pnpm exec playwright test -c tests/web-auth/playwright.config.ts
       - name: Keycloak log
         if: failure()
         run: docker compose -f infra/idp/compose.yml logs --no-color keycloak | tail -200
@@ -76,6 +82,8 @@ jobs:
           path: |
             test-results/idp/
             playwright-report/idp/
+            test-results/web-auth/
+            playwright-report/web-auth/
           retention-days: 7
       - name: Stop the identity provider
         if: always()

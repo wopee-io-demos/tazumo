@@ -46,3 +46,8 @@
   .detailProducts li>button{grid-column:2;justify-self:start}
   .merchantList{grid-template-columns:1fr}
 }
+.merchantCard>div{flex:1}
+.favouriteButton{flex:none;align-self:flex-start;min-width:44px;min-height:44px;border-radius:50%;border:1px solid var(--ink);background:transparent;color:var(--primary);font-size:22px;line-height:1;cursor:pointer}
+.favouriteButton[aria-pressed="true"]{background:var(--primary);color:var(--tint);border-color:var(--primary)}
+.app .favouriteButton:focus-visible{outline:3px solid var(--ink);outline-offset:3px}
+.detailHero .favouriteButton{margin-left:auto}

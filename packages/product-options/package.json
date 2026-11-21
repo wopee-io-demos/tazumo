@@ -1,0 +1,23 @@
+{
+  "name": "@tazumo/product-options",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./fixtures": "./src/fixtures.ts"
+  },
+  "engines": {
+    "node": ">=22.8"
+  },
+  "scripts": {
+    "test": "node --experimental-strip-types --experimental-test-coverage --test-coverage-include=src/*.ts --test-coverage-exclude=src/*.test.ts --test-coverage-branches=100 --test-coverage-lines=100 --test-coverage-functions=100 --test src/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@tazumo/commerce": "workspace:*",
+    "@tazumo/core": "workspace:*",
+    "typescript": "^5.8.3",
+    "@types/node": "^22.15.0"
+  }
+}
