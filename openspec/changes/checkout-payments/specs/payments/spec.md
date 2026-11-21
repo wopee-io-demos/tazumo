@@ -13,6 +13,10 @@ The payments package SHALL construct a Stripe provider only with a test-mode sec
 - WHEN the key is a publishable key, empty, partial or not a string
 - THEN construction throws `invalid_key`
 
+#### Scenario: Cleartext endpoint refused
+- WHEN a plain-http endpoint is configured for a host other than a loopback address
+- THEN construction throws `invalid_endpoint`
+
 #### Scenario: Live-mode objects refused
 - WHEN the provider returns an object, or a webhook carries an event or PaymentIntent, with `livemode` other than `false`
 - THEN it is rejected with `live_mode`
@@ -48,7 +52,7 @@ The payments package SHALL verify `Stripe-Signature` over the raw body within a 
 
 #### Scenario: Failed payment
 - WHEN a correctly signed `payment_intent.payment_failed` event arrives
-- THEN the outcome is `payment_failed` with the decline code as reason, or `payment_failed` if the code is not a plain slug
+- THEN the outcome is `payment_failed` with the decline code as reason, or `payment_failed` if the code does not match the orders reason pattern `^[a-z][a-z_]{0,63}$`
 
 #### Scenario: Bad signature
 - WHEN the signature was made with another secret, the body was changed, or the header is missing or malformed
@@ -63,14 +67,18 @@ The payments package SHALL verify `Stripe-Signature` over the raw body within a 
 - THEN verification throws `payload_not_raw`
 
 #### Scenario: Replayed event
-- WHEN the same event id is delivered a second time
-- THEN the outcome is `duplicate` and carries no command
+- WHEN the same event id is delivered a second time after it was applied
+- THEN the outcome is `duplicate` and `apply` is not called again
+
+#### Scenario: Failed application is not recorded
+- WHEN `apply` throws (for example `currency_mismatch` against the order total)
+- THEN the event id is not recorded and the next delivery of the same event is applied
 
 ### Requirement: Money in minor units
 The payments package SHALL charge only the @tazumo/commerce market currencies in positive integer minor units and SHALL reject payments that do not match the order total.
 
 #### Scenario: Unsupported currency or amount
-- WHEN an intent is requested in another currency or with a zero, negative, fractional or unsafe amount
+- WHEN an intent is requested in another currency or with a zero, negative, fractional or above-99,999,999 amount
 - THEN it rejects with `unsupported_currency` or `invalid_amount` before any provider call
 
 #### Scenario: Currency mismatch

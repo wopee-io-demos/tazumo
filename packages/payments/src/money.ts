@@ -13,6 +13,9 @@ const twoDecimal = (currency: string): boolean => {
   }
 };
 
+/** Stripe's largest accepted amount (eight digits). Per-currency minimum charges are left to Stripe (`provider_rejected`). */
+export const MAX_STRIPE_AMOUNT = 99_999_999;
+
 const isMinorUnits = (value: unknown): value is number => Number.isSafeInteger(value) && (value as number) >= 0;
 
 /** Stripe amounts are integers in the currency's smallest unit, which equals minor units for two-decimal currencies. */
@@ -20,8 +23,8 @@ export function toStripeAmount(money: Money): { amount: number; currency: string
   if (typeof money?.currency !== 'string' || !supportedCurrencies.has(money.currency)) {
     throw new PaymentError('unsupported_currency', 'currency is not a Tazumo market currency');
   }
-  if (!isMinorUnits(money.minorUnits) || money.minorUnits === 0) {
-    throw new PaymentError('invalid_amount', 'amount must be a positive safe integer in minor units');
+  if (!isMinorUnits(money.minorUnits) || money.minorUnits === 0 || money.minorUnits > MAX_STRIPE_AMOUNT) {
+    throw new PaymentError('invalid_amount', 'amount must be a positive integer in minor units up to 99,999,999');
   }
   return { amount: money.minorUnits, currency: money.currency.toLowerCase() };
 }

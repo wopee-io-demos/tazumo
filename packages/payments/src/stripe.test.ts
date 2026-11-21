@@ -24,6 +24,11 @@ describe('test-mode key guard', () => {
     }
   });
 
+  it('refuses a plain-http endpoint that is not loopback, so a key never travels in cleartext', () => {
+    assert.throws(() => createStripeTestProvider({ secretKey: 'sk_test_123', endpoint: { host: 'stripe-mock.example', port: 80, protocol: 'http' } }), code('invalid_endpoint'));
+    assert.doesNotThrow(() => createStripeTestProvider({ secretKey: 'sk_test_123', endpoint: { host: 'stripe-mock.example', port: 443, protocol: 'https' } }));
+  });
+
   it('accepts test-mode secret and restricted keys', () => {
     for (const secretKey of ['sk_test_123', 'rk_test_123']) {
       const provider = createStripeTestProvider({ secretKey, endpoint: unreachable });
@@ -58,5 +63,10 @@ describe('input checks before any provider call', () => {
   it('refuses live-mode provider objects', () => {
     const intent = { id: 'pi_123', livemode: true, status: 'succeeded', amount: 100, currency: 'eur', metadata: {} };
     assert.throws(() => toView(intent as never), code('live_mode'));
+  });
+
+  it('reports no order id when the metadata is not a Tazumo order UUID', () => {
+    const intent = { id: 'pi_123', livemode: false, status: 'succeeded', amount: 100, currency: 'eur', metadata: { tazumo_order_id: 'order-1' } };
+    assert.equal(toView(intent as never).orderId, null);
   });
 });

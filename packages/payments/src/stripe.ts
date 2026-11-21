@@ -1,6 +1,6 @@
 import Stripe from 'stripe';
 import { PaymentError } from './errors.ts';
-import { assertIdempotencyKey, assertOrderId } from './idempotency.ts';
+import { assertIdempotencyKey, assertOrderId, uuidPattern } from './idempotency.ts';
 import { fromStripeAmount, toStripeAmount } from './money.ts';
 import { ORDER_METADATA_KEY, paymentIntentIdPattern, paymentIntentStatuses, type CreatePaymentIntentInput, type PaymentIntentStatus, type PaymentIntentView, type PaymentProvider } from './port.ts';
 
@@ -8,7 +8,7 @@ const tokenPattern = /^(ctoken|pm)_[A-Za-z0-9_]{1,200}$/;
 
 export type StripeTestConfig = {
   secretKey: string;
-  /** Only for stripe-mock or another local stand-in; omit to use api.stripe.com. */
+  /** Only for stripe-mock or another local stand-in; omit to use api.stripe.com. Plain http is allowed for loopback hosts only. */
   endpoint?: { host: string; port: number; protocol: 'http' | 'https' };
   timeoutMs?: number;
   maxNetworkRetries?: number;
@@ -31,7 +31,8 @@ export function toView(intent: Stripe.PaymentIntent): PaymentIntentView {
   assertPaymentIntentId(intent.id);
   const status = intent.status as string;
   if (!(paymentIntentStatuses as readonly string[]).includes(status)) throw new PaymentError('invalid_provider_response', 'unknown PaymentIntent status');
-  const orderId = intent.metadata?.[ORDER_METADATA_KEY] ?? null;
+  const reference = intent.metadata?.[ORDER_METADATA_KEY];
+  const orderId = typeof reference === 'string' && uuidPattern.test(reference) ? reference : null;
   return {
     id: intent.id,
     status: status as PaymentIntentStatus,
@@ -74,8 +75,12 @@ async function call(run: () => Promise<Stripe.PaymentIntent>): Promise<PaymentIn
 
 export function createStripeTestProvider(config: StripeTestConfig): PaymentProvider {
   assertTestModeKey(config?.secretKey);
+  const endpoint = config.endpoint;
+  if (endpoint && endpoint.protocol !== 'https' && !['127.0.0.1', 'localhost', '::1'].includes(endpoint.host)) {
+    throw new PaymentError('invalid_endpoint', 'plain http is allowed only for a loopback stripe-mock');
+  }
   const client = new Stripe(config.secretKey, {
-    ...(config.endpoint ?? {}),
+    ...(endpoint ?? {}),
     timeout: config.timeoutMs ?? 10_000,
     maxNetworkRetries: config.maxNetworkRetries ?? 2,
     telemetry: false,

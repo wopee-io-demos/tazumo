@@ -14,23 +14,38 @@ export type WebhookOutcome =
   | { kind: 'ignored'; eventId: string; eventType: string }
   | { kind: 'duplicate'; eventId: string };
 
+export type CommandOutcome = Extract<WebhookOutcome, { kind: 'command' }>;
+
 /**
- * Records delivered event ids. In the API this must write in the same transaction that applies the command,
- * so a rolled-back delivery is not marked as seen.
+ * Runs `apply` at most once per event id and records the id only if `apply` succeeds. In the API, recording the id
+ * and applying the command share one database transaction, so a failed delivery is retried by Stripe, not lost.
  */
 export interface ReplayGuard {
-  /** Returns true the first time an event id is seen, false for every later delivery. */
-  firstSeen(eventId: string): boolean | Promise<boolean>;
+  /** Resolves true when `apply` ran and succeeded, false when the event id was already recorded or is in flight. */
+  once(eventId: string, apply: () => Promise<void>): Promise<boolean>;
 }
 
 export function createMemoryReplayGuard(): ReplayGuard {
-  const seen = new Set<string>();
-  return { firstSeen: (id) => (seen.has(id) ? false : (seen.add(id), true)) };
+  const recorded = new Set<string>();
+  return {
+    async once(eventId, apply) {
+      if (recorded.has(eventId)) return false;
+      recorded.add(eventId);
+      try {
+        await apply();
+        return true;
+      } catch (error) {
+        recorded.delete(eventId);
+        throw error;
+      }
+    }
+  };
 }
 
 export const DEFAULT_TOLERANCE_SECONDS = 300;
 const eventIdPattern = /^evt_[A-Za-z0-9]{1,100}$/;
-const reasonPattern = /^[a-z_]{1,64}$/;
+/** Same shape @tazumo/orders accepts for reasons (PR #105). */
+export const reasonPattern = /^[a-z][a-z_]{0,63}$/;
 
 export type VerifyInput = {
   /** The exact request bytes as received, before any JSON parsing. */
@@ -109,9 +124,15 @@ export function mapStripeEvent(event: unknown): Exclude<WebhookOutcome, { kind: 
   return { kind: 'command', eventId, orderId, idempotencyKey: `stripe-${eventId}`, command, amount };
 }
 
-/** Verify, map and de-duplicate one webhook delivery. The caller then checks the amount against the order total. */
-export async function processStripeWebhook(input: VerifyInput & { replayGuard: ReplayGuard }): Promise<WebhookOutcome> {
+/**
+ * Verifies and maps one delivery, then hands a command to `apply` exactly once per event id. `apply` checks the amount
+ * against the order total (`assertPaymentMatchesOrder`) and applies the command; if it throws, nothing is recorded.
+ */
+export async function processStripeWebhook(
+  input: VerifyInput & { replayGuard: ReplayGuard; apply: (outcome: CommandOutcome) => Promise<void> }
+): Promise<WebhookOutcome> {
   const outcome = mapStripeEvent(verifyStripeSignature(input));
-  if (!(await input.replayGuard.firstSeen(outcome.eventId))) return { kind: 'duplicate', eventId: outcome.eventId };
-  return outcome;
+  if (outcome.kind !== 'command') return outcome;
+  const applied = await input.replayGuard.once(outcome.eventId, () => input.apply(outcome));
+  return applied ? outcome : { kind: 'duplicate', eventId: outcome.eventId };
 }

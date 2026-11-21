@@ -1,6 +1,7 @@
 export type PaymentErrorCode =
   | 'live_key_refused'
   | 'invalid_key'
+  | 'invalid_endpoint'
   | 'invalid_webhook_secret'
   | 'invalid_tolerance'
   | 'unsupported_currency'

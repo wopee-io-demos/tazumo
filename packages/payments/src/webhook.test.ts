@@ -2,7 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import Stripe from 'stripe';
-import { PaymentError, assertPaymentMatchesOrder, createMemoryReplayGuard, paymentActor, processStripeWebhook, verifyStripeSignature, type ReplayGuard } from './index.ts';
+import { PaymentError, assertPaymentMatchesOrder, createMemoryReplayGuard, paymentActor, processStripeWebhook, verifyStripeSignature, type CommandOutcome, type ReplayGuard } from './index.ts';
 
 const code = (c: string) => (e: unknown) => e instanceof PaymentError && e.code === c;
 const newSecret = () => `whsec_${randomBytes(24).toString('base64url')}`;
@@ -24,8 +24,10 @@ function event(type: string, intent: Record<string, unknown> = {}, extra: Record
 }
 const sign = (payload: string, opts: { at?: number; key?: string } = {}) =>
   Stripe.webhooks.generateTestHeaderString({ payload, secret: opts.key ?? secret, timestamp: Math.floor((opts.at ?? now) / 1000) });
-const deliver = (rawBody: string | Uint8Array, signatureHeader: string | undefined, replayGuard: ReplayGuard = createMemoryReplayGuard()) =>
-  processStripeWebhook({ rawBody, signatureHeader, secret, now: () => now, replayGuard });
+const applied: CommandOutcome[] = [];
+const record = async (o: CommandOutcome): Promise<void> => void applied.push(o);
+const deliver = (rawBody: string | Uint8Array, signatureHeader: string | undefined, replayGuard: ReplayGuard = createMemoryReplayGuard(), apply = record) =>
+  processStripeWebhook({ rawBody, signatureHeader, secret, now: () => now, replayGuard, apply });
 
 describe('Stripe webhook signature', () => {
   it('accepts a payload signed by the Stripe SDK and maps payment_intent.succeeded to payment_authorized', async () => {
@@ -43,7 +45,7 @@ describe('Stripe webhook signature', () => {
 
   it('maps payment_intent.payment_failed to payment_failed with a safe reason', async () => {
     const declined = event('payment_intent.payment_failed', { last_payment_error: { code: 'card_declined', decline_code: 'insufficient_funds' } });
-    const odd = event('payment_intent.payment_failed', { last_payment_error: { code: 'Card <b>declined</b>' } });
+    const odd = event('payment_intent.payment_failed', { last_payment_error: { code: 'Card <b>declined</b>', decline_code: '_leading' } });
     const a = await deliver(declined, sign(declined));
     const b = await deliver(odd, sign(odd));
     assert.deepEqual(a.kind === 'command' && a.command, { type: 'payment_failed', reason: 'insufficient_funds' });
@@ -65,10 +67,12 @@ describe('Stripe webhook signature', () => {
   it('rejects a bad signature or a tampered body without touching the replay guard', async () => {
     const body = event('payment_intent.succeeded');
     let touched = 0;
-    const guard = { firstSeen: () => (touched++, true) };
+    const guard: ReplayGuard = { once: async () => (touched++, true) };
+    const before = applied.length;
     await assert.rejects(deliver(body, sign(body, { key: newSecret() }), guard), code('signature_mismatch'));
     await assert.rejects(deliver(body.replace('1250', '1'), sign(body), guard), code('signature_mismatch'));
     assert.equal(touched, 0);
+    assert.equal(applied.length, before);
   });
 
   it('rejects missing and malformed headers', async () => {
@@ -107,8 +111,18 @@ describe('Stripe webhook events', () => {
   it('returns duplicate for a replayed event, so no second command is applied', async () => {
     const body = event('payment_intent.succeeded');
     const guard = createMemoryReplayGuard();
+    const before = applied.length;
     assert.equal((await deliver(body, sign(body), guard)).kind, 'command');
     assert.deepEqual(await deliver(body, sign(body), guard), { kind: 'duplicate', eventId: JSON.parse(body).id });
+    assert.equal(applied.length, before + 1);
+  });
+
+  it('records nothing when applying fails, so the provider retry is applied', async () => {
+    const body = event('payment_intent.succeeded', { currency: 'czk' });
+    const guard = createMemoryReplayGuard();
+    const strict = async (o: CommandOutcome) => assertPaymentMatchesOrder(o.amount, { currency: 'EUR', minorUnits: 1250 });
+    await assert.rejects(deliver(body, sign(body), guard, strict), code('currency_mismatch'));
+    assert.equal((await deliver(body, sign(body), guard)).kind, 'command');
   });
 
   it('refuses live-mode events and objects', async () => {
@@ -123,6 +137,7 @@ describe('Stripe webhook events', () => {
     const outcome = await deliver(body, sign(body));
     assert.ok(outcome.kind === 'command');
     assert.throws(() => assertPaymentMatchesOrder(outcome.amount, { currency: 'EUR', minorUnits: 1250 }), code('currency_mismatch'));
+    assert.throws(() => assertPaymentMatchesOrder(outcome.amount, { currency: 'CZK', minorUnits: 125000 }), code('amount_mismatch'));
     const zeroDecimal = event('payment_intent.succeeded', { currency: 'jpy' });
     await assert.rejects(deliver(zeroDecimal, sign(zeroDecimal)), code('unsupported_currency'));
   });

@@ -10,6 +10,12 @@ const target = new URL(upstream);
 
 type Seen = { method: string; path: string; idempotencyKey: string | undefined; body: URLSearchParams };
 const seen: Seen[] = [];
+const leakyToken = 'pm_card_visa';
+const injectedErrors: Record<string, { status: number; error: Record<string, string> }> = {
+  pi_1ErrCard: { status: 402, error: { type: 'card_error', code: 'card_declined', decline_code: 'insufficient_funds' } },
+  pi_1ErrAuth: { status: 401, error: { type: 'invalid_request_error' } },
+  pi_1ErrInvalid: { status: 400, error: { type: 'invalid_request_error', code: 'parameter_invalid_integer' } }
+};
 const bodiesByKey = new Map<string, string>();
 
 /**
@@ -24,6 +30,12 @@ function recordingProxy(): Server {
       const body = Buffer.concat(chunks).toString('utf8');
       const key = req.headers['idempotency-key'] as string | undefined;
       seen.push({ method: req.method ?? '', path: req.url ?? '', idempotencyKey: key, body: new URLSearchParams(body) });
+      const injected = injectedErrors[(req.url ?? '').split('/').pop() ?? ''];
+      if (injected) {
+        res.writeHead(injected.status, { 'content-type': 'application/json', 'request-id': 'req_proxy' });
+        res.end(JSON.stringify({ error: { ...injected.error, message: `Leaky provider message mentioning ${leakyToken} and sk_test_123` } }));
+        return;
+      }
       if (key && bodiesByKey.has(key) && bodiesByKey.get(key) !== body) {
         res.writeHead(400, { 'content-type': 'application/json', 'request-id': 'req_proxy' });
         res.end(JSON.stringify({ error: { type: 'idempotency_error', message: 'Keys for idempotent requests can only be used with the same parameters they were first used with.' } }));
@@ -101,6 +113,20 @@ describe('Stripe adapter against stripe-mock', () => {
     assert.deepEqual([last().method, last().path], ['GET', '/v1/payment_intents/pi_1RetrieveMe']);
     assert.equal(intent.amount.currency, 'USD');
     assert.throws(() => assertPaymentMatchesOrder(intent.amount, eur), code('currency_mismatch'));
+  });
+
+  it('maps provider errors to codes and never passes provider messages, tokens or keys on (responses injected by the proxy)', async () => {
+    const cases: [string, string, string | undefined][] = [
+      ['pi_1ErrCard', 'card_declined', 'card_declined'],
+      ['pi_1ErrAuth', 'provider_auth', undefined],
+      ['pi_1ErrInvalid', 'provider_rejected', 'parameter_invalid_integer']
+    ];
+    for (const [id, expected, providerCode] of cases) {
+      await assert.rejects(provider.retrievePaymentIntent(id), (e: unknown) => {
+        const text = JSON.stringify([(e as Error).message, (e as PaymentError).details]);
+        return code(expected)(e) && (e as PaymentError).details.providerCode === providerCode && !text.includes(leakyToken) && !text.includes('sk_test_123');
+      }, id);
+    }
   });
 
   it('cancels with its own idempotency key', async () => {

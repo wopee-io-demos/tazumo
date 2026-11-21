@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import Stripe from 'stripe';
-import { createMemoryReplayGuard, idempotencyKeyPattern, paymentActor, processStripeWebhook } from './index.ts';
+import { createMemoryReplayGuard, idempotencyKeyPattern, paymentActor, processStripeWebhook, reasonPattern, type CommandOutcome } from './index.ts';
 
 const repo = new URL('../../../', import.meta.url);
 const read = (path: string) => readFileSync(new URL(path, repo), 'utf8');
@@ -31,7 +31,9 @@ describe('drift against @tazumo/orders', () => {
     assert.ok(types.includes("{ type: 'payment_authorized'; paymentReference: string }"));
     assert.ok(types.includes("{ type: 'payment_failed'; reason: string }"));
     assert.match(types, /systemSources = Object\.freeze\(\[[^\]]*'payment'/);
-    assert.ok(read('packages/orders/src/machine.ts').includes(`const idempotencyKey = ${idempotencyKeyPattern};`));
+    const machine = read('packages/orders/src/machine.ts');
+    assert.ok(machine.includes(`const idempotencyKey = ${idempotencyKeyPattern};`));
+    assert.ok(machine.includes(`const reasonCode = ${reasonPattern};`));
   });
 
   it('drives an order from payment_pending to confirmed, and a replay appends nothing', { skip: ordersMissing }, async () => {
@@ -56,9 +58,12 @@ describe('drift against @tazumo/orders', () => {
       data: { object: { id: 'pi_1Drift', object: 'payment_intent', livemode: false, amount: 1250, currency: 'eur', metadata: { tazumo_order_id: orderId } } }
     });
     const signatureHeader = Stripe.webhooks.generateTestHeaderString({ payload, secret });
-    const outcome = await processStripeWebhook({ rawBody: payload, signatureHeader, secret, replayGuard: createMemoryReplayGuard() });
+    let applied: any;
+    const apply = async (c: CommandOutcome) => {
+      applied = o.applyCommand(events, c.command, paymentActor, at, c.idempotencyKey);
+    };
+    const outcome = await processStripeWebhook({ rawBody: payload, signatureHeader, secret, replayGuard: createMemoryReplayGuard(), apply });
     assert.ok(outcome.kind === 'command');
-    const applied = o.applyCommand(events, outcome.command, paymentActor, at, outcome.idempotencyKey);
     assert.ok(applied.ok, JSON.stringify(applied));
     assert.equal(applied.value.state.status, 'confirmed');
     assert.equal(applied.value.state.paymentReference, 'pi_1Drift');

@@ -18,7 +18,7 @@ describe('money in integer minor units', () => {
   it('rejects other currencies and non-integer, zero, negative or unsafe amounts', () => {
     assert.throws(() => toStripeAmount({ currency: 'USD', minorUnits: 100 }), code('unsupported_currency'));
     assert.throws(() => toStripeAmount({ currency: 'eur', minorUnits: 100 }), code('unsupported_currency'));
-    for (const minorUnits of [0, -1, 12.5, Number.NaN, Number.MAX_SAFE_INTEGER + 1]) {
+    for (const minorUnits of [0, -1, 12.5, Number.NaN, 100_000_000, Number.MAX_SAFE_INTEGER + 1]) {
       assert.throws(() => toStripeAmount({ currency: 'EUR', minorUnits }), code('invalid_amount'), String(minorUnits));
     }
   });

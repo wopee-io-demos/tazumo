@@ -1,6 +1,6 @@
 export { PaymentError, type PaymentErrorCode } from './errors.ts';
 export { assertIdempotencyKey, idempotencyKeyPattern, pspIdempotencyKey, type PspOperation } from './idempotency.ts';
-export { assertPaymentMatchesOrder, fromStripeAmount, supportedCurrencies, toStripeAmount } from './money.ts';
+export { MAX_STRIPE_AMOUNT, assertPaymentMatchesOrder, fromStripeAmount, supportedCurrencies, toStripeAmount } from './money.ts';
 export {
   ORDER_METADATA_KEY,
   paymentIntentStatuses,
@@ -16,7 +16,9 @@ export {
   mapStripeEvent,
   paymentActor,
   processStripeWebhook,
+  reasonPattern,
   verifyStripeSignature,
+  type CommandOutcome,
   type PaymentCommand,
   type ReplayGuard,
   type VerifyInput,
