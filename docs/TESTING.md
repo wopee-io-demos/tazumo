@@ -51,7 +51,7 @@ The required checks (`check`, `evidence`, `dependency-audit`, `CodeQL PR analysi
 | Docs only (`*.md`, `docs/**`, `openspec/**`) | policy and OpenAPI checks only | skipped steps, reports success | skipped | skipped |
 | `apps/web/**`, `packages/**`, `tests/e2e/**`, `contracts/**`, `playwright.config.ts` | install, typecheck, unit and contract tests, web build | Playwright e2e and report | only if a `package.json` changed | analysis |
 | `apps/mobile/**`, `packages/core/**`, `packages/brand/**` | the above plus `pnpm bundle:mobile` | e2e only for package changes | as above | analysis |
-| Other code (for example `apps/api/**`) | install, typecheck, unit and contract tests | skipped | as above | analysis when JS/TS changed |
+| Other code (for example `apps/api/**`) | install, typecheck, unit and contract tests | skipped | as above | analysis when JS/TS, HTML, JSON or YAML outside `.github/workflows` changed |
 | Root `package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`, `.npmrc`, root `tsconfig*.json`, `ci.yml`, `test-evidence.yml`, `security.yml`, `codeql.yml`, the classifier | everything | everything | audit | analysis |
 
 Playwright runs once per pull request, in `evidence`; `check` no longer runs it. The runner guard runs in `evidence` when a workflow changes. Pushes to `main`, schedules, manual runs and pull requests into any branch other than `main` always run everything. `Secret scan` always scans the PR's commits.

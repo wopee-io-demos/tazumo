@@ -25,15 +25,15 @@ export function classify(files,{event='pull_request',base='main'}={}){
     mobile:full||any(code,/^apps\/mobile\//,/^packages\/(core|brand)\//),
     deps:full||any(code,/(^|\/)package\.json$/,/^pnpm-lock\.yaml$/,/^pnpm-workspace\.yaml$/,/^\.npmrc$/),
     guard:full||any(code,/^\.github\/workflows\//,/^scripts\/check-runner-guard\.mjs$/),
-    jsts:full||any(code,/\.(c|m)?[jt]sx?$/,/\.(mts|cts|html?|vue|json|ya?ml)$/,/^\.github\/codeql\//),
+    jsts:full||any(code.filter(f=>!/^\.github\/workflows\//.test(f)),/\.(c|m)?[jt]sx?$/,/\.(mts|cts|html?|vue|json|ya?ml)$/,/^\.github\/codeql\//),
     shots_web:full||any(shipped,/^apps\/web\//,/^packages\/(core|brand)\//,/^scripts\/capture-web-screenshots\.sh$/,/^tests\/screenshots\/[^/]+$/,/^\.github\/workflows\/screenshots\.yml$/),
     shots_native:full||any(shipped,/^apps\/mobile\//,/^packages\/(core|brand)\//,/^tests\/screenshots\/native\//,/^\.github\/workflows\/screenshots\.yml$/)
   };
   return result;
 }
 
-export function changedFiles(base='HEAD^1',head='HEAD'){
-  return execFileSync('git',['diff','--name-only','--no-renames',base,head],{encoding:'utf8'}).split('\n').filter(Boolean);
+export function changedFiles({base='HEAD^1',head='HEAD',cwd}={}){
+  return execFileSync('git',['diff','--name-only','--no-renames',base,head],{encoding:'utf8',cwd}).split('\n').filter(Boolean);
 }
 
 const entry=process.argv[1]&&pathToFileURL(realpathSync(process.argv[1])).href;

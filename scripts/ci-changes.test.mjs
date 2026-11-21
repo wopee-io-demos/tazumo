@@ -61,7 +61,7 @@ test('root install files and pipeline files run everything',()=>{
 });
 
 test('other workflow changes run the runner guard only',()=>{
-  assert.deepEqual(on(classify(['.github/workflows/screenshots.yml'])),['code','guard','jsts','shots_native','shots_web']);
+  assert.deepEqual(on(classify(['.github/workflows/screenshots.yml'])),['code','guard','shots_native','shots_web']);
   assert.deepEqual(on(classify(['scripts/check-runner-guard.mjs'])),['code','guard','jsts']);
 });
 
@@ -97,7 +97,7 @@ test('test files in apps do not start screenshot jobs',()=>{
 
 test('changedFiles lists additions, edits, deletions and both sides of a rename on a merge commit',()=>{
   const dir=mkdtempSync(join(tmpdir(),'a4-ci-changes-'));
-  const git=(...a)=>execFileSync('git',['-C',dir,'-c','user.name=t','-c','user.email=t@example.invalid',...a],{encoding:'utf8'});
+  const git=(...a)=>execFileSync('git',['-C',dir,'-c','user.name=t','-c','user.email=t@example.invalid','-c','commit.gpgsign=false',...a],{encoding:'utf8'});
   try{
     git('init','-q','-b','main');
     mkdirSync(join(dir,'apps/web'),{recursive:true});
@@ -111,10 +111,7 @@ test('changedFiles lists additions, edits, deletions and both sides of a rename 
     git('add','.');git('commit','-qm','change');
     git('checkout','-q','main');
     git('merge','-q','--no-ff','-m','merge','feature');
-    const cwd=process.cwd();
-    process.chdir(dir);
-    try{assert.deepEqual(changedFiles().sort(),['apps/web/a.md','apps/web/a.ts','gone.ts','new.ts']);}
-    finally{process.chdir(cwd);}
+    assert.deepEqual(changedFiles({cwd:dir}).sort(),['apps/web/a.md','apps/web/a.ts','gone.ts','new.ts']);
     assert.equal(classify(['apps/web/a.md','apps/web/a.ts']).web,true);
   }finally{rmSync(dir,{recursive:true,force:true});}
 });
