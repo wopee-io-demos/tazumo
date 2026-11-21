@@ -5,7 +5,7 @@ set -euo pipefail
 apk="$1" out="$2"
 here="$(cd "$(dirname "$0")" && pwd)"
 mkdir -p "$out"
-adb wait-for-device
+bash "$here/android-settle.sh" boot
 adb shell settings put global sysui_demo_allowed 1
 adb shell settings put global sysui_tuner_demo_on 1
 demo(){ adb shell am broadcast -a com.android.systemui.demo -e command "$@" | tr -d '\r' | tail -1; }
@@ -21,8 +21,9 @@ statusbar(){
 adb shell cmd uimode night no
 adb install -r "$apk"
 shoot(){ statusbar; adb exec-out screencap -p > "$out/$1.png"; }
-flow(){ maestro test "$here/$1.yaml"; }
+flow(){ bash "$here/android-settle.sh" close; maestro test "$here/$1.yaml"; }
 capture(){
+  bash "$here/android-settle.sh" close
   adb shell am force-stop io.wopee.demos.tazumo
   adb shell monkey -p io.wopee.demos.tazumo -c android.intent.category.LAUNCHER 1 >/dev/null
   flow wait-catalogue && shoot catalogue &&
