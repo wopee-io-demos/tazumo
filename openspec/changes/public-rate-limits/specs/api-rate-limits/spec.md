@@ -3,7 +3,7 @@
 ## ADDED Requirements
 
 ### Requirement: Every route is rate limited
-Every API route SHALL declare a rate-limit tier. Anonymous routes SHALL be limited per client IP and stay anonymous. The service SHALL refuse to start with a route that declares no tier, or a tier that contradicts the contract's authentication requirement.
+Every API route SHALL declare the rate-limit tier the contract implies (`authenticated` for BearerAuth operations, `health` for `/health`, `public` otherwise), and unmatched requests SHALL count against the public limit. Anonymous routes SHALL be limited per client IP and stay anonymous. The service SHALL refuse to start with a route that declares no tier, or a tier that contradicts the contract's authentication requirement.
 
 #### Scenario: Public client over the limit
 - WHEN one client IP exceeds the public limit on a discovery route

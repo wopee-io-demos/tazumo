@@ -188,6 +188,18 @@ describe('rate limits on public and health routes', () => {
     }
   });
 
+  test('unmatched paths and methods share the public limit', async () => {
+    const app = build({ public: { limit: 2, windowMs: 60_000 } });
+    try {
+      const ip = '198.18.3.1';
+      assert.equal((await app.inject({ method: 'GET', url: '/nope', remoteAddress: ip })).statusCode, 404);
+      assert.equal((await app.inject({ method: 'POST', url: '/v1/markets', remoteAddress: ip })).statusCode, 404);
+      assert.equal((await app.inject({ method: 'GET', url: '/nope', remoteAddress: ip })).statusCode, 429);
+    } finally {
+      await app.close();
+    }
+  });
+
   test('every registered route is rate limited', async () => {
     const one = { limit: 1, windowMs: 60_000 };
     const app = build({ public: one, health: one, ip: one, principal: one });
@@ -197,7 +209,7 @@ describe('rate limits on public and health routes', () => {
     });
     try {
       await app.ready();
-      assert.equal(routes.length, 18, 'all 11 operations plus HEAD for every GET');
+      assert.equal(routes.length, 18, '10 contract operations, /health, and a HEAD route for every GET');
       for (const [index, route] of routes.entries()) {
         const remoteAddress = `198.19.${Math.floor(index / 250)}.${(index % 250) + 1}`;
         const call = () => app.inject({ method: route.method as 'GET', url: route.url, remoteAddress });
@@ -216,6 +228,8 @@ describe('rate limits on public and health routes', () => {
       assert.throws(() => app.get('/unlimited', async () => ({})), /declares no rate-limit tier/);
       assert.throws(() => app.get('/v1/me', { config: { rateLimit: rateLimitTier.public } }, async () => ({})), /does not match the contract/);
       assert.throws(() => app.get('/anon', { config: { rateLimit: rateLimitTier.authenticated } }, async () => ({})), /does not match the contract/);
+      assert.throws(() => app.get('/anon2', { config: { rateLimit: rateLimitTier.health } }, async () => ({})), /expected public/);
+      assert.throws(() => app.get('/health2', { config: { rateLimit: { tier: 'typo' as 'public' } } }, async () => ({})), /does not match/);
     } finally {
       await app.close().catch(() => {});
     }

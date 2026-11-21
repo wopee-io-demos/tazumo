@@ -264,6 +264,25 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limit exceeded (per client IP; anonymous routes default to 300 requests per 60 s)",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the current window resets",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
           }
         }
       }

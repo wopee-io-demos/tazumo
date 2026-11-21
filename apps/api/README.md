@@ -17,7 +17,13 @@ Every route declares a rate-limit tier in its route config. Startup fails withou
 
 - **Anonymous discovery routes:** limited per client IP (300 requests per 60 s).
 - **`/health`:** its own per-IP budget (1,200 requests per 60 s), so probes keep working while discovery traffic is limited.
-- **Authenticated routes:** limited per IP (300 requests per 60 s, before token verification) and per principal (120 requests per 60 s). Over the limit, requests get 429 with `Retry-After`. Limits are per instance. Set `TRUST_PROXY` (a comma-separated list of proxy IP addresses/CIDRs) behind a reverse proxy, otherwise all clients share the proxy's bucket.
+- **Authenticated routes:** limited per IP (300 requests per 60 s, before token verification) and per principal (120 requests per 60 s). Over the limit, requests get 429 with `Retry-After`. Unmatched paths count against the public limit.
+
+These limits apply to every tier:
+
+- **Per instance:** each instance keeps its own counters.
+- **Behind a reverse proxy:** set `TRUST_PROXY` to a comma-separated list of proxy IP addresses or CIDRs. Otherwise all clients share the proxy's bucket.
+- **Deploy probes:** point them at the instance directly, not through the proxy, so probe traffic is not counted together with client traffic.
 
 GDPR: `POST /v1/me/erasure` (self-service) and `POST /v1/admin/users/{userId}/erasure` (admin or support) pseudonymise the user, delete their grants and audit the erasure. Tokens issued before the erasure are rejected afterwards. `GET /v1/me/export` returns the caller's data. Deleting the account at the identity provider is a separate operator step until a provider is wired in. Erasure recognition depends on `AUTH_LOG_SALT`, so rotate it deliberately. Schedule `pnpm db:forget-erased` daily with owner credentials; it replaces keyed-hash tombstones older than 24 h 2 min with random ones.
 
