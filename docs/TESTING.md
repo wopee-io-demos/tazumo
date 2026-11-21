@@ -73,10 +73,10 @@ The path-filtered workflows (`api.yml`, `backoffice.yml`, `screenshots.yml`, `de
 - **Main:** every push to `main`, the nightly schedule and manual dispatch run all native jobs, so `main` is always verified natively.
 - **iOS runner (#144):** the iOS job runs on the self-hosted `mac-ios` runner (`mac-ios-1`) when the repo variable `IOS_RUNNER=self-hosted` is set, or when `RUNNER_MODE` is unset or `self-hosted`. Otherwise it runs on hosted `macos-15`. Pull requests from forks always use `macos-15`, which `scripts/check-runner-guard.mjs` enforces. The trade-off: one self-hosted Mac serialises iOS builds, but it avoids the hosted macOS queue.
 - **Persistent iOS build cache (mac-ios-1 only):**
-  - **What it keeps:** the generated `apps/mobile/ios` directory (including `Pods`) and the Xcode DerivedData, under `~/.tazumo-ci-cache/ios/<key>`.
-  - **The key:** `apps/mobile/scripts/ios-cache-key.mjs` hashes the Xcode version, the Expo native layer (`app.json`, `package.json`, `eas.json`, `plugins/**`), the workspace install settings, and the version of every installed package that ships a podspec.
+  - **What it keeps:** the generated `apps/mobile/ios` directory (including `Pods`) and the Xcode DerivedData, under `~/.tazumo-ci-cache/<runner name>/ios/<key>`.
+  - **The key:** `apps/mobile/scripts/ios-cache-key.mjs` hashes the Xcode, CocoaPods and Node versions, the Expo native layer (`app.json`, the mobile dependencies, `eas.json`, `plugins/**`), the workspace install settings, the prebuild and codegen tool versions, and the version of every installed package that ships a podspec.
   - **How it moves:** the job moves the cache in before prebuild and back out after a successful build. A same-volume move keeps file identities, so Xcode builds incrementally.
-  - **Fallback:** a new key or a failed build means a clean build.
+  - **Fallback:** a new key, a failed compile, a cache error or less than 30 GB free space means a clean build. A cancelled compile keeps the cache, because Xcode resumes interrupted builds. pnpm hardlinks from the runner's store in this job, so `node_modules` file identities stay stable for incremental builds.
   - **Retention:** the three newest keys are kept, capped at 20 GB.
   - **Hosted runners:** they never use the cache.
 

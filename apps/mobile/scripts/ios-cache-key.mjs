@@ -3,7 +3,7 @@
 // It changes when anything that shapes the native iOS build changes: the Xcode version, the Expo native layer
 // (app.json, package.json, config plugins), the workspace install settings, or the version of any installed
 // package that ships a CocoaPods podspec. JavaScript-only package changes do not change it.
-// Usage: XCODE_VERSION="$(xcodebuild -version)" node ios-cache-key.mjs [mobileDir]
+// Usage: XCODE_VERSION="$(xcodebuild -version)" TOOLCHAIN="$(pod --version) $(node --version)" node ios-cache-key.mjs [mobileDir]
 import {createHash} from 'node:crypto';
 import {existsSync,readFileSync,readdirSync,realpathSync,statSync} from 'node:fs';
 import {dirname,join,relative,resolve} from 'node:path';
@@ -33,26 +33,36 @@ function nativePackages(nodeModules){
   return [...found].sort();
 }
 
-export function cacheInputs(mobileDir,xcodeVersion){
+const PREBUILD_TOOLS=['@expo/config-plugins','@expo/prebuild-config','expo-modules-autolinking','@react-native/codegen','@react-native-community/cli','@react-native-community/cli-platform-ios','@react-native-community/cli-platform-apple'];
+
+function versionOf(nodeModules,name){
+  try{return `${name}@${JSON.parse(readFileSync(join(nodeModules,name,'package.json'),'utf8')).version}`}catch{return `${name}@-`}
+}
+
+export function cacheInputs(mobileDir,xcodeVersion,toolchain=''){
   const root=resolve(mobileDir,'..','..');
-  const files=['app.json','package.json','eas.json'].map(f=>join(mobileDir,f));
+  const files=['app.json','eas.json'].map(f=>join(mobileDir,f));
+  const mobilePkg=existsSync(join(mobileDir,'package.json'))?JSON.parse(readFileSync(join(mobileDir,'package.json'),'utf8')):{};
   const plugins=join(mobileDir,'plugins');
   if(existsSync(plugins))walk(plugins,(f)=>files.push(f));
   files.push(join(root,'pnpm-workspace.yaml'),join(root,'.npmrc'));
   const rootPkg=existsSync(join(root,'package.json'))?JSON.parse(readFileSync(join(root,'package.json'),'utf8')):{};
   return {
     xcode:String(xcodeVersion??'').trim(),
+    toolchain:String(toolchain??'').trim(),
+    mobileDependencies:{dependencies:mobilePkg.dependencies??{},devDependencies:mobilePkg.devDependencies??{}},
+    prebuildTools:PREBUILD_TOOLS.map(n=>versionOf(join(root,'node_modules'),n)),
     files:files.filter(f=>existsSync(f)&&statSync(f).isFile()).sort().map(f=>[relative(root,f),createHash('sha256').update(readFileSync(f)).digest('hex')]),
     overrides:rootPkg.pnpm?.overrides??{},
     nativePackages:nativePackages(join(root,'node_modules'))
   };
 }
 
-export function cacheKey(mobileDir,xcodeVersion){
+export function cacheKey(mobileDir,xcodeVersion,toolchain=''){
   if(!String(xcodeVersion??'').trim())throw new Error('XCODE_VERSION is required');
-  return createHash('sha256').update(JSON.stringify(cacheInputs(mobileDir,xcodeVersion))).digest('hex').slice(0,20);
+  return createHash('sha256').update(JSON.stringify(cacheInputs(mobileDir,xcodeVersion,toolchain))).digest('hex').slice(0,20);
 }
 
 if(process.argv[1]&&realpathSync(fileURLToPath(import.meta.url))===realpathSync(process.argv[1])){
-  console.log(cacheKey(resolve(process.argv[2]??join(dirname(fileURLToPath(import.meta.url)),'..')),process.env.XCODE_VERSION));
+  console.log(cacheKey(resolve(process.argv[2]??join(dirname(fileURLToPath(import.meta.url)),'..')),process.env.XCODE_VERSION,process.env.TOOLCHAIN));
 }

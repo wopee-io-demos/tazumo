@@ -44,11 +44,26 @@ test('the key changes with Xcode, the native layer and native package versions',
   assert.notEqual(cacheKey(mobile,'Xcode 27.2'),plugin);
 });
 
+test('the key changes with overrides, workspace settings, the toolchain and prebuild tools',()=>{
+  const {root,mobile}=repo();
+  const base=cacheKey(mobile,'Xcode 27.2','1.17.0 v22.19.0');
+  assert.notEqual(cacheKey(mobile,'Xcode 27.2','1.17.1 v22.19.0'),base);
+  write(join(root,'node_modules','@expo','prebuild-config','package.json'),'{"name":"@expo/prebuild-config","version":"9.0.1"}');
+  const tools=cacheKey(mobile,'Xcode 27.2','1.17.0 v22.19.0');
+  assert.notEqual(tools,base);
+  write(join(root,'package.json'),'{"pnpm":{"overrides":{"image-size":"^2.1.0"}}}');
+  const overrides=cacheKey(mobile,'Xcode 27.2','1.17.0 v22.19.0');
+  assert.notEqual(overrides,tools);
+  write(join(root,'pnpm-workspace.yaml'),'nodeLinker: isolated\n');
+  assert.notEqual(cacheKey(mobile,'Xcode 27.2','1.17.0 v22.19.0'),overrides);
+});
+
 test('JavaScript-only package and app source changes keep the key',()=>{
   const {root,mobile}=repo();
   const base=cacheKey(mobile,'Xcode 27.2');
   write(join(root,'node_modules','lodash','package.json'),'{"name":"lodash","version":"4.17.22"}');
   write(join(mobile,'src','App.tsx'),'export default null');
+  write(join(mobile,'package.json'),'{"name":"@tazumo/mobile","scripts":{"test":"node --test"}}');
   assert.equal(cacheKey(mobile,'Xcode 27.2'),base);
 });
 

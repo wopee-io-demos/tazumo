@@ -128,6 +128,10 @@ jobs:
     if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.native == 'true') }}
     runs-on: ${{ ((vars.RUNNER_MODE == 'hosted' && vars.IOS_RUNNER != 'self-hosted') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository)) && 'macos-15' || fromJSON('["self-hosted","macOS","mac-ios"]') }}
     timeout-minutes: 90
+    env:
+      # Hardlinks from the runner's persistent pnpm store keep node_modules file identities stable across runs,
+      # so Xcode can reuse DerivedData for the React Native and Expo local pods.
+      npm_config_package_import_method: hardlink
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -140,13 +144,15 @@ jobs:
       - name: Restore the persistent iOS build cache (self-hosted only)
         id: ios-cache
         if: runner.environment == 'self-hosted'
+        continue-on-error: true
         run: |
-          key="$(XCODE_VERSION="$(xcodebuild -version)" node apps/mobile/scripts/ios-cache-key.mjs)"
-          dir="$HOME/.tazumo-ci-cache/ios/$key"
+          key="$(XCODE_VERSION="$(xcodebuild -version)" TOOLCHAIN="$(pod --version) $(node --version)" node apps/mobile/scripts/ios-cache-key.mjs)"
+          dir="$HOME/.tazumo-ci-cache/$RUNNER_NAME/ios/$key"
           echo "dir=$dir" >> "$GITHUB_OUTPUT"
           if [ -d "$dir/ios/Pods" ] && [ -d "$dir/DerivedData/Build" ]; then
             mv "$dir/ios" apps/mobile/ios
             mv "$dir/DerivedData" "$RUNNER_TEMP/tazumo-ios"
+            rm -f apps/mobile/ios/.xcode.env.local
             echo "Restored the iOS build cache $key"
           else
             echo "No iOS build cache for $key; building clean"
@@ -155,6 +161,7 @@ jobs:
       - run: pod install
         working-directory: apps/mobile/ios
       - name: Compile simulator application
+        id: compile
         working-directory: apps/mobile/ios
         run: |
           xcodebuild -workspace Tazumo.xcworkspace -scheme Tazumo -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath "$RUNNER_TEMP/tazumo-ios" CODE_SIGNING_ALLOWED=NO build
@@ -167,14 +174,17 @@ jobs:
           retention-days: 7
       - name: Save the persistent iOS build cache (self-hosted only)
         if: always() && steps.ios-cache.outcome == 'success'
+        continue-on-error: true
         env:
           CACHE_DIR: ${{ steps.ios-cache.outputs.dir }}
-          JOB_STATUS: ${{ job.status }}
+          COMPILE: ${{ steps.compile.outcome }}
         run: |
           root="$(dirname "$CACHE_DIR")"
           entries() { find "$root" -mindepth 1 -maxdepth 1 -type d -exec stat -f '%m %N' {} + 2>/dev/null | sort -rn | cut -d' ' -f2-; }
           rm -rf "$CACHE_DIR"
-          if [ "$JOB_STATUS" = success ] && [ -d apps/mobile/ios/Pods ] && [ -d "$RUNNER_TEMP/tazumo-ios/Build" ]; then
+          free_kb="$(df -k "$HOME" | awk 'NR==2 {print $4}')"
+          if { [ "$COMPILE" = success ] || [ "$COMPILE" = cancelled ]; } && [ "$free_kb" -gt 31457280 ] \
+            && [ -d apps/mobile/ios/Pods ] && [ -d "$RUNNER_TEMP/tazumo-ios/Build" ]; then
             mkdir -p "$CACHE_DIR"
             mv apps/mobile/ios "$CACHE_DIR/ios"
             mv "$RUNNER_TEMP/tazumo-ios" "$CACHE_DIR/DerivedData"
