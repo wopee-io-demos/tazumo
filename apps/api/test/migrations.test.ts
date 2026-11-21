@@ -33,8 +33,8 @@ test('database rejects invalid money and identifiers', async () => {
     await db.pool.query(`INSERT INTO merchants (id, slug, market_code, name) VALUES ('00000000-0000-4000-8000-000000000001', 'm', 'm1', 'M')`);
     const product = (price: number, currency: string) =>
       db.pool.query(
-        `INSERT INTO products (id, slug, merchant_id, category_code, name, price_minor, currency)
-         VALUES (gen_random_uuid(), 'p' || floor(random() * 1e9)::text, '00000000-0000-4000-8000-000000000001', 'food', 'P', $1, $2)`,
+        `INSERT INTO products (id, slug, merchant_id, category_code, vat_category, name, price_minor, currency)
+         VALUES (gen_random_uuid(), 'p' || floor(random() * 1e9)::text, '00000000-0000-4000-8000-000000000001', 'food', 'food', 'P', $1, $2)`,
         [price, currency]
       );
     await product(1190, 'CZK');
@@ -65,6 +65,29 @@ test('migration 0003 refuses an existing tazumo_api role with unsafe attributes 
     await db.pool.query('ALTER ROLE tazumo_api NOLOGIN');
     await db.pool.query('REVOKE pg_read_all_data FROM tazumo_api');
     await fresh.drop();
+    await db.drop();
+  }
+});
+
+test('migration 0005 constrains VAT categories and accepts every commerce override id', async () => {
+  const { markets } = await import('@tazumo/commerce');
+  const db = await createTestDb();
+  try {
+    await db.pool.query(`INSERT INTO markets VALUES ('m1', 'SK', 'EUR', 'sk-SK')`);
+    await db.pool.query(`INSERT INTO catalogue_categories VALUES ('food', 'Food', 0)`);
+    await db.pool.query(`INSERT INTO merchants (id, slug, market_code, name) VALUES ('00000000-0000-4000-8000-000000000001', 'm', 'm1', 'M')`);
+    const product = (vatCategory: string | null, vatRateId: string | null) =>
+      db.pool.query(
+        `INSERT INTO products (id, slug, merchant_id, category_code, vat_category, vat_rate_id, name, price_minor, currency)
+         VALUES (gen_random_uuid(), 'p' || floor(random() * 1e9)::text, '00000000-0000-4000-8000-000000000001', 'food', $1, $2, 'P', 100, 'EUR')`,
+        [vatCategory, vatRateId]
+      );
+    const ids = new Set(Object.values(markets).flatMap((m) => [...Object.keys(m.vat.rates), ...Object.values(m.vat.categoryOverrides).flat()]));
+    for (const rateId of ids) await product('groceries', rateId);
+    await assert.rejects(product('books', null), /check constraint/);
+    await assert.rejects(product(null, null), /null value/);
+    await assert.rejects(product('food', 'bad id!'), /check constraint/);
+  } finally {
     await db.drop();
   }
 });
