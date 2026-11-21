@@ -3,7 +3,7 @@
 Payment provider port and a Stripe adapter that runs in **test mode only** (ADR-0026). No real money moves, and card data never reaches Tazumo: clients collect cards with Stripe's own UI and send an opaque `ctoken_…` or `pm_…` token.
 
 - `createStripeTestProvider({ secretKey })` refuses any key that is not `sk_test_…` or `rk_test_…`.
-- `processStripeWebhook({ rawBody, signatureHeader, secret, replayGuard, apply })` verifies `Stripe-Signature` over the raw body (300 s tolerance both ways), refuses live-mode events, maps the event to the `@tazumo/orders` command (`payment_authorized` or `payment_failed`) with its idempotency key, and calls `apply` once per event id. In `apply`, call `assertPaymentMatchesOrder(outcome.amount, order.total)` and apply the command with `paymentActor`; if it throws, the event id is not recorded. The API's `ReplayGuard.once` records the id and runs `apply` in one transaction.
+- `processStripeWebhook({ rawBody, signatureHeader, secret, replayGuard, apply })` verifies `Stripe-Signature` over the raw body (300 s tolerance both ways), refuses live-mode events, maps the event to the `@tazumo/orders` command (`payment_authorized` or `payment_failed`) with its idempotency key, and calls `apply` once per event id. In `apply`, call `assertPaymentMatchesOrder(outcome.amount, order.total)` and apply the command with `paymentActor`; throw on any orders `ok: false` result, so the event id is not recorded and Stripe retries. Answer 2xx for `command`, `ignored` and `duplicate`, and non-2xx for `in_flight`. The API builds its `ReplayGuard` per request from the transaction that `apply` uses.
 - `pspIdempotencyKey(orderId, 'create' | 'cancel')` gives the provider idempotency key for an order.
 
 ## Tests

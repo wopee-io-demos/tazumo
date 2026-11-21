@@ -70,8 +70,12 @@ The payments package SHALL verify `Stripe-Signature` over the raw body within a 
 - WHEN the same event id is delivered a second time after it was applied
 - THEN the outcome is `duplicate` and `apply` is not called again
 
+#### Scenario: Concurrent delivery
+- WHEN a delivery arrives while the same event id is still being applied
+- THEN the outcome is `in_flight`, so the route answers non-2xx and Stripe retries
+
 #### Scenario: Failed application is not recorded
-- WHEN `apply` throws (for example `currency_mismatch` against the order total)
+- WHEN `apply` throws (for example `currency_mismatch` against the order total, or an orders `illegal_transition`)
 - THEN the event id is not recorded and the next delivery of the same event is applied
 
 ### Requirement: Money in minor units

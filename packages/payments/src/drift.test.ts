@@ -57,12 +57,20 @@ describe('drift against @tazumo/orders', () => {
       livemode: false,
       data: { object: { id: 'pi_1Drift', object: 'payment_intent', livemode: false, amount: 1250, currency: 'eur', metadata: { tazumo_order_id: orderId } } }
     });
-    const signatureHeader = Stripe.webhooks.generateTestHeaderString({ payload, secret });
     let applied: any;
     const apply = async (c: CommandOutcome) => {
-      applied = o.applyCommand(events, c.command, paymentActor, at, c.idempotencyKey);
+      const result = o.applyCommand(events, c.command, paymentActor, at, c.idempotencyKey);
+      if (!result.ok) throw new Error(result.error);
+      applied = result;
     };
-    const outcome = await processStripeWebhook({ rawBody: payload, signatureHeader, secret, replayGuard: createMemoryReplayGuard(), apply });
+    const replayGuard = createMemoryReplayGuard();
+    const signatureHeader = Stripe.webhooks.generateTestHeaderString({ payload, secret });
+    const early = (body: string) => processStripeWebhook({ rawBody: body, signatureHeader: Stripe.webhooks.generateTestHeaderString({ payload: body, secret }), secret, replayGuard, apply: async (c) => {
+      const result = o.applyCommand([created.value.event], c.command, paymentActor, at, c.idempotencyKey);
+      if (!result.ok) throw new Error(result.error);
+    } });
+    await assert.rejects(early(payload), /illegal_transition/);
+    const outcome = await processStripeWebhook({ rawBody: payload, signatureHeader, secret, replayGuard, apply });
     assert.ok(outcome.kind === 'command');
     assert.ok(applied.ok, JSON.stringify(applied));
     assert.equal(applied.value.state.status, 'confirmed');

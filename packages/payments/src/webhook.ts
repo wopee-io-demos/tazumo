@@ -12,31 +12,38 @@ export const paymentActor = Object.freeze({ kind: 'system', source: 'payment' } 
 export type WebhookOutcome =
   | { kind: 'command'; eventId: string; orderId: string; idempotencyKey: string; command: PaymentCommand; amount: Money }
   | { kind: 'ignored'; eventId: string; eventType: string }
-  | { kind: 'duplicate'; eventId: string };
+  | { kind: 'duplicate'; eventId: string }
+  | { kind: 'in_flight'; eventId: string };
 
 export type CommandOutcome = Extract<WebhookOutcome, { kind: 'command' }>;
 
+export type GuardResult = 'applied' | 'duplicate' | 'in_flight';
+
 /**
- * Runs `apply` at most once per event id and records the id only if `apply` succeeds. In the API, recording the id
- * and applying the command share one database transaction, so a failed delivery is retried by Stripe, not lost.
+ * Runs `apply` at most once per event id and records the id only if `apply` resolves. `apply` must throw whenever the
+ * command was not applied (for @tazumo/orders: any `ok: false` result), except for deliberate acknowledgements such as
+ * an orders replay or a late success audited as `refund_required`. In the API, construct the guard per request from
+ * the transaction that `apply` also uses, so recording the id and applying the command commit or roll back together.
  */
 export interface ReplayGuard {
-  /** Resolves true when `apply` ran and succeeded, false when the event id was already recorded or is in flight. */
-  once(eventId: string, apply: () => Promise<void>): Promise<boolean>;
+  /** `duplicate`: already recorded, acknowledge. `in_flight`: another delivery is being applied, answer non-2xx so Stripe retries. */
+  once(eventId: string, apply: () => Promise<void>): Promise<GuardResult>;
 }
 
 export function createMemoryReplayGuard(): ReplayGuard {
   const recorded = new Set<string>();
+  const inFlight = new Set<string>();
   return {
     async once(eventId, apply) {
-      if (recorded.has(eventId)) return false;
-      recorded.add(eventId);
+      if (recorded.has(eventId)) return 'duplicate';
+      if (inFlight.has(eventId)) return 'in_flight';
+      inFlight.add(eventId);
       try {
         await apply();
-        return true;
-      } catch (error) {
-        recorded.delete(eventId);
-        throw error;
+        recorded.add(eventId);
+        return 'applied';
+      } finally {
+        inFlight.delete(eventId);
       }
     }
   };
@@ -133,6 +140,6 @@ export async function processStripeWebhook(
 ): Promise<WebhookOutcome> {
   const outcome = mapStripeEvent(verifyStripeSignature(input));
   if (outcome.kind !== 'command') return outcome;
-  const applied = await input.replayGuard.once(outcome.eventId, () => input.apply(outcome));
-  return applied ? outcome : { kind: 'duplicate', eventId: outcome.eventId };
+  const result = await input.replayGuard.once(outcome.eventId, () => input.apply(outcome));
+  return result === 'applied' ? outcome : { kind: result, eventId: outcome.eventId };
 }

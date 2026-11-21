@@ -19,6 +19,7 @@ export {
   reasonPattern,
   verifyStripeSignature,
   type CommandOutcome,
+  type GuardResult,
   type PaymentCommand,
   type ReplayGuard,
   type VerifyInput,

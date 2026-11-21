@@ -67,7 +67,7 @@ describe('Stripe webhook signature', () => {
   it('rejects a bad signature or a tampered body without touching the replay guard', async () => {
     const body = event('payment_intent.succeeded');
     let touched = 0;
-    const guard: ReplayGuard = { once: async () => (touched++, true) };
+    const guard: ReplayGuard = { once: async () => (touched++, 'applied') };
     const before = applied.length;
     await assert.rejects(deliver(body, sign(body, { key: newSecret() }), guard), code('signature_mismatch'));
     await assert.rejects(deliver(body.replace('1250', '1'), sign(body), guard), code('signature_mismatch'));
@@ -115,6 +115,18 @@ describe('Stripe webhook events', () => {
     assert.equal((await deliver(body, sign(body), guard)).kind, 'command');
     assert.deepEqual(await deliver(body, sign(body), guard), { kind: 'duplicate', eventId: JSON.parse(body).id });
     assert.equal(applied.length, before + 1);
+  });
+
+  it('reports a concurrent delivery of an event still being applied as in_flight, not duplicate', async () => {
+    const body = event('payment_intent.succeeded');
+    const guard = createMemoryReplayGuard();
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const first = deliver(body, sign(body), guard, () => gate);
+    assert.deepEqual(await deliver(body, sign(body), guard), { kind: 'in_flight', eventId: JSON.parse(body).id });
+    release();
+    assert.equal((await first).kind, 'command');
+    assert.equal((await deliver(body, sign(body), guard)).kind, 'duplicate');
   });
 
   it('records nothing when applying fails, so the provider retry is applied', async () => {
