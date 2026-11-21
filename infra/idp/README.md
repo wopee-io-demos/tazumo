@@ -63,4 +63,4 @@ For the preview build use `preview --port 4174 --strictPort` (the realm allows 5
 DATABASE_URL=postgres://... pnpm exec playwright test -c tests/idp/playwright.config.ts
 ```
 
-The last test waits until the registration token has expired (300 s plus the API's 60 s clock tolerance).
+The suite also occupies `127.0.0.1:5173` (a stub for the web client's callback) and `127.0.0.1:4174` (the back-office preview), so stop any dev server on those ports first. The last test waits until the registration token has expired (300 s plus the API's 60 s clock tolerance).

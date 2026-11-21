@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { expect, test, type Page } from '@playwright/test';
 import { audience, clients, oidc, tokenType } from './env.mts';
-import { authorizeUrl, callApi, callbackParams, completeSignIn, decode, exchange, watchCallbacks, mailedLink, pkce, startSignIn, visit, type Tokens } from './oidc.mts';
+import { authorizeUrl, callApi, callbackParams, completeSignIn, decode, exchange, mailedLink, pkce, startSignIn, type Tokens } from './oidc.mts';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -30,7 +30,7 @@ test('registration on the Keycloak page, e-mail verification, password set after
   await page.getByRole('button', { name: /register/i }).click();
   await expect(page.getByText(/verify your email/i).first()).toBeVisible();
 
-  await visit(page, await mailedLink(email, /verify email/i));
+  await page.goto(await mailedLink(email, /verify email/i));
   await page.locator('#password-new').fill(firstPassword);
   await page.locator('#password-confirm').fill(firstPassword);
   await page.locator('[type=submit]').click();
@@ -51,8 +51,7 @@ test('registration on the Keycloak page, e-mail verification, password set after
 });
 
 test('the API refuses a token for another audience, the ID token and a missing token; RFC 8707 resource does not set the audience', async ({ page }) => {
-  watchCallbacks(page);
-  await visit(page, authorizeUrl(clients.probe, { state: 'resource', code_challenge: pkce().challenge, code_challenge_method: 'S256', resource: audience }));
+  await page.goto(authorizeUrl(clients.probe, { state: 'resource', code_challenge: pkce().challenge, code_challenge_method: 'S256', resource: audience }));
   expect((await callbackParams(page, clients.probe)).get('error')).toBe('invalid_target');
 
   const resource = 'https://api.tazumo.test';
@@ -74,8 +73,7 @@ test('the API refuses a token for another audience, the ID token and a missing t
 });
 
 test('Keycloak enforces PKCE S256 and refuses the password grant', async ({ page }) => {
-  watchCallbacks(page);
-  await visit(page, authorizeUrl(clients.web, { state: 'no-pkce' }));
+  await page.goto(authorizeUrl(clients.web, { state: 'no-pkce' }));
   const refused = await callbackParams(page, clients.web);
   expect(refused.get('error')).toBe('invalid_request');
 
@@ -102,7 +100,7 @@ test('forgot password: the Mailpit reset link sets a new password on the Keycloa
   await reset.locator('[type=submit]').click();
   await expect(reset.getByText(/you should receive an email/i)).toBeVisible();
 
-  await visit(reset, await mailedLink(email, /reset password/i));
+  await reset.goto(await mailedLink(email, /reset password/i));
   await reset.locator('#password-new').fill(secondPassword);
   await reset.locator('#password-confirm').fill(secondPassword);
   await reset.locator('[type=submit]').click();

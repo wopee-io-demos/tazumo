@@ -16,41 +16,16 @@ export function authorizeUrl(client: Client, params: Record<string, string>) {
   return url.toString();
 }
 
-const redirects = new WeakMap<Page, string[]>();
-
-/** Records Keycloak's redirects to the app. Nothing listens on the app origin, so the code is read from the Location header. */
-export function watchCallbacks(page: Page) {
-  if (redirects.has(page)) return;
-  const seen: string[] = [];
-  redirects.set(page, seen);
-  page.on('response', (response) => {
-    const location = response.headers()['location'];
-    if (location) seen.push(new URL(location, response.url()).href);
-  });
-}
-
-/** Navigates, tolerating the refused connection when Keycloak redirects straight to the (unserved) app origin. */
-export async function visit(page: Page, url: string) {
-  await page.goto(url).catch((error: Error) => {
-    if (!error.message.includes('ERR_CONNECTION_REFUSED')) throw error;
-  });
-}
-
 export async function startSignIn(page: Page, client: Client, extra: Record<string, string> = {}) {
   const flow = pkce();
-  watchCallbacks(page);
-  await visit(page, authorizeUrl(client, { state: flow.state, code_challenge: flow.challenge, code_challenge_method: 'S256', ...extra }));
+  await page.goto(authorizeUrl(client, { state: flow.state, code_challenge: flow.challenge, code_challenge_method: 'S256', ...extra }));
   return flow;
 }
 
+/** Waits until Keycloak has redirected to the app's callback (served by callback-server.mts) and the page has loaded. */
 export async function callbackParams(page: Page, client: Client) {
-  const seen = redirects.get(page) ?? [];
-  for (let attempt = 0; attempt < 150; attempt++) {
-    const index = seen.findIndex((href) => href.startsWith(`${client.redirectUri}?`));
-    if (index >= 0) return new URL(seen.splice(index, 1)[0]).searchParams;
-    await page.waitForTimeout(100);
-  }
-  throw new Error(`no redirect to ${client.redirectUri}; page at ${page.url()}`);
+  await page.waitForURL((url) => url.href.startsWith(`${client.redirectUri}?`));
+  return new URL(page.url()).searchParams;
 }
 
 export async function exchange(client: Client, code: string, verifier: string) {

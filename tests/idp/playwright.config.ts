@@ -31,6 +31,11 @@ export default defineConfig({
       AUTH_LOG_SALT: randomBytes(24).toString('hex'),
     },
   }, {
+    command: 'node --experimental-strip-types tests/idp/callback-server.mts',
+    cwd: '../..',
+    url: clients.web.redirectUri,
+    timeout: 30_000,
+  }, {
     command: `${backoffice} build && ${backoffice} preview --port ${backofficePort} --strictPort`,
     cwd: '../..',
     url: clients.backoffice.redirectUri,
