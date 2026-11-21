@@ -66,7 +66,7 @@ jobs:
         with:
           node-version: '22'
       - run: sudo apt-get update -q && sudo apt-get install -yq pngquant
-      - run: pnpm install --no-frozen-lockfile
+      - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
       - run: bash scripts/capture-web-screenshots.sh
         env:
@@ -93,7 +93,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: pnpm install --no-frozen-lockfile
+      - run: pnpm install --frozen-lockfile
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -162,7 +162,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - run: pnpm install --no-frozen-lockfile
+      - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @tazumo/mobile exec expo prebuild --platform android --non-interactive --no-install
       - name: Assemble release-variant APK (debug keystore, x86_64)
         working-directory: apps/mobile/android

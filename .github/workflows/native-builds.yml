@@ -16,8 +16,8 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: native-builds-${{ github.event.pull_request.number || github.ref }}${{ github.event_name == 'schedule' && '-nightly' || '' }}
-  cancel-in-progress: true
+  group: native-builds-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   changes:
     name: Native-relevant changes
@@ -56,11 +56,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+          cache: pnpm
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-      - run: pnpm install --no-frozen-lockfile
+      - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @tazumo/mobile test
       - run: pnpm --filter @tazumo/mobile exec expo prebuild --platform android --non-interactive --no-install
       - name: Assemble debug APK
@@ -85,11 +86,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+          cache: pnpm
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-      - run: pnpm install --no-frozen-lockfile
+      - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @tazumo/mobile test
       - run: pnpm --filter @tazumo/mobile exec expo prebuild --platform android --non-interactive --no-install
       - name: Assemble release-variant APK (debug keystore, x86_64, embedded JS bundle)
@@ -136,7 +138,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: pnpm install --no-frozen-lockfile
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @tazumo/mobile exec expo prebuild --platform ios --non-interactive --no-install
       - run: pod install
         working-directory: apps/mobile/ios
