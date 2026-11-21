@@ -41,7 +41,7 @@ SUT reference imagery captured from the real app. These are not Wopee or Appium 
 
 | | Desktop 1440x900 | Mobile 390x844 |
 | --- | --- | --- |
-| Catalogue | <img src="docs/screenshots/web/desktop-home.png" width="420" alt="Web catalogue on desktop: header with language switcher, hero, category chips, all eight products and the merchant list"> | <img src="docs/screenshots/web/mobile-home.png" width="200" alt="Web catalogue on mobile: header with cart and language switcher, hero and search"> |
+| Catalogue | <img src="docs/screenshots/web/desktop-home.png" width="420" alt="Web catalogue on desktop: header with cart, sign-in notice and language switcher, hero, category chips including Favourites, all eight products and the merchant list"> | <img src="docs/screenshots/web/mobile-home.png" width="200" alt="Web catalogue on mobile: header with cart, sign-in notice and language switcher, hero and search"> |
 | Category: Groceries | <img src="docs/screenshots/web/desktop-category-groceries.png" width="420" alt="Groceries category selected, showing Sourdough loaf and Local apples"> | <img src="docs/screenshots/web/mobile-category-groceries.png" width="200" alt="Groceries category selected on mobile"> |
 | Search: "fresh" | <img src="docs/screenshots/web/desktop-search-fresh.png" width="420" alt="Search for fresh returns three products"> | <img src="docs/screenshots/web/mobile-search-fresh.png" width="200" alt="Search for fresh on mobile"> |
 | Cart with items | <img src="docs/screenshots/web/desktop-cart.png" width="420" alt="Basket dialog with two pizzas, a loaf and flowers, line totals, subtotal 46.20 euro, checkout disabled"> | <img src="docs/screenshots/web/mobile-cart.png" width="200" alt="Basket dialog on mobile"> |
@@ -50,7 +50,7 @@ SUT reference imagery captured from the real app. These are not Wopee or Appium 
 
 | Provenance | Web |
 | --- | --- |
-| SUT commit | [`c8169ee`](https://github.com/wopee-io-demos/tazumo/commit/c8169eeb56c4935489944ec6962aefc7f9233f43), the last change to `apps/web`, `packages` and workspace config at capture time; the PNGs are byte-identical to the capture on `f9616f7`, so nothing visible changed in between |
+| SUT commit | [`be970e2`](https://github.com/wopee-io-demos/tazumo/commit/be970e26633469e94876c5740051fcb1ed082179), the last change to `apps/web`, `packages` and workspace config at capture time |
 | Fixture data | Synthetic catalogue and merchants in `packages/core`; cart = 2x Margherita pizza, 1x Sourdough loaf, 1x Fresh flowers; detail pages for `piazza-local` and `pizza` |
 | Capture command | `bash scripts/capture-web-screenshots.sh` after `pnpm install` and `pnpm exec playwright install chromium`; needs `pngquant` and network access for Google Fonts. It runs `pnpm build`, serves `vite preview`, runs `tests/screenshots/capture.spec.ts` and replaces the gallery only when every capture passes |
 | Browser | Playwright 1.65.1, Chromium 159.0.8154.6, macOS arm64 host |
