@@ -28,3 +28,4 @@ export {merchants,findMerchant,findProduct,merchantForProduct,productsForMerchan
 export type {Merchant,CartLine} from './discovery.ts';
 export {accountMessageKeys,accountText} from './account.ts';
 export type {AccountMessageKey} from './account.ts';
+export {parseFavourites,toggleFavourite,serializeFavourites} from './favourites.ts';
