@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
-import {mkdtempSync,readFileSync,rmSync} from 'node:fs';
+import {mkdirSync,mkdtempSync,readFileSync,readdirSync,rmSync} from 'node:fs';
 import {createRequire} from 'node:module';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
@@ -22,8 +22,9 @@ test('one product version: the manifest, the root package and every release-plea
   assert.match(productVersion,/^\d+\.\d+\.\d+$/);
   assert.equal(json('package.json').version,productVersion);
   const extra=config.packages['.']['extra-files'];
-  assert.deepEqual(extra.map((f:{path:string})=>f.path).sort(),
-    ['apps/api/package.json','apps/backoffice/package.json','apps/mobile/app.json','apps/mobile/package.json','apps/web/package.json']);
+  const apps=readdirSync(join(repoRoot,'apps'),{withFileTypes:true}).filter(d=>d.isDirectory()).map(d=>`apps/${d.name}/package.json`);
+  assert.ok(apps.length>=4);
+  assert.deepEqual(extra.map((f:{path:string})=>f.path).sort(),[...apps,'apps/mobile/app.json'].sort(),'every app is in extra-files');
   for(const {type,path,jsonpath} of extra){
     assert.equal(type,'json');
     const value=jsonpath.slice(2).split('.').reduce((o:Record<string,unknown>,k:string)=>o[k] as Record<string,unknown>,json(path));
@@ -55,13 +56,25 @@ test('build identity reads the product and contract versions from the repository
     contracts:{sut:json('contracts/sut.json').version,openapi:json('contracts/openapi.json').info.version}});
 });
 
-test('the commit comes from TAZUMO_COMMIT, GITHUB_SHA or git, and is "unknown" otherwise',()=>{
-  assert.equal(resolveCommit({TAZUMO_COMMIT:sha,GITHUB_SHA:'f'.repeat(40)}),sha);
-  assert.equal(resolveCommit({GITHUB_SHA:sha}),sha);
-  assert.equal(resolveCommit({}),execFileSync('git',['rev-parse','HEAD'],{cwd:repoRoot,encoding:'utf8'}).trim());
-  for(const bad of ['main','abc1234',`${sha}\n`,sha.toUpperCase(),'$(id)'])assert.equal(resolveCommit({TAZUMO_COMMIT:bad}),'unknown',bad);
+test('the commit comes from TAZUMO_COMMIT, this checkout or Tazumo\'s own GITHUB_SHA, and is "unknown" otherwise',()=>{
+  const head=execFileSync('git',['rev-parse','HEAD'],{cwd:repoRoot,encoding:'utf8'}).trim();
+  const other='f'.repeat(40);
+  assert.equal(resolveCommit({TAZUMO_COMMIT:sha,GITHUB_SHA:other}),sha);
+  assert.equal(resolveCommit({}),head);
+  assert.equal(resolveCommit({GITHUB_REPOSITORY:'wopee-io-demos/tazumo',GITHUB_SHA:other}),head,'the checkout wins over GITHUB_SHA');
+  for(const bad of ['main','abc1234',`${sha}\n`,sha.toUpperCase(),'$(id)'])assert.equal(resolveCommit({TAZUMO_COMMIT:bad}),head,bad);
   const outside=mkdtempSync(join(tmpdir(),'tazumo-no-git-'));
-  try{assert.equal(resolveCommit({},outside),'unknown')}finally{rmSync(outside,{recursive:true,force:true})}
+  const nested=join(outside,'tazumo');
+  try{
+    assert.equal(resolveCommit({},outside),'unknown');
+    assert.equal(resolveCommit({TAZUMO_COMMIT:'main'},outside),'unknown');
+    assert.equal(resolveCommit({GITHUB_REPOSITORY:'wopee-io-demos/tazumo',GITHUB_SHA:other},outside),other);
+    assert.equal(resolveCommit({GITHUB_REPOSITORY:'wopee-io-demos/mobile-demo',GITHUB_SHA:other},outside),'unknown','a consumer\'s GITHUB_SHA is not Tazumo\'s commit');
+    execFileSync('git',['init','-q',outside]);
+    execFileSync('git',['-c','user.name=t','-c','user.email=t@invalid','commit','-q','--allow-empty','-m','consumer'],{cwd:outside});
+    mkdirSync(nested);
+    assert.equal(resolveCommit({},nested),'unknown','an enclosing repository\'s HEAD is not Tazumo\'s commit');
+  }finally{rmSync(outside,{recursive:true,force:true})}
 });
 
 test('native build numbers come from TAZUMO_BUILD_NUMBER and default to 1',()=>{
@@ -90,6 +103,7 @@ test('semver precedence follows the specification',()=>{
   const ordered=['0.7.0-alpha','0.7.0-alpha.1','0.7.0-alpha.beta','0.7.0-beta','0.7.0-beta.2','0.7.0-beta.11','0.7.0-draft','0.7.0','0.7.1','0.8.0-draft','0.10.0','1.0.0'];
   for(let i=1;i<ordered.length;i++)assert.ok(compareSemver(ordered[i-1],ordered[i])<0,`${ordered[i-1]} < ${ordered[i]}`);
   assert.equal(compareSemver('0.7.0+build.1','0.7.0'),0);
+  assert.ok(compareSemver('0.9007199254740993.0','0.9007199254740992.0')>0,'arbitrary-size integers');
 });
 
 test('the OpenAPI version must change, and increase, whenever the contract changes',()=>{
@@ -102,5 +116,8 @@ test('the OpenAPI version must change, and increase, whenever the contract chang
   assert.deepEqual(checkOpenapiVersion(spec,edit('0.7.0',false)),[]);
   assert.match(checkOpenapiVersion(spec,edit('0.6.0-draft')).join(),/must be greater than/);
   assert.match(checkOpenapiVersion(spec,edit('0.7.0-alpha',false)).join(),/must be greater than/);
+  const legacy=edit('draft-7',false);
+  assert.match(checkOpenapiVersion(legacy,edit('draft-7')).join(),/is not a semantic version/);
+  assert.deepEqual(checkOpenapiVersion(legacy,edit('0.1.0')),[]);
   for(const bad of ['0.8','v0.8.0','0.8.0-','08.0.0'])assert.match(checkOpenapiVersion(spec,edit(bad)).join(),/is not a semantic version/,bad);
 });

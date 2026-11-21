@@ -6,7 +6,7 @@ Tracking: issue #159 (absorbs #120), OpenSpec `release-versioning`
 
 ## Context
 
-Tazumo is the system under test for the demo repositories. Web, mobile and the API are built from one commit and ship together. Before this decision there were no tags, releases or changelog, every manifest said `0.1.0` and no deployment reported what it was built from, so consumers could not tell which build they were testing. The two contracts were already versioned: `contracts/sut.json` by semver enforced by `pnpm check:sut`, and `contracts/openapi.json` by hand. Squash-merge titles already follow Conventional Commits.
+Tazumo is the system under test for the demo repositories. Web, mobile and the API are built from one commit and ship together. Before this decision there were no tags, releases or changelog, every manifest said `0.1.0` and no deployment reported what it was built from, so consumers could not tell which build they were testing. The two contracts were already versioned: `contracts/sut.json` by semver enforced by `pnpm check:sut`, and `contracts/openapi.json` by hand. Squash-merge titles follow Conventional Commits by convention; nothing lints them yet (follow-up in the issue tracker).
 
 ## Decision
 
@@ -21,12 +21,13 @@ Tazumo is the system under test for the demo repositories. Web, mobile and the A
 - `.github/workflows/release.yml` runs `googleapis/release-please-action`, pinned to a commit SHA, on every push to `main`, on a GitHub-hosted runner. It is the only job with `contents: write` and `pull-requests: write`. The workflow default is no permissions.
 - release-please keeps one release PR open with the next version, the changelog entry and the version bumps. Merging that PR creates the tag and the GitHub Release.
 - The release PR goes through the same ruleset as any other PR: required checks, squash merge, no direct pushes to `main`. It is opened with the workflow token, and GitHub does not start workflows for events caused by that token, so the maintainer closes and reopens the PR to run the checks before merging. A GitHub App token would make this automatic. It needs a secret the repository does not have yet.
+- release-please needs the `autorelease: pending` and `autorelease: tagged` labels; they are created in the repository up front, so the job needs no `issues: write`.
 - Only `feat`, `fix`, `perf`, `revert` and `deps` commits appear in the changelog and cause a release. `docs`, `test`, `ci`, `build`, `refactor` and `chore` (including `chore(deps)`) do not.
 
 ### Pre-1.0 policy
 
 - `0.y.z` means the demo is still changing shape. A breaking change (`feat!:` or a `BREAKING CHANGE:` footer) or a feature bumps the minor version. A fix bumps the patch version. Nothing reaches `1.0.0` automatically.
-- `1.0.0` is cut deliberately with a `Release-As: 1.0.0` footer once the repository owner declares the SUT stable. That should not happen before the SUT contract reaches `1.0.0`.
+- `1.0.0` is cut deliberately with a `Release-As: 1.0.0` footer in a squash commit message once the repository owner declares the SUT stable. That should not happen before the SUT contract reaches `1.0.0`.
 
 ### Contracts stay independently versioned
 
@@ -36,9 +37,9 @@ Tazumo is the system under test for the demo repositories. Web, mobile and the A
 
 ### Build identity
 
-- The web build writes `version.json` (`version`, `commit`, `builtAt`, `contracts.sut`, `contracts.openapi`) and `<meta name="tazumo-version">` and `<meta name="tazumo-commit">` into `index.html`, from `scripts/build-info.mjs`. The commit is `TAZUMO_COMMIT`, then `GITHUB_SHA`, then `git rev-parse HEAD`, and `unknown` when none gives a full SHA. It is never empty and never hand-edited.
-- The API's `GET /health` returns `version` (from `apps/api/package.json`) and `commit` (`TAZUMO_COMMIT`, otherwise `unknown`).
-- Native builds take `ios.buildNumber` and `android.versionCode` from `TAZUMO_BUILD_NUMBER`, which CI sets to `github.run_number`, through `apps/mobile/app.config.js`. They default to `1` locally and are never committed.
+- The web build writes `version.json` (`version`, `commit`, `builtAt`, `contracts.sut`, `contracts.openapi`) and `<meta name="tazumo-version">` and `<meta name="tazumo-commit">` into `index.html`, from `scripts/build-info.mjs`. The commit is `TAZUMO_COMMIT`, then the HEAD of the Tazumo checkout itself, then `GITHUB_SHA` only inside this repository's workflows, and `unknown` when none gives a full SHA. A consumer building a pinned checkout in its own workflow must not report its own commit. It is never empty and never hand-edited.
+- The API's `GET /health` returns `version` (from `apps/api/package.json`) and `commit` (`TAZUMO_COMMIT`, otherwise `unknown`). `/health` stays outside the OpenAPI contract, so these fields are informal.
+- Native builds take `ios.buildNumber` and `android.versionCode` from `TAZUMO_BUILD_NUMBER`, which `native-builds.yml` sets to `github.run_number`, through `apps/mobile/app.config.js`. They default to `1` locally and are never committed.
 
 ## Alternatives considered
 

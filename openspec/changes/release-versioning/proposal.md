@@ -9,9 +9,9 @@ Issue [#159](https://github.com/wopee-io-demos/tazumo/issues/159), absorbing [#1
 - `scripts/check-openapi-version.mjs` (`pnpm check:openapi`), run in `ci.yml` next to `check:sut` against the base: the OpenAPI version must be semver and must increase whenever the contract changes.
 - `scripts/build-info.mjs` and a Vite plugin: the web build and dev server serve `version.json` with `version`, `commit`, `builtAt` and both contract versions, and `index.html` gets `tazumo-version` and `tazumo-commit` meta tags.
 - API `GET /health` returns `version` and `commit` (`TAZUMO_COMMIT`).
-- `apps/mobile/app.config.js` sets `ios.buildNumber` and `android.versionCode` from `TAZUMO_BUILD_NUMBER` (default `1`).
+- `apps/mobile/app.config.js` sets `ios.buildNumber` and `android.versionCode` from `TAZUMO_BUILD_NUMBER` (default `1`); `native-builds.yml` sets it to `github.run_number` and checks the Android `versionCode` after prebuild.
 - `pages.yml`: checks the built `version.json` against `package.json` and the commit, smoke-tests the deployed one, redeploys on contract changes.
 - Docs: `docs/RELEASING.md`, README line, `docs/SUT-CONTRACT.md` pointer, API README.
 
 ## Out of scope
-Publishing packages, store signing and submission, a GitHub App token for the release PR (checks start by reopening the PR until then), setting `TAZUMO_BUILD_NUMBER` in `native-builds.yml` (owned by the native builds workflow; requested there), downstream verification in web-demo (follow-up issue).
+Linting PR titles and the squash-merge message settings (follow-up issue), publishing packages, store signing and submission, a GitHub App token for the release PR (checks start by reopening the PR until then), downstream verification in web-demo (follow-up issue).

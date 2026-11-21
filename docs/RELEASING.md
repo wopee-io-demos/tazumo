@@ -7,7 +7,7 @@ The Tazumo SUT (web, mobile and API) has one product version, released as `vX.Y.
 | Product (SUT) | `.release-please-manifest.json`, mirrored into the root and `apps/*` `package.json` and `apps/mobile/app.json` | release-please; `tests/contract/versioning.test.mts` checks they agree |
 | SUT contract | `contracts/sut.json` `version` | `pnpm check:sut --base <ref>` |
 | OpenAPI contract | `contracts/openapi.json` `info.version` | `pnpm check:openapi --base <ref>` |
-| Native build number | `TAZUMO_BUILD_NUMBER` (CI: `github.run_number`), default `1` | `apps/mobile/app.config.js` |
+| Native build number | `TAZUMO_BUILD_NUMBER`, set to `github.run_number` by `native-builds.yml`; default `1` | `apps/mobile/app.config.js` |
 
 ## How a release happens
 
@@ -17,7 +17,9 @@ The Tazumo SUT (web, mobile and API) has one product version, released as `vX.Y.
 4. When the required checks pass, squash-merge it. Never push to `main` directly; the ruleset forbids it.
 5. The next `release.yml` run tags the merge commit `vX.Y.Z` and publishes the GitHub Release with the changelog entry. The Pages workflow redeploys the web preview because `package.json` changed, so `version.json` reports the new version.
 
-Version bumps before 1.0: a feature or a breaking change bumps the minor version, a fix bumps the patch version. To force a version (for example `1.0.0`), add a `Release-As: 1.0.0` footer to a commit on `main`.
+Version bumps before 1.0: a feature or a breaking change bumps the minor version, a fix bumps the patch version. To force a version (for example `1.0.0`), put a `Release-As: 1.0.0` footer in the squash commit message when merging a PR (`gh pr merge <N> --squash --body 'Release-As: 1.0.0'`); `main` takes no direct pushes.
+
+The PR title becomes the squash commit title, so give it a Conventional Commit type. Titles are not linted yet; a title without a type is left out of the changelog and the version bump.
 
 A PR that changes `contracts/openapi.json` must raise `info.version` in the same PR (additive change: next minor). A PR that changes `contracts/sut.json` follows [SUT-CONTRACT](SUT-CONTRACT.md).
 
@@ -37,10 +39,11 @@ Every web build serves `version.json` next to `index.html`:
 ```
 
 - `version` is the last released product version, from the manifests. Builds between releases keep it, so use `commit` to identify a build exactly. A build of a tagged release has `commit` equal to the tag's commit.
-- `commit` is the source commit: `TAZUMO_COMMIT`, then `GITHUB_SHA`, then `git rev-parse HEAD`, and `unknown` when none of them is a full 40-character SHA. It is never empty.
+- `commit` is the source commit: `TAZUMO_COMMIT`, then the HEAD of the Tazumo checkout (not of an enclosing repository), then `GITHUB_SHA` when the workflow runs in `wopee-io-demos/tazumo` itself; `unknown` when none of them is a full 40-character SHA. It is never empty. A consumer that builds a pinned Tazumo checkout in its own workflow therefore reports Tazumo's commit, not its own.
+- Pull request builds report GitHub's temporary merge commit, which never lands on `main`. Only deployed builds from `main` are meant to be pinned.
 - `index.html` carries the same values as `<meta name="tazumo-version">` and `<meta name="tazumo-commit">`.
 - The dev server (`pnpm dev:sut`) serves `/version.json` too.
-- The API's `GET /health` returns `version` and `commit`. Set `TAZUMO_COMMIT` to the deployed commit when starting the service; otherwise it reports `unknown`.
+- The API's `GET /health` returns `version` and `commit`. Set `TAZUMO_COMMIT` to the deployed commit when starting the service; otherwise it reports `unknown`. `/health` is an operational route outside `contracts/openapi.json`, so these fields are informal, not contract. Exposing them unauthenticated is acceptable for a synthetic demo SUT.
 
 The Pages workflow checks `version.json` against `package.json` and the built commit before upload, and its live smoke checks the deployed `version.json` and meta tags.
 

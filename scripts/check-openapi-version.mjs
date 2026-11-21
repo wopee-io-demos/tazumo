@@ -11,14 +11,15 @@ export const semver=/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*
 /** Semver precedence: negative, zero or positive. Build metadata is ignored. */
 export function compareSemver(a,b){
   const [,...x]=semver.exec(a),[,...y]=semver.exec(b);
-  for(let i=0;i<3;i++)if(Number(x[i])!==Number(y[i]))return Number(x[i])-Number(y[i]);
+  const sign=(m,n)=>(BigInt(m)>BigInt(n))-(BigInt(m)<BigInt(n));
+  for(let i=0;i<3;i++)if(sign(x[i],y[i]))return sign(x[i],y[i]);
   if(!x[3]||!y[3])return x[3]?-1:y[3]?1:0;
   const p=x[3].split('.'),q=y[3].split('.');
   for(let i=0;i<Math.max(p.length,q.length);i++){
     if(p[i]===undefined)return -1;
     if(q[i]===undefined)return 1;
     const m=/^\d+$/.test(p[i]),n=/^\d+$/.test(q[i]);
-    if(m&&n&&Number(p[i])!==Number(q[i]))return Number(p[i])-Number(q[i]);
+    if(m&&n&&sign(p[i],q[i]))return sign(p[i],q[i]);
     if(m!==n)return m?-1:1;
     if(p[i]!==q[i])return p[i]<q[i]?-1:1;
   }
@@ -32,9 +33,8 @@ export function checkOpenapiVersion(base,next){
   if(typeof version!=='string'||!semver.test(version))return [`${path} info.version "${version}" is not a semantic version`];
   if(!base)return [];
   const before=base.info?.version;
-  if(typeof before!=='string'||!semver.test(before))return [];
   if(withoutVersion(base)!==withoutVersion(next)&&version===before)return [`${path} changed but info.version is still ${before}: bump it (additive change: next minor)`];
-  if(version!==before&&compareSemver(version,before)<=0)return [`${path} info.version ${version} must be greater than ${before}`];
+  if(typeof before==='string'&&semver.test(before)&&version!==before&&compareSemver(version,before)<=0)return [`${path} info.version ${version} must be greater than ${before}`];
   return [];
 }
 
