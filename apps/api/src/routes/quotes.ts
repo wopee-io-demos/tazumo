@@ -17,6 +17,13 @@ type QuoteBody = {
 const QUOTE_TTL_MS = 10 * 60_000;
 const SYNTHETIC_MAX_METERS = 8_000;
 
+const postalCodePatterns: Record<string, RegExp> = {
+  SK: /^\d{3} ?\d{2}$/,
+  CZ: /^\d{3} ?\d{2}$/,
+  DE: /^\d{5}$/,
+  AT: /^\d{4}$/
+};
+
 const clientErrors: Record<string, 400 | 422> = {
   invalid_quantity: 400,
   invalid_distance: 400,
@@ -79,7 +86,11 @@ export async function quoteRoutes(app: FastifyInstance, { pool }: { pool: pg.Poo
     '/v1/order-quotes',
     { schema: routeSchema('post', '/v1/order-quotes'), config: { rateLimit: rateLimitTier.public } },
     async (request, reply) => {
-      const body = request.body;
+      const body = {
+        ...request.body,
+        merchantId: request.body.merchantId.toLowerCase(),
+        items: request.body.items.map((item) => ({ ...item, productId: item.productId.toLowerCase() }))
+      };
       const marketRow = await pool.query<{ countryCode: string }>(`SELECT country_code AS "countryCode" FROM markets WHERE code = $1`, [
         body.marketCode
       ]);
@@ -99,6 +110,10 @@ export async function quoteRoutes(app: FastifyInstance, { pool }: { pool: pg.Poo
       }
       if (body.deliveryAddress.countryCode.toUpperCase() !== countryCode) {
         return reply.code(422).send(apiError(request, 'outside_delivery_area', 'The delivery address is outside this market'));
+      }
+      const postalPattern = postalCodePatterns[countryCode];
+      if (postalPattern && !postalPattern.test(body.deliveryAddress.postalCode.trim())) {
+        return reply.code(400).send(apiError(request, 'invalid_postal_code', `Postal code does not match the ${countryCode} format`));
       }
 
       const productIds = [...new Set(body.items.map((item) => item.productId))];
@@ -133,6 +148,15 @@ export async function quoteRoutes(app: FastifyInstance, { pool }: { pool: pg.Poo
       } catch (error) {
         if (!(error instanceof CommerceRuleError)) throw error;
         const status = clientErrors[error.code];
+        if (error.code === 'outside_delivery_area') {
+          return reply.code(422).send(
+            apiError(request, error.code, `The synthetic delivery distance of ${distance} m is beyond the last delivery band`, {
+              distanceMeters: distance,
+              maxMeters: error.details.maxMeters,
+              distanceSynthetic: true
+            })
+          );
+        }
         if (status) return reply.code(status).send(apiError(request, error.code, error.message));
         request.log.error({ commerceError: error.code }, 'pricing failed on server data');
         return reply.code(500).send(apiError(request, 'internal_error', 'Internal server error'));

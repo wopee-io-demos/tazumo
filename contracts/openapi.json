@@ -3,7 +3,7 @@
   "info": {
     "title": "Tazumo Marketplace API",
     "version": "0.7.0-draft",
-    "description": "Contract proposal. The read-only Discovery operations and the Identity, Admin role-grant Privacy (erasure, export) and quote (synthetic fees, VAT rates to re-verify) operations have a reference implementation in apps/api (synthetic fixture data, not deployed). All prices are server-calculated. Checkout is disabled in the current clients."
+    "description": "Contract proposal. The read-only Discovery operations and the Identity, Admin role-grant, Privacy (erasure, export) and quote (synthetic fees, VAT rates to re-verify) operations have a reference implementation in apps/api (synthetic fixture data, not deployed). All prices are server-calculated. Checkout is disabled in the current clients."
   },
   "servers": [
     {

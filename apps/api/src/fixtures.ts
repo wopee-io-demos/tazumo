@@ -41,6 +41,12 @@ export const fixtureVatCategory: Readonly<Record<string, VatCategory>> = {
   book: 'gifts'
 };
 
+function vatCategoryFor(productId: string): VatCategory {
+  const category = fixtureVatCategory[productId];
+  if (!category) throw new Error(`Fixture product ${productId} has no VAT category`);
+  return category;
+}
+
 export const demoMarket: MarketRow = { code: 'demo-eu', countryCode: 'IE', currency: 'EUR', locale: 'en-IE' };
 
 export function buildSeed() {
@@ -57,7 +63,7 @@ export function buildSeed() {
       slug: product.id,
       merchantId,
       categoryCode: slugify(product.category),
-      vatCategory: fixtureVatCategory[product.id] ?? 'gifts',
+      vatCategory: vatCategoryFor(product.id),
       name: product.name,
       description: product.description,
       priceMinor: product.priceCents,

@@ -11,4 +11,16 @@
   - 404, 400 and 422 cases including the IE demo market;
   - unavailable items;
   - a 500 on bad server data, with no address in the logs.
-- [ ] Current-head CI green and independent review recorded in the PR.
+- [x] Independent review on 48cf90a: 1 blocker, 3 should-fix and 7 nits.
+  - Blocker fixed: the `vat_rate_id` CHECK rejected `basicFood`. The CHECK now allows capitals, every commerce override id is tested, and end-to-end tests cover the SK `reduced5` and AT `basicFood` overrides.
+  - Should-fix, all fixed:
+    - body UUIDs are lowercased, and `urn:uuid` is rejected with 400;
+    - the beyond-band 422 is labelled synthetic;
+    - the client-price test is strict.
+  - Nits fixed:
+    - per-country postal code formats;
+    - the backfill covers synthetic rows only;
+    - the fixture VAT map throws on unmapped products;
+    - preview semantics are documented in the spec;
+    - migration constraint tests.
+- [ ] Current-head CI green (record run URLs).

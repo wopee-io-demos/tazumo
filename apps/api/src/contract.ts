@@ -26,8 +26,14 @@ function rewriteRefs<T>(value: T): T {
   );
 }
 
+function strictUuids<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value), (_key, v) =>
+    v && typeof v === 'object' && !Array.isArray(v) && v.format === 'uuid' && !v.pattern ? { ...v, pattern: uuidPattern } : v
+  );
+}
+
 export function componentSchemas(): JsonSchema[] {
-  return Object.entries(contract.components.schemas).map(([name, schema]) => ({ $id: name, ...rewriteRefs(schema) }));
+  return Object.entries(contract.components.schemas).map(([name, schema]) => ({ $id: name, ...strictUuids(rewriteRefs(schema)) }));
 }
 
 export const toFastifyPath = (path: string) => path.replace(/\{(\w+)\}/g, ':$1');

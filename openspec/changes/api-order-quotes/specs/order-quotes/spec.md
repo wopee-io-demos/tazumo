@@ -27,3 +27,10 @@ The service SHALL refuse to quote instead of guessing.
 #### Scenario: Invalid basket or delivery
 - WHEN a product is unknown, a quantity is out of range, a line is duplicated, or the delivery is beyond the last band or in another country
 - THEN the response is 404, 400 or 422 respectively, with an `ApiError`.
+
+### Requirement: Quotes are previews until orders exist
+Until quotes are persisted for order creation, the service SHALL mark every quote `redeemable: false`. It SHALL price unavailable items while flagging them, and it SHALL NOT consider merchants' `acceptingOrders`. The synthetic distance SHALL be replaced by server-side geocoding before any quote becomes redeemable.
+
+#### Scenario: Beyond-band refusal
+- WHEN the synthetic distance exceeds the last delivery band
+- THEN the 422 response states that the distance is synthetic and includes it in `details`.
