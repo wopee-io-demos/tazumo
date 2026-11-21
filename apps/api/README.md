@@ -41,3 +41,18 @@ CREATE ROLE tazumo_api_app LOGIN PASSWORD '...' IN ROLE tazumo_api;
 ```
 
 Design: [OpenSpec `api-auth`](../../openspec/changes/api-auth/design.md).
+
+## Local identity provider
+
+The development Keycloak realm in [`infra/idp`](../../infra/idp/README.md) (ADR-0017) issues tokens this API accepts. Start it with `bash infra/idp/up.sh`, then run the server with:
+
+| Variable | Value for the `tazumo` realm |
+| --- | --- |
+| `AUTH_ISSUER` | `http://127.0.0.1:48180/realms/tazumo` (Keycloak's `KC_HOSTNAME` fixes it, whatever host the browser used) |
+| `AUTH_AUDIENCE` | `tazumo-api` (added by an audience mapper on the app clients; not a client ID) |
+| `AUTH_JWKS_URL` | `http://127.0.0.1:48180/realms/tazumo/protocol/openid-connect/certs` (http is accepted because the host is loopback) |
+| `AUTH_TOKEN_TYPE` | `at+jwt` (the realm's clients issue RFC 9068 access tokens) |
+| `AUTH_MAX_TOKEN_LIFETIME` | optional; the realm's access tokens live 300 s, below the 3600 s default cap |
+| `AUTH_LOG_SALT` | any random value of 32+ characters, for example `openssl rand -hex 24` |
+
+Users sign up, sign in and reset passwords only on Keycloak's pages. No API route accepts a password, and `tests/idp/no-password-fields.test.mts` keeps it that way. `.github/workflows/idp.yml` runs this API against the real realm.

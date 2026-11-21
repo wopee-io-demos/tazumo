@@ -1,8 +1,8 @@
 # ADR-0017: OIDC provider for EU data residency
 
-Status: **Proposed.** The decision belongs to the repository owner.
-Date: 2026-11-20
-Tracking: issue #56, ADR-0016 (token verification is provider-neutral)
+Status: **Accepted.** Decided by the repository owner on 2026-11-21: self-hosted Keycloak in the EU, as recommended (recorded on #56 and #87).
+Date: 2026-11-20 (proposed), 2026-11-21 (accepted)
+Tracking: issue #56, issue #87 (spike), ADR-0016 (token verification is provider-neutral)
 
 ## Context
 
@@ -86,7 +86,7 @@ What differs per provider:
 
 **Auth0 EU and Entra External ID are technically strong but rank lower here.** Their US parents carry legal exposure. They remain viable if legal review accepts the Data Privacy Framework and SCC route.
 
-## Consequences if accepted
+## Consequences
 
 1. Run a spike:
    - Keycloak in a container locally and in `api.yml`;
@@ -99,4 +99,16 @@ What differs per provider:
    - setting `AUTH_ISSUER`, `AUTH_AUDIENCE`, `AUTH_JWKS_URL` and `AUTH_TOKEN_TYPE` from the realm.
 3. Call the provider's account-deletion API from the erasure operation, replacing the operator step.
 
-Nothing in this ADR wires a provider. Until it is accepted, `AUTH_*` stays unset in every environment, so protected routes return 503.
+No deployed environment is wired to a provider yet. Outside development and CI, `AUTH_*` stays unset, so protected routes return 503.
+
+## Spike findings (#87)
+
+Consequence 1 is done: `infra/idp` (Keycloak 26.8.2, Mailpit, PostgreSQL 17, pinned by digest) and `.github/workflows/idp.yml`, which runs the real `apps/api` server against it.
+
+- **Access token `typ`:** `at+jwt`. Keycloak sets the RFC 9068 header per client with the attribute `access.token.header.type.rfc9068`, so `AUTH_TOKEN_TYPE=at+jwt` is enforced in CI. ID tokens keep `typ: JWT` and their `aud` is the client ID, and the API rejects them.
+- **Audience:** Keycloak ignores the RFC 8707 `resource` parameter. An `oidc-audience-mapper` on each app client adds `tazumo-api` to access tokens only. A token from a client without the mapper gets 401 from the API.
+- **Lifetime:** realm access token lifespan 300 s. A real token is refused with 401 once `exp` plus the API's 60 s tolerance has passed.
+- **Issuer:** `KC_HOSTNAME` pins the issuer (`http://127.0.0.1:48180/realms/tazumo` locally and in CI), whichever URL the browser used.
+- **Registration:** with e-mail verification on, Keycloak 26.8 asks for the password only after the verification link is opened, so no password exists for an unproven address.
+- **Passwords stay at the provider:** public clients have the password grant disabled (Keycloak answers `unauthorized_client`), PKCE `S256` is required (a request without a challenge is refused), and a test fails if an app or API route accepts a password field.
+- **Still open:** the production deployment (consequence 2), provider-side account deletion from the erasure operation and recent re-authentication for self-service erasure (consequence 3, #56), and client wiring (#88).
