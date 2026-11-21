@@ -21,4 +21,12 @@
 - [x] Contract v0.5.0 (main took 0.4.0 with favourites #130): native `auth*` selectors with `native.requiresAuth`; web `authPending` and `authSigningOut` added to `web.requiresAuth`; `checkRequiresAuth` and the semver grading cover both platforms. Evidence: `pnpm check:sut --base origin/main` reports a minor change (v0.5.0) with no unregistered auth IDs; `pnpm test:contract` passes.
 - [ ] CI: `tests/idp/native-client.spec.ts` (the native client's code + PKCE on `tazumo://auth/callback`, refresh, logout, refused paths) and `tests/web-auth/` (now covering the transient states) in `idp.yml`; the Android emulator smoke sees `sut-auth-unavailable`; the iOS build on mac-ios-1. Local runs are not allowed under the low-load rule.
 - [x] Independent review (fresh reviewer agent, head cf7abdf): no blockers. Fixed: only a refused refresh or a 401 deletes the stored tokens, and network or API failures keep them and retry; refresh and ID tokens are stored under separate keys below 2048 bytes; state changes are announced with `AccessibilityInfo`; a silent `restoring` state at start; a double-tap guard; ID token `exp` checked; `iss` required when advertised; the realm-lint allowance limited to redirect and post-logout URIs (with `Object.hasOwn`). Documented in ADR-0027 and the mobile README: the plain-http dev issuer, the iOS sign-out prompt, Keychain and Android backup, no logging, Expo Go on `--localhost`.
+- [x] Delta review (fresh reviewer agent, cf7abdf..0db587e): no blockers. Fixed:
+  - only `invalid_grant`, `invalid_client` and `unauthorized_client` count as a refused refresh;
+  - a sign-out guard, with `signing-out` set before the deletes;
+  - secure-store operations serialised, so a late refresh write cannot outlive sign-out;
+  - no double TalkBack announcement;
+  - exact `iss` comparison;
+  - tests for a refused scheduled refresh, rotation, a missing `exp`, the late write, a double sign-out, the smoke copy matching `@tazumo/core`, and native `requiresAuth` contract cases.
+  The CI-only transient-state test now asserts `signing-out` while the click's held navigation is pending. Mobile tests 44/44, contract 31/31.
 - [x] Follow-up filed: #165 (an app-level native sign-in E2E on an emulator against Keycloak; too heavy for this slice).

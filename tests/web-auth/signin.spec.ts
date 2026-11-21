@@ -264,10 +264,11 @@ test('the transient signing-in and signing-out states are announced', async ({ b
 
   await page.route((url) => url.href.startsWith(`${issuer}/protocol/openid-connect/logout?`), slow);
   await page.getByTestId('sut-auth-account').click();
-  await page.getByTestId('sut-auth-sign-out').click();
+  // The click waits for the navigation it starts, which the route holds, so assert while it is still pending.
+  const signingOut = page.getByTestId('sut-auth-sign-out').click();
   await expect(page.getByTestId('sut-auth-signing-out')).toHaveAttribute('role', 'status');
   await recordSelectors(page);
-  await Promise.all(held);
+  await signingOut;
   await expect(page.getByTestId('sut-auth-sign-in')).toBeVisible();
   await page.unrouteAll({ behavior: 'wait' });
 });

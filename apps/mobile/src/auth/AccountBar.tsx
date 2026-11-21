@@ -20,8 +20,8 @@ export function AccountBar({ lang, colors }: { lang: Language; colors: Colors })
 
   if (state.status === 'restoring') return null;
   if (state.status === 'unconfigured') return <Text testID="sut-auth-unavailable" style={styles.note}>{text('signInUnavailable')}</Text>;
-  if (state.status === 'pending') return <Text testID="sut-auth-pending" accessibilityLiveRegion="polite" style={styles.note}>{text('signingIn')}</Text>;
-  if (state.status === 'signing-out') return <Text testID="sut-auth-signing-out" accessibilityLiveRegion="polite" style={styles.note}>{text('signingOut')}</Text>;
+  if (state.status === 'pending') return <Text testID="sut-auth-pending" style={styles.note}>{text('signingIn')}</Text>;
+  if (state.status === 'signing-out') return <Text testID="sut-auth-signing-out" style={styles.note}>{text('signingOut')}</Text>;
   if (state.status === 'signed-out') {
     return (
       <View style={styles.bar}>

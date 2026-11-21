@@ -36,7 +36,7 @@ function fakePort(over:Partial<NativeAuthPort>={}){
 test('config needs an issuer, a client ID and an API URL; without them the app has no sign-in',async()=>{
   assert.equal(parseNativeAuthConfig({issuer:config.issuer,clientId:'c'}),null);
   assert.equal(parseNativeAuthConfig({clientId:'c',apiUrl:'https://api.test'}),null);
-  assert.deepEqual(parseNativeAuthConfig({issuer:`${config.issuer}/`,clientId:' tazumo-native ',apiUrl:'https://api.test/'}),config);
+  assert.deepEqual(parseNativeAuthConfig({issuer:` ${config.issuer} `,clientId:' tazumo-native ',apiUrl:'https://api.test/'}),config);
   const auth=createNativeAuth(null,null);
   await auth.start();
   await auth.signIn('sign-in');
@@ -83,6 +83,8 @@ test('a cancelled browser leaves the app signed out quietly; an error response i
 const rejected:[string,Partial<NativeAuthPort>,boolean][]=[
   ['a discovery document for another issuer',{discover:async()=>({issuer:'https://evil.test/realms/tazumo',promptValues:[],issParameter:true})},false],
   ['a callback without iss although discovery requires it',{authorize:async()=>({type:'success',code:'c',codeVerifier:'v'})},false],
+  ['an ID token without exp',{exchange:async()=>tokens({idToken:idToken({exp:undefined})})},true],
+  ['an ID token whose iss differs only by a trailing slash',{exchange:async()=>tokens({idToken:idToken({iss:`${config.issuer}/`})})},true],
   ['an expired ID token',{exchange:async()=>tokens({idToken:idToken({exp:now/1000-120})})},true],
   ['a callback iss for another issuer',{authorize:async()=>({type:'success',code:'c',codeVerifier:'v',iss:'https://evil.test'})},false],
   ['an ID token with another nonce',{exchange:async()=>tokens({idToken:idToken({nonce:'other'})})},true],
@@ -163,7 +165,7 @@ test('each stored value stays under the 2048-byte secure-store limit with realis
   for(const value of f.saved.values())assert.ok(new TextEncoder().encode(value).length<2048);
 });
 
-test('the refresh timer rotates tokens; a refresh that finishes after sign-out is dropped',async()=>{
+test('a refresh that finishes after sign-out is dropped and leaves nothing in secure storage',async()=>{
   let release:(t:TokenSet)=>void=()=>{};
   const f=fakePort({refresh:()=>new Promise<TokenSet>(resolve=>{release=resolve})});
   const auth=createNativeAuth(config,f.port);
@@ -219,3 +221,48 @@ test('no token reaches the console',async()=>{
 test('jwtClaims decodes UTF-8 payloads',()=>{
   assert.equal(jwtClaims(jwt({name:'Žofie'})).name,'Žofie');
 });
+
+test('the refresh timer rotates tokens; a refused scheduled refresh ends the session and forgets it',async()=>{
+  const f=fakePort();
+  const auth=createNativeAuth(config,f.port);
+  await auth.signIn('sign-in');
+  f.timers[0].run();
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(f.saved.get('refreshToken'),'refresh-2');
+  const g=fakePort({refresh:async()=>{throw new RefreshRejected('invalid_grant')}});
+  const refused=createNativeAuth(config,g.port);
+  await refused.signIn('sign-in');
+  g.timers[0].run();
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.deepEqual(refused.state(),{status:'signed-out',notice:'sessionEnded'});
+  assert.equal(g.saved.size,0);
+});
+
+test('a refresh whose secure-store write is still running when the user signs out leaves no token behind',async()=>{
+  let releaseWrite:()=>void=()=>{};
+  let slow=false;
+  const f=fakePort();
+  const set=f.port.store.set;
+  f.port.store.set=async(key,value)=>{if(slow&&key==='refreshToken')await new Promise<void>(resolve=>{releaseWrite=resolve});return set(key,value)};
+  const auth=createNativeAuth(config,f.port);
+  await auth.signIn('sign-in');
+  slow=true;
+  f.timers[0].run();
+  await new Promise(resolve=>setImmediate(resolve));
+  const out=auth.signOut();
+  releaseWrite();
+  await out;
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(f.saved.size,0);
+  assert.deepEqual(auth.state(),{status:'signed-out'});
+});
+
+test('a second sign-out tap does not open another browser session',async()=>{
+  const f=fakePort();
+  const auth=createNativeAuth(config,f.port);
+  await auth.signIn('sign-in');
+  await Promise.all([auth.signOut(),auth.signOut()]);
+  assert.equal(f.called('endSession').length,1);
+  assert.match(String(f.called('endSession')[0].args[0]),/id_token_hint=/);
+});
+

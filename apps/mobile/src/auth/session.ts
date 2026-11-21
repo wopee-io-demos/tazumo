@@ -58,13 +58,14 @@ export function jwtClaims(jwt: string): Record<string, unknown> {
 export function parseNativeAuthConfig(values: { issuer?: string; clientId?: string; scope?: string; apiUrl?: string }): NativeAuthConfig | null {
   const issuer = values.issuer?.trim(), clientId = values.clientId?.trim(), apiUrl = values.apiUrl?.trim();
   if (!issuer || !clientId || !apiUrl) return null;
-  return { issuer: trimSlash(issuer), clientId, scope: values.scope?.trim() || 'openid', apiUrl: trimSlash(apiUrl) };
+  return { issuer, clientId, scope: values.scope?.trim() || 'openid', apiUrl: trimSlash(apiUrl) };
 }
 
 export function createNativeAuth(config: NativeAuthConfig | null, port: NativeAuthPort | null): NativeAuth {
   let current: AuthState = config && port ? { status: 'restoring' } : { status: 'unconfigured' };
   const listeners = new Set<() => void>();
   const set = (next: AuthState) => {
+    if (next === current) return;
     current = next;
     listeners.forEach((listener) => listener());
   };
@@ -74,6 +75,10 @@ export function createNativeAuth(config: NativeAuthConfig | null, port: NativeAu
   let timer: unknown;
   let generation = 0;
   let started: Promise<void> | null = null;
+  let storage: Promise<unknown> = Promise.resolve();
+  /** Secure-store operations run one at a time, so a write from an older session can never land after a sign-out's deletes. */
+  const queued = (op: () => Promise<unknown>) => (storage = storage.then(op, op).catch(() => undefined));
+  const forgetStored = () => queued(() => Promise.all((['refreshToken', 'idToken'] as const).map((key) => port!.store.delete(key))));
 
   /** Drops the in-memory session. `forget` also deletes the stored tokens; network failures keep them for the next start. */
   const leave = async (next: AuthState, forget: boolean) => {
@@ -82,23 +87,22 @@ export function createNativeAuth(config: NativeAuthConfig | null, port: NativeAu
     access = null;
     if (forget) {
       refreshToken = idToken = null;
-      await Promise.all((['refreshToken', 'idToken'] as const).map((key) => port!.store.delete(key).catch(() => undefined)));
+      await forgetStored();
     }
     set(next);
   };
   const endSession = (notice?: Notice) => leave({ status: 'signed-out', notice }, true);
 
   async function accept(tokens: TokenSet) {
+    const turn = generation;
     access = tokens.accessToken;
-    if (tokens.refreshToken) {
-      refreshToken = tokens.refreshToken;
-      await port!.store.set('refreshToken', refreshToken);
+    refreshToken = tokens.refreshToken ?? refreshToken;
+    idToken = tokens.idToken ?? idToken;
+    for (const key of ['refreshToken', 'idToken'] as const) {
+      const value = tokens[key];
+      if (value) await queued(() => (turn === generation ? port!.store.set(key, value) : Promise.resolve()));
     }
-    if (tokens.idToken) {
-      idToken = tokens.idToken;
-      await port!.store.set('idToken', idToken);
-    }
-    schedule(tokens.expiresIn ? Math.max(5, tokens.expiresIn - refreshLeadSeconds) : undefined);
+    if (turn === generation) schedule(tokens.expiresIn ? Math.max(5, tokens.expiresIn - refreshLeadSeconds) : undefined);
   }
 
   function schedule(seconds?: number) {
@@ -132,7 +136,7 @@ export function createNativeAuth(config: NativeAuthConfig | null, port: NativeAu
     const claims = jwtClaims(tokens.idToken);
     const audience = [claims.aud].flat();
     const fresh = typeof claims.exp === 'number' && claims.exp > port!.now() / 1000 - clockToleranceSeconds;
-    if (claims.nonce !== nonce || trimSlash(String(claims.iss)) !== config!.issuer || !audience.includes(config!.clientId) || !fresh) throw new Error('ID token rejected');
+    if (claims.nonce !== nonce || claims.iss !== config!.issuer || !audience.includes(config!.clientId) || !fresh) throw new Error('ID token rejected');
     return typeof claims.email === 'string' ? claims.email : undefined;
   }
 
@@ -169,12 +173,12 @@ export function createNativeAuth(config: NativeAuthConfig | null, port: NativeAu
       set({ status: 'pending' });
       try {
         const discovery = await port.discover();
-        if (trimSlash(discovery.issuer ?? '') !== config.issuer) throw new Error('issuer mismatch');
+        if (discovery.issuer !== config.issuer) throw new Error('issuer mismatch');
         const nonce = port.randomNonce();
         const result = await port.authorize({ nonce, ...(mode === 'sign-up' && discovery.promptValues.includes('create') ? { prompt: 'create' as const } : {}) });
         if (result.type === 'cancel') return set({ status: 'signed-out' });
         if (result.type === 'error') return endSession('signInRefused');
-        if ((result.iss !== undefined || discovery.issParameter) && trimSlash(result.iss ?? '') !== config.issuer) throw new Error('iss mismatch');
+        if ((result.iss !== undefined || discovery.issParameter) && result.iss !== config.issuer) throw new Error('iss mismatch');
         const tokens = await port.exchange(result.code, result.codeVerifier);
         const email = verifiedEmail(tokens, nonce);
         await accept(tokens);
@@ -184,9 +188,10 @@ export function createNativeAuth(config: NativeAuthConfig | null, port: NativeAu
       }
     },
     async signOut() {
-      if (!config || !port) return;
+      if (!config || !port || current.status !== 'signed-in') return;
       const hint = idToken;
-      await leave({ status: 'signing-out' }, true);
+      set({ status: 'signing-out' });
+      await leave(current, true);
       try {
         const { endSessionEndpoint } = await port.discover();
         if (endSessionEndpoint) {

@@ -116,6 +116,12 @@ test('every sut- identifier in the cases exists in the app source',()=>{
  for(const id of ids)assert.ok(source.includes(id)||source.includes(id.replace(/-pizza$/,'-${p.id}')),`missing ${id}`);
 });
 
+test('the smoke expects the unconfigured-build text from @tazumo/core',async()=>{
+ const {accountText}=await import('../../../packages/core/src/account.ts');
+ const step=smoke.platforms.android.steps.find(s=>s.value.includes('sut-auth-unavailable'));
+ assert.ok(step.value.includes(`@text="${accountText('en','signInUnavailable')}"`),step.value);
+});
+
 function fakeServer(visible){
  const server=createServer((req,res)=>{
   let body='';

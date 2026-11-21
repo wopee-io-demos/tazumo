@@ -166,6 +166,12 @@ test('semantic version: gating an existing selector behind a provider is major, 
   const lifted=clone(base);
   lifted.web.requiresAuth=lifted.web.requiresAuth.filter((key:string)=>key!=='authSignIn');
   assert.equal(checkCompatibility(base,lifted).level,'minor');
+  const nativeGated=clone(base);
+  nativeGated.native.requiresAuth=[...nativeGated.native.requiresAuth,'search'];
+  assert.equal(checkCompatibility(base,nativeGated).level,'major');
+  const nativeBad=clone(base);
+  nativeBad.native.requiresAuth=['noSuchKey'];
+  assert.ok(checkRepo({...repo,contract:nativeBad}).some(e=>/native\.requiresAuth: "noSuchKey"/.test(e)));
   const fresh=clone(base);
   fresh.web.selectors.authExtra='[data-testid="sut-auth-extra"]';
   fresh.web.requiresAuth=[...fresh.web.requiresAuth,'authExtra'];

@@ -4,6 +4,8 @@ import * as SecureStore from 'expo-secure-store';
 import * as WebBrowser from 'expo-web-browser';
 import { RefreshRejected, type NativeAuthConfig, type NativeAuthPort, type StoreKey, type TokenSet } from './session';
 
+/** Token-endpoint errors that mean the grant itself is no longer valid; anything else (`unknown_error`, `temporarily_unavailable`) is treated like a network failure. */
+const refusals = new Set(['invalid_grant', 'invalid_client', 'unauthorized_client']);
 const storeKeys: Record<StoreKey, string> = { refreshToken: 'tazumo.auth.refresh', idToken: 'tazumo.auth.id' };
 const toTokens = (response: AuthSession.TokenResponse): TokenSet => ({
   accessToken: response.accessToken,
@@ -56,7 +58,7 @@ export function createExpoPort(config: NativeAuthConfig): NativeAuthPort {
       try {
         return toTokens(await AuthSession.refreshAsync({ clientId: config.clientId, refreshToken }, await discover()));
       } catch (error) {
-        throw error instanceof AuthSession.TokenError ? new RefreshRejected(error.code) : error;
+        throw error instanceof AuthSession.TokenError && refusals.has(error.code) ? new RefreshRejected(error.code) : error;
       }
     },
     async endSession(url) {
