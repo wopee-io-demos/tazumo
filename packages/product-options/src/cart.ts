@@ -6,6 +6,7 @@ import { validateSelection } from './validate.ts';
 /** What a cart needs to know about one product: its base price and its option groups, if it has any. */
 export type CartProduct = { id: string; basePrice: Money; options?: ProductOptions };
 
+/** `quantity` is the cart's own and may exceed `MAX_LINE_QUANTITY`; the quote rejects such a line. */
 export type PricedCartLine = PricedSelection & { key: string; productId: string; testKey: string; lineKey: string };
 
 const definitionOf = (product: CartProduct): ProductOptions =>

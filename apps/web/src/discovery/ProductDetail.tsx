@@ -17,12 +17,14 @@ const initialSelection=(id:string):Selection=>{
 export function ProductDetail({lang,id,cart,onCartChange}:Props){
   const product=findProduct(id),item=cartProduct(id);
   const heading=useRouteFocus(id);
+  const price=(next:Selection)=>item&&priceSelection(item.options??{productId:item.id,currency:item.basePrice.currency,groups:[]},item.basePrice,next,1);
   const [selection,setSelection]=useState<Selection>(()=>initialSelection(id));
-  const priced=item&&priceSelection(item.options??{productId:item.id,currency:item.basePrice.currency,groups:[]},item.basePrice,selection,1);
+  const priced=price(selection);
+  const [lastPrice,setLastPrice]=useState(()=>priced?.ok?priced.unitPrice.minorUnits:product?.priceCents??0);
+  const select=(next:Selection)=>{const result=price(next);setSelection(next);if(result?.ok)setLastPrice(result.unitPrice.minorUnits)};
   const key=item&&priced?.ok?cartKey(item,priced.selection):undefined;
   const quantity=key?cart[key]??0:0;
-  const actions=useRef<HTMLDivElement>(null),previous=useRef({key,quantity}),lastPrice=useRef(product?.priceCents??0);
-  if(priced?.ok)lastPrice.current=priced.unitPrice.minorUnits;
+  const actions=useRef<HTMLDivElement>(null),previous=useRef({key,quantity});
   useEffect(()=>{
     const before=previous.current;previous.current={key,quantity};
     if(before.key===key&&(before.quantity===0)!==(quantity===0))actions.current?.querySelector<HTMLButtonElement>(quantity>0?'[data-testid^="sut-detail-increase"]':'button')?.focus();
@@ -39,8 +41,8 @@ export function ProductDetail({lang,id,cart,onCartChange}:Props){
         <h1 ref={heading} tabIndex={-1}>{product.name}</h1>
         {merchant&&<p>{t(lang,'soldBy')} <a href={merchantHref(merchant.id)} data-testid="sut-detail-merchant-link">{merchant.name}</a></p>}
         <p>{product.description}</p>
-        {item.options&&<OptionPicker lang={lang} definition={item.options} selection={selection} errors={priced.ok?[]:priced.errors} onChange={setSelection}/>}
-        <p className="detailPrice" data-testid="sut-detail-price" aria-live="polite">{formatLocalizedPrice(lastPrice.current,lang)}</p>
+        {item.options&&<OptionPicker lang={lang} definition={item.options} selection={selection} errors={priced.ok?[]:priced.errors} onChange={select}/>}
+        <p className="detailPrice" data-testid="sut-detail-price" aria-live="polite">{formatLocalizedPrice(lastPrice,lang)}</p>
         <div ref={actions} className="detailActions">{quantity===0
           ?<button type="button" className="primaryAction" data-testid={`sut-add-${product.id}`} aria-label={`${t(lang,'add')} ${product.name}`} disabled={!key} onClick={()=>change(1)}>{t(lang,'add')}</button>
           :<div className="inBasketRow"><span>{t(lang,'inBasket')}</span><QuantityStepper lang={lang} name={product.name} idKey={product.id} quantity={quantity} testIdPrefix="sut-detail" onChange={change} onRemove={()=>onCartChange(c=>removeFromCart(c,key!))}/></div>}</div>
