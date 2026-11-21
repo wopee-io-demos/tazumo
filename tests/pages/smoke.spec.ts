@@ -1,12 +1,16 @@
 import {test,expect,type Page} from '@playwright/test';
+import {cartButton,search} from '../e2e/support/locators';
 
+const origin=new URL(process.env.PAGES_URL??'http://invalid').origin;
 const entry=`./${process.env.PAGES_QUERY??''}`;
 
 async function open(page:Page,hash=''){
   const errors:string[]=[];
   page.on('pageerror',e=>errors.push(e.message));
+  page.on('response',r=>{if(r.status()>=400&&new URL(r.url()).origin===origin)errors.push(`${r.status()} ${r.url()}`);});
   const response=await page.goto(entry+hash);
   expect(response?.status()).toBe(200);
+  await page.waitForLoadState('load');
   return errors;
 }
 
@@ -19,10 +23,10 @@ test('deployed preview is visibly labelled as a demo',async({page})=>{
 
 test('search, add to cart and disabled checkout on the deployed preview',async({page},testInfo)=>{
   const errors=await open(page);
-  await page.getByRole('textbox',{name:'What are you looking for?'}).fill('Margherita');
+  await search(page).fill('Margherita');
   await expect(page.locator('[data-testid^="sut-product-link-"]')).toHaveText(['Margherita pizza']);
   await page.getByRole('button',{name:'Add Margherita pizza'}).click();
-  await page.getByRole('button',{name:'Cart, 1'}).click();
+  await cartButton(page,1).click();
   const dialog=page.getByTestId('sut-cart-dialog');
   await expect(dialog.getByTestId('sut-cart-line-pizza')).toContainText('Margherita pizza');
   await expect(dialog.getByTestId('sut-checkout-disabled')).toBeDisabled();

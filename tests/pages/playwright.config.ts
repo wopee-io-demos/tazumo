@@ -1,7 +1,8 @@
 import {defineConfig,devices} from '@playwright/test';
 
-const url=process.env.PAGES_URL;
-if(!url)throw new Error('PAGES_URL is not set: point it at the deployed preview, e.g. https://wopee-io-demos.github.io/tazumo/');
+const raw=process.env.PAGES_URL;
+if(!raw)throw new Error('PAGES_URL is not set: point it at the deployed preview, e.g. https://wopee-io-demos.github.io/tazumo/');
+const url=raw.endsWith('/')?raw:`${raw}/`;
 
 export default defineConfig({
   testDir:'.',
