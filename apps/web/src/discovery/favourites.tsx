@@ -11,12 +11,21 @@ function readFavourites():string[] {
 export function useFavourites(){
   const [favourites,setFavourites]=useState<string[]>(readFavourites);
   useEffect(()=>{
-    const onStorage=(e:StorageEvent)=>{if(e.key===favouritesStorageKey||e.key===null)setFavourites(parseFavourites(e.newValue,knownIds));};
+    const onStorage=(e:StorageEvent)=>{
+      try{if(e.storageArea!==window.localStorage)return;}catch{return;}
+      if(e.key===favouritesStorageKey||e.key===null)setFavourites(parseFavourites(e.newValue,knownIds));
+    };
     window.addEventListener('storage',onStorage);
     return ()=>window.removeEventListener('storage',onStorage);
   },[]);
-  useEffect(()=>{try{window.localStorage.setItem(favouritesStorageKey,serializeFavourites(favourites));}catch{}},[favourites]);
-  const toggle=useCallback((id:string)=>setFavourites(list=>toggleFavourite(list,id)),[]);
+  const toggle=useCallback((id:string)=>{
+    let stored:string[]|undefined;
+    try{stored=parseFavourites(window.localStorage.getItem(favouritesStorageKey));}catch{}
+    if(!stored){setFavourites(list=>toggleFavourite(list,id));return;}
+    const next=toggleFavourite(stored,id);
+    try{window.localStorage.setItem(favouritesStorageKey,serializeFavourites(next));}catch{}
+    setFavourites(next.filter(x=>knownIds.includes(x)));
+  },[]);
   return {favourites,toggle};
 }
 

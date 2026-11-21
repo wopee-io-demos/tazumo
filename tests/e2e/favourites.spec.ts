@@ -1,4 +1,5 @@
 import {test,expect} from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
 
 const key='tazumo.favourites';
 
@@ -70,6 +71,9 @@ test('corrupted storage and unknown merchant ids are ignored without errors',asy
   await page.reload();
   await page.getByTestId('sut-favourites-filter').click();
   await expect(page.getByTestId('sut-merchant-list').getByRole('link')).toHaveText(['Green Table']);
+  await page.getByTestId('sut-favourites-filter').click();
+  await page.getByTestId('sut-favourite-city-tech').click();
+  expect(await page.evaluate(k=>JSON.parse(localStorage.getItem(k)!),key)).toEqual(['closed-merchant','green-table','city-tech']);
   expect(errors).toEqual([]);
 });
 
@@ -83,4 +87,37 @@ test('without storage favourites still work in memory',async({page})=>{
   await expect(page.getByTestId('sut-merchant-list').getByRole('link')).toHaveText(['Piazza Local']);
   await expect(page.getByRole('alert')).toHaveCount(0);
   expect(errors).toEqual([]);
+});
+
+test('corrupted value written by another tab clears favourites without errors',async({context})=>{
+  const first=await context.newPage(),second=await context.newPage();
+  const errors:string[]=[];
+  first.on('pageerror',e=>errors.push(e.message));
+  await first.goto('/');
+  await second.goto('/');
+  await first.getByTestId('sut-favourite-piazza-local').click();
+  await second.evaluate(k=>localStorage.setItem(k,'garbage'),key);
+  await expect(first.getByTestId('sut-favourite-piazza-local')).toHaveAttribute('aria-pressed','false');
+  expect(errors).toEqual([]);
+});
+
+test('un-favouriting under the filter keeps focus on the merchants heading',async({page})=>{
+  await page.goto('/');
+  await page.getByTestId('sut-favourite-green-table').click();
+  await page.getByTestId('sut-favourites-filter').click();
+  await page.getByTestId('sut-favourite-green-table').click();
+  await expect(page.getByRole('heading',{level:2,name:'Merchants'})).toBeFocused();
+});
+
+test('favourite controls have no serious or critical axe violations',async({page})=>{
+  await page.goto('/');
+  await page.getByTestId('sut-favourite-green-table').click();
+  await page.getByTestId('sut-favourites-filter').click();
+  const blocking=(v:{impact?:string|null}[])=>v.filter(x=>x.impact==='serious'||x.impact==='critical');
+  const tags=['wcag2a','wcag2aa','wcag21a','wcag21aa','wcag22aa'];
+  const list=await new AxeBuilder({page}).include('[data-testid="sut-merchant-list"]').include('[data-testid="sut-favourites-filter"]').withTags(tags).analyze();
+  expect(blocking(list.violations)).toEqual([]);
+  await page.getByTestId('sut-merchant-link-green-table').click();
+  const detail=await new AxeBuilder({page}).include('.detailHero').withTags(tags).analyze();
+  expect(blocking(detail.violations)).toEqual([]);
 });

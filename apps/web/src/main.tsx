@@ -1,7 +1,7 @@
 import React,{useMemo,useRef,useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {brandName,palettes,preferredPalette,type PaletteName} from '@tazumo/brand';
-import {products,categories,filterProducts,merchants,changeQuantity,cartCount,formatLocalizedPrice,t,categoryLabel,type Category,type Cart} from '@tazumo/core';
+import {products,categories,filterProducts,merchantForProduct,changeQuantity,cartCount,formatLocalizedPrice,t,categoryLabel,type Category,type Cart} from '@tazumo/core';
 import './style.css';
 import './discovery/discovery.css';
 import {CartDrawer} from './discovery/CartDrawer';
@@ -19,7 +19,7 @@ function App(){
  const theme=palettes[palette];
  const cartOpener=useRef<HTMLButtonElement>(null);
  const {favourites,toggle:toggleFavourite}=useFavourites(),[favouritesOnly,setFavouritesOnly]=useState(false);
- const visible=useMemo(()=>filterProducts(products,query,category).filter(p=>!favouritesOnly||merchants.some(m=>m.name===p.merchant&&favourites.includes(m.id))),[query,category,favourites,favouritesOnly]);
+ const visible=useMemo(()=>filterProducts(products,query,category).filter(p=>!favouritesOnly||favourites.includes(merchantForProduct(p)?.id??'')),[query,category,favourites,favouritesOnly]);
  const itemCount=cartCount(cart);
  const route=useHashRoute();
  return <div className="app" style={{'--primary':theme.primary,'--accent':theme.accent,'--tint':theme.background,'--ink':theme.ink} as React.CSSProperties}>
