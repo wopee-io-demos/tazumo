@@ -45,11 +45,11 @@ jobs:
     steps:
       - name: Point DATABASE_URL at the postgres service
         run: echo "DATABASE_URL=postgres://tazumo:tazumo-ci-only@127.0.0.1:${{ job.services.postgres.ports['5432'] }}/tazumo_test" >> "$GITHUB_ENV"
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
         with:
           version: 10.11.0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
       - run: pnpm install --no-frozen-lockfile
