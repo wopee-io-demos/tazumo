@@ -95,6 +95,7 @@ export type OrderState = {
   createdAt: string;
   updatedAt: string;
   merchantAccepted: boolean;
+  confirmedAt: string | null;
   courierUserId: string | null;
   paymentReference: string | null;
   reason: string | null;

@@ -20,17 +20,25 @@ const ORDER = '0b6f1d5e-3a7c-4c51-9d0e-2f6a8b1c4d01';
 const OTHER_ORDER = '0b6f1d5e-3a7c-4c51-9d0e-2f6a8b1c4d02';
 const MERCHANT = '6a1f2b3c-4d5e-4f60-8a7b-9c0d1e2f3a01';
 const OTHER_MERCHANT = '6a1f2b3c-4d5e-4f60-8a7b-9c0d1e2f3a02';
+const CUSTOMER_ID = 'a1000000-0000-4000-8000-000000000001';
+const OTHER_CUSTOMER_ID = 'a1000000-0000-4000-8000-000000000002';
+const STAFF_ID = 'a1000000-0000-4000-8000-000000000003';
+const OTHER_STAFF_ID = 'a1000000-0000-4000-8000-000000000004';
+const SUPPORT_ID = 'a1000000-0000-4000-8000-000000000005';
+const OTHER_SUPPORT_ID = 'a1000000-0000-4000-8000-000000000006';
+const ADMIN_ID = 'a1000000-0000-4000-8000-000000000007';
+const STRAY_ID = 'a1000000-0000-4000-8000-000000000008';
 const COURIER_ID = 'c0c0c0c0-1111-4222-8333-444455556666';
 
 const user = (userId: string, ...grants: Principal['grants']): Actor => ({ kind: 'user', principal: { userId, grants } });
-const customer = user('u-customer', { role: 'customer', merchantId: null });
-const otherCustomer = user('u-other', { role: 'customer', merchantId: null });
-const staff = user('u-staff', { role: 'customer', merchantId: null }, { role: 'merchant_staff', merchantId: MERCHANT });
-const otherStaff = user('u-staff-b', { role: 'merchant_staff', merchantId: OTHER_MERCHANT });
+const customer = user(CUSTOMER_ID, { role: 'customer', merchantId: null });
+const otherCustomer = user(OTHER_CUSTOMER_ID, { role: 'customer', merchantId: null });
+const staff = user(STAFF_ID, { role: 'customer', merchantId: null }, { role: 'merchant_staff', merchantId: MERCHANT });
+const otherStaff = user(OTHER_STAFF_ID, { role: 'merchant_staff', merchantId: OTHER_MERCHANT });
 const courier = user(COURIER_ID, { role: 'courier', merchantId: null });
 const otherCourier = user('c0c0c0c0-1111-4222-8333-444455557777', { role: 'courier', merchantId: null });
-const support = user('u-support', { role: 'support', merchantId: null });
-const admin = user('u-admin', { role: 'admin', merchantId: null });
+const support = user(SUPPORT_ID, { role: 'support', merchantId: null });
+const admin = user(ADMIN_ID, { role: 'admin', merchantId: null });
 const system = (source: 'payment' | 'acceptance' | 'dispatch' | 'operations'): Actor => ({ kind: 'system', source });
 
 let ids = 0;
@@ -90,7 +98,7 @@ describe('order lifecycle', () => {
     assert.deepEqual(log.map((e) => e.sequence), [1, 2, 3, 4, 5, 6, 7, 8, 9]);
     assert.deepEqual(log.map((e) => e.status), ['created', 'payment_pending', 'confirmed', 'confirmed', 'preparing', 'ready_for_pickup', 'courier_assigned', 'picked_up', 'delivered']);
     assert.ok(log.every((e, i) => i === 0 || e.occurredAt >= log[i - 1].occurredAt));
-    assert.deepEqual(log[3].actor, { kind: 'user', userId: 'u-staff', role: 'merchant_staff', merchantId: MERCHANT });
+    assert.deepEqual(log[3].actor, { kind: 'user', userId: STAFF_ID, role: 'merchant_staff', merchantId: MERCHANT });
     assert.deepEqual(log[2].actor, { kind: 'system', source: 'payment' });
     const state = replay(log);
     assert.ok(state.ok);
@@ -124,7 +132,7 @@ describe('order lifecycle', () => {
       assert.equal(r.ok ? 'ok' : r.error, 'idempotency_conflict');
     }
     const cancelled = run(reach('preparing'), [[{ type: 'cancel', reason: 'merchant_unreachable' }, support]]);
-    const otherSupport = user('u-support-2', { role: 'support', merchantId: null });
+    const otherSupport = user(OTHER_SUPPORT_ID, { role: 'support', merchantId: null });
     const byOther = applyCommand(cancelled, { type: 'cancel', reason: 'merchant_unreachable' }, otherSupport, minute(50), cancelled.at(-1)!.idempotencyKey, options);
     assert.equal(byOther.ok ? 'ok' : byOther.error, 'idempotency_conflict');
   });
@@ -132,7 +140,7 @@ describe('order lifecycle', () => {
   it('authorizes before the idempotency lookup, so revoked or unrelated actors learn nothing', () => {
     const log = run(reach('preparing'), [[{ type: 'cancel', reason: 'merchant_unreachable' }, support]]);
     const key = log.at(-1)!.idempotencyKey;
-    const revoked = applyCommand(log, { type: 'cancel', reason: 'merchant_unreachable' }, user('u-support'), minute(50), key, options);
+    const revoked = applyCommand(log, { type: 'cancel', reason: 'merchant_unreachable' }, user(SUPPORT_ID), minute(50), key, options);
     assert.equal(revoked.ok ? 'ok' : revoked.error, 'forbidden');
     const stranger = applyCommand(log, { type: 'cancel' }, otherCustomer, minute(50), key, options);
     assert.equal(stranger.ok ? 'ok' : stranger.error, 'forbidden');
@@ -236,7 +244,7 @@ describe('order lifecycle', () => {
     assert.equal(late.ok ? 'ok' : late.error, 'illegal_transition');
     const byAdmin = applyCommand(reach('preparing'), { type: 'cancel', reason: 'merchant_unreachable' }, admin, minute(40), 'cancel-admin', options);
     assert.ok(byAdmin.ok);
-    assert.deepEqual(byAdmin.value.event.actor, { kind: 'user', userId: 'u-admin', role: 'admin' });
+    assert.deepEqual(byAdmin.value.event.actor, { kind: 'user', userId: ADMIN_ID, role: 'admin' });
   });
 
   it('requires a reason code for system failures, payment failures and support cancellations', () => {
@@ -305,7 +313,7 @@ describe('order lifecycle', () => {
       [[{ orderId: ORDER, merchantId: MERCHANT, total }, customer, minute(0), 'short'], 'invalid_idempotency_key'],
       [[{ orderId: ORDER, merchantId: MERCHANT, total }, customer, '2026-02-30T10:00:00Z', 'create-key-1'], 'invalid_instant'],
       [[{ orderId: ORDER, merchantId: MERCHANT, total }, customer, 'now', 'create-key-1'], 'invalid_instant'],
-      [[{ orderId: ORDER, merchantId: MERCHANT, total }, user('u-x', { role: 'merchant_staff', merchantId: MERCHANT }), minute(0), 'create-key-1'], 'forbidden'],
+      [[{ orderId: ORDER, merchantId: MERCHANT, total }, user(STRAY_ID, { role: 'merchant_staff', merchantId: MERCHANT }), minute(0), 'create-key-1'], 'forbidden'],
       [[{ orderId: ORDER, merchantId: MERCHANT, total }, system('payment'), minute(0), 'create-key-1'], 'forbidden'],
     ];
     for (const [args, error] of bad) {
@@ -337,13 +345,13 @@ describe('order lifecycle', () => {
       tamper(4, { type: 'toString' as OrderEvent['type'] }),
       tamper(2, { orderId: OTHER_ORDER }),
       tamper(2, { idempotencyKey: log[1].idempotencyKey }),
-      tamper(0, { data: { customerUserId: 'u-customer' } }),
+      tamper(0, { data: { customerUserId: CUSTOMER_ID } }),
       tamper(0, { data: { ...log[0].data, merchantId: 'x' } }),
-      tamper(0, { actor: { kind: 'user', userId: 'u-other', role: 'customer' } }),
+      tamper(0, { actor: { kind: 'user', userId: OTHER_CUSTOMER_ID, role: 'customer' } }),
       tamper(2, { data: undefined }),
-      tamper(2, { actor: { kind: 'user', userId: 'u-customer', role: 'customer' } }),
+      tamper(2, { actor: { kind: 'user', userId: CUSTOMER_ID, role: 'customer' } }),
       tamper(2, { idempotencyKey: undefined as unknown as string }),
-      tamper(3, { actor: { kind: 'user', userId: 'u-staff-b', role: 'merchant_staff', merchantId: OTHER_MERCHANT } }),
+      tamper(3, { actor: { kind: 'user', userId: OTHER_STAFF_ID, role: 'merchant_staff', merchantId: OTHER_MERCHANT } }),
       tamper(4, { reason: 'Jane Doe called from +421900111222' }),
     ];
     for (const events of cases) {
@@ -377,10 +385,53 @@ describe('order lifecycle', () => {
 
   it('rejects a support cancellation re-attributed to the customer after confirmation', () => {
     const log = run(reach('preparing'), [[{ type: 'cancel', reason: 'merchant_unreachable' }, support]]);
-    const forged = log.map((e, i) => (i === log.length - 1 ? { ...e, actor: { kind: 'user' as const, userId: 'u-customer', role: 'customer' as const } } : e));
+    const forged = log.map((e, i) => (i === log.length - 1 ? { ...e, actor: { kind: 'user' as const, userId: CUSTOMER_ID, role: 'customer' as const } } : e));
     assert.equal(replay(forged).ok ? 'ok' : 'invalid', 'invalid');
     const early = run(reach('payment_pending'), [[{ type: 'cancel' }, customer]]);
     assert.ok(replay(early).ok);
+  });
+
+  it('rejects tampered events: last status, unknown fields, reasons, IDs and acceptance times', () => {
+    const lastOf = (log: OrderEvent[], patch: (e: OrderEvent) => OrderEvent) => [...log.slice(0, -1), patch(log.at(-1)!)];
+    const preparing = reach('preparing');
+    const at = (i: number, patch: Partial<OrderEvent> | Record<string, unknown>) => preparing.map((e, j) => (j === i ? ({ ...e, ...patch } as OrderEvent) : e));
+    const delivered = run(reach('picked_up'), [[{ type: 'deliver' }, courier]]);
+    const pickedUp = reach('picked_up');
+    const assigned = reach('courier_assigned');
+    const supportCancel = run(reach('preparing'), [[{ type: 'cancel', reason: 'merchant_unreachable' }, support]]);
+    const customerCancel = run(created(), [[{ type: 'cancel' }, customer]]);
+    const cases: [string, OrderEvent[]][] = [
+      ['status tamper on the last event', lastOf(preparing, (e) => ({ ...e, status: 'ready_for_pickup' }))],
+      ['delivered with free-text data', lastOf(delivered, (e) => ({ ...e, data: { note: 'leave at door', eta: '5 min' } }))],
+      ['order_created with an e-mail', at(0, { data: { ...preparing[0].data, customerEmail: 'jane@example.com' } })],
+      ['top-level courier position', at(4, { courierPosition: '48.14,17.10' })],
+      ['actor with an extra field', at(4, { actor: { ...preparing[4].actor, email: 'x@example.com' } })],
+      ['reason on picked_up', lastOf(pickedUp, (e) => ({ ...e, reason: 'other' }))],
+      ['courierUserId bob', assigned.map((e) => (e.type === 'courier_assigned' ? { ...e, data: { courierUserId: 'bob' } } : e))],
+      ['cancelled without its reason', lastOf(supportCancel, ({ reason: _drop, ...e }) => e)],
+      ['customer cancel attributed to another customer', lastOf(customerCancel, (e) => ({ ...e, actor: { kind: 'user', userId: OTHER_CUSTOMER_ID, role: 'customer' } }))],
+      ['malformed acceptanceDecidedAt', at(3, { data: { acceptanceDecidedAt: 'yesterday' } })],
+      ['acceptance decided before confirmation', at(3, { data: { acceptanceDecidedAt: minute(1) } })],
+      ['acceptance decided after its event', at(3, { data: { acceptanceDecidedAt: minute(30) } })],
+      ['non-UUID actor', at(4, { actor: { kind: 'user', userId: 'u-staff', role: 'merchant_staff', merchantId: MERCHANT } })],
+    ];
+    for (const [name, events] of cases) {
+      const r = replay(events);
+      assert.equal(r.ok ? 'ok' : r.error, 'invalid_history', name);
+    }
+    assert.ok(replay(delivered).ok && replay(supportCancel).ok && replay(customerCancel).ok);
+  });
+
+  it('requires UUID user IDs, rejects hour 24 and inconsistent accepted decisions', () => {
+    const total = { currency: 'EUR', minorUnits: 100 };
+    const named = createOrder({ orderId: ORDER, merchantId: MERCHANT, total }, user('jane', { role: 'customer', merchantId: null }), minute(0), 'create-key-7', options);
+    assert.equal(named.ok ? 'ok' : named.error, 'forbidden');
+    const hour24 = createOrder({ orderId: ORDER, merchantId: MERCHANT, total }, customer, '2026-11-20T24:00:00Z', 'create-key-8', options);
+    assert.equal(hour24.ok ? 'ok' : hour24.error, 'invalid_instant');
+    for (const bad of [acceptance('accepted', { declineReason: 'too_busy' }), acceptance('accepted', { receivedAt: minute(1) })]) {
+      const r = applyCommand(reach('confirmed'), { type: 'merchant_accept', acceptance: bad }, staff, minute(40), 'accept-case-1', options);
+      assert.equal(r.ok ? 'ok' : r.error, 'acceptance_mismatch', JSON.stringify(bad));
+    }
   });
 
   it('rejects a courier event from someone other than the assigned courier in replay', () => {
@@ -403,9 +454,9 @@ describe('order lifecycle', () => {
     assert.equal(timeline.value.status, 'cancelled');
     assert.equal(timeline.value.lastUpdatedAt, log.at(-1)!.occurredAt);
     assert.equal(timeline.value.entries.length, log.length);
-    assert.deepEqual(timeline.value.entries.at(-1), { sequence: log.length, type: 'cancelled', status: 'cancelled', occurredAt: log.at(-1)!.occurredAt, reason: 'merchant_unreachable' });
+    assert.deepEqual(timeline.value.entries.at(-1), { sequence: log.length, type: 'cancelled', status: 'cancelled', occurredAt: log.at(-1)!.occurredAt, reason: 'cancelled_by_support' });
     const text = JSON.stringify(timeline.value);
-    for (const hidden of ['u-staff', 'u-support', 'pi_test_123', 'key-', 'fingerprint', 'actor']) assert.ok(!text.includes(hidden), hidden);
+    for (const hidden of [STAFF_ID, SUPPORT_ID, 'pi_test_123', 'key-', 'fingerprint', 'actor', 'merchant_unreachable']) assert.ok(!text.includes(hidden), hidden);
     const assigned = customerTimeline(reach('courier_assigned'));
     assert.ok(assigned.ok);
     assert.ok(!JSON.stringify(assigned.value).includes(COURIER_ID));

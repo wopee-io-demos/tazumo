@@ -22,7 +22,7 @@ const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const reasonCode = /^[a-z][a-z_]{0,63}$/;
 const reference = /^[A-Za-z0-9_-]{1,128}$/;
 const idempotencyKey = /^[A-Za-z0-9_-]{8,128}$/;
-const isoInstant = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/;
+const isoInstant = /^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d{1,3})?(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)$/;
 
 type Failure = { ok: false; error: OrderError; detail?: string };
 const fail = (error: OrderError, detail?: string): Failure => ({ ok: false, error, detail });
@@ -114,7 +114,7 @@ const reasonRequired: ReadonlySet<EventType> = new Set(['payment_failed', 'merch
 function principalOf(actor: unknown): { userId: string; grants: unknown[] } | null {
   if (!isObject(actor) || actor.kind !== 'user' || !isObject(actor.principal)) return null;
   const { userId, grants } = actor.principal;
-  return typeof userId === 'string' && userId.length > 0 && userId.length <= 255 && Array.isArray(grants) ? { userId, grants } : null;
+  return typeof userId === 'string' && uuid.test(userId) && Array.isArray(grants) ? { userId: userId.toLowerCase(), grants } : null;
 }
 
 function matchWho(actor: Actor, who: Who, state: OrderState): ActorRef | null {
@@ -218,7 +218,10 @@ function checkAcceptance(type: CommandType, c: Normalized, state: OrderState, at
   if (orderId !== state.id || merchantId !== state.merchantId || decision !== expected) {
     return fail('acceptance_mismatch', `acceptance must be ${expected} for this order and merchant`);
   }
-  if (receivedAt < state.createdAt || decidedAt < receivedAt || decidedAt > at) return fail('acceptance_mismatch', 'acceptance times are inconsistent with the order');
+  if (state.confirmedAt === null || receivedAt < state.confirmedAt || decidedAt < receivedAt || decidedAt > at) {
+    return fail('acceptance_mismatch', 'acceptance times are inconsistent with the order');
+  }
+  if (expected === 'accepted' && declineReason !== undefined) return fail('acceptance_mismatch', 'an accepted decision carries no decline reason');
   if (expected === 'auto_declined' ? decidedAt < deadline || declineReason !== 'window_expired' : decidedAt >= deadline) {
     return fail('acceptance_mismatch', 'acceptance decision is inconsistent with its deadline');
   }
@@ -254,7 +257,10 @@ function reduce(state: OrderState, event: OrderEvent): OrderState {
   const next: OrderState = { ...state, status: event.status, sequence: event.sequence, updatedAt: event.occurredAt };
   if (event.type === 'merchant_accepted') next.merchantAccepted = true;
   if (event.type === 'courier_assigned') next.courierUserId = String(event.data?.courierUserId);
-  if (event.type === 'payment_authorized') next.paymentReference = String(event.data?.paymentReference);
+  if (event.type === 'payment_authorized') {
+    next.paymentReference = String(event.data?.paymentReference);
+    next.confirmedAt = event.occurredAt;
+  }
   if (event.reason !== undefined) next.reason = event.reason;
   return next;
 }
@@ -309,7 +315,7 @@ function validEventActor(event: OrderEvent, state: OrderState): boolean {
   const a = event.actor as unknown;
   if (!allowed || !isObject(a)) return false;
   if (a.kind === 'system') return (systemSources as readonly unknown[]).includes(a.source) && allowed.system.includes(a.source as string);
-  if (a.kind !== 'user' || typeof a.userId !== 'string' || a.userId.length === 0) return false;
+  if (a.kind !== 'user' || typeof a.userId !== 'string' || !uuid.test(a.userId) || a.userId !== a.userId.toLowerCase()) return false;
   return allowed.users.some(({ who, from }) => {
     if (from && !from.includes(state.status)) return false;
     if (!roleOf[who].includes(a.role as Role)) return false;
@@ -320,15 +326,40 @@ function validEventActor(event: OrderEvent, state: OrderState): boolean {
   });
 }
 
-function validEventPayload(event: OrderEvent): boolean {
+const eventKeys = ['id', 'orderId', 'sequence', 'type', 'occurredAt', 'status', 'actor', 'idempotencyKey', 'fingerprint', 'reason', 'data'];
+const dataKeys: Partial<Record<EventType, readonly string[]>> = {
+  order_created: ['customerUserId', 'merchantId', 'currency', 'minorUnits'],
+  payment_authorized: ['paymentReference'],
+  merchant_accepted: ['acceptanceDecidedAt'],
+  merchant_declined: ['acceptanceDecidedAt'],
+  merchant_auto_declined: ['acceptanceDecidedAt'],
+  courier_assigned: ['courierUserId'],
+};
+
+function validEventShape(event: OrderEvent): boolean {
+  const e = event as unknown as Record<string, unknown>;
+  if (!hasOnly(e, eventKeys)) return false;
+  const a = e.actor;
+  if (!isObject(a)) return false;
+  const actorKeys = a.kind === 'system' ? ['kind', 'source'] : a.role === 'merchant_staff' ? ['kind', 'userId', 'role', 'merchantId'] : ['kind', 'userId', 'role'];
+  if (!hasOnly(a, actorKeys)) return false;
+  const expected = dataKeys[event.type] ?? [];
+  if (e.data === undefined) return expected.length === 0;
+  return isObject(e.data) && hasOnly(e.data, expected) && expected.every((k) => Object.hasOwn(e.data as object, k));
+}
+
+function validEventPayload(event: OrderEvent, state: OrderState): boolean {
   const d = event.data ?? {};
+  if (reasonRequired.has(event.type) !== (event.reason !== undefined)) return false;
   if (event.reason !== undefined && (typeof event.reason !== 'string' || !reasonCode.test(event.reason))) return false;
-  if (reasonRequired.has(event.type) && event.reason === undefined) return false;
   if (event.type === 'merchant_declined' && !(declineReasons as readonly string[]).includes(event.reason ?? '')) return false;
   if (event.type === 'merchant_auto_declined' && event.reason !== 'window_expired') return false;
   if (event.type === 'payment_authorized') return typeof d.paymentReference === 'string' && reference.test(d.paymentReference);
   if (event.type === 'courier_assigned') return typeof d.courierUserId === 'string' && uuid.test(d.courierUserId);
-  if (event.type.startsWith('merchant_')) return toInstant(d.acceptanceDecidedAt) === d.acceptanceDecidedAt;
+  if (event.type.startsWith('merchant_')) {
+    const decided = d.acceptanceDecidedAt;
+    return toInstant(decided) === decided && state.confirmedAt !== null && (decided as string) >= state.confirmedAt && (decided as string) <= event.occurredAt;
+  }
   return true;
 }
 
@@ -342,7 +373,10 @@ function initial(event: OrderEvent): Result<OrderState> {
     return fail('invalid_history', 'order_created lacks customer, merchant or total');
   }
   const a = event.actor as unknown;
-  if (!isObject(a) || a.kind !== 'user' || a.role !== 'customer' || a.userId !== d.customerUserId) return fail('invalid_history', 'order_created must be made by its customer');
+  if (!isObject(a) || a.kind !== 'user' || a.role !== 'customer' || a.userId !== d.customerUserId || !uuid.test(d.customerUserId)) {
+    return fail('invalid_history', 'order_created must be made by its customer');
+  }
+  if (!validEventShape(event) || event.reason !== undefined) return fail('invalid_history', 'order_created has unknown fields');
   return {
     ok: true,
     value: {
@@ -355,6 +389,7 @@ function initial(event: OrderEvent): Result<OrderState> {
       createdAt: event.occurredAt,
       updatedAt: event.occurredAt,
       merchantAccepted: false,
+      confirmedAt: null,
       courierUserId: null,
       paymentReference: null,
       reason: null,
@@ -385,7 +420,7 @@ export function replay(events: readonly OrderEvent[]): Result<OrderState> {
     const effect = event.type !== 'order_created' && Object.hasOwn(transitions, event.type) ? transitions[event.type as keyof typeof transitions] : undefined;
     if (!effect || !effect.allowed(state) || effect.to !== event.status) return fail('invalid_history', `${event.type} is not allowed from ${state.status}`);
     if (!validEventActor(event, state)) return fail('invalid_history', `${event.type} has an actor that may not produce it`);
-    if (!validEventPayload(event)) return fail('invalid_history', `${event.type} has an invalid reason or data`);
+    if (!validEventShape(event) || !validEventPayload(event, state)) return fail('invalid_history', `${event.type} has unknown fields or an invalid reason or data`);
     state = reduce(state, event);
   }
   return { ok: true, value: state! };

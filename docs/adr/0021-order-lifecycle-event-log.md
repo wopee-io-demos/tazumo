@@ -15,21 +15,22 @@ ADR-0003 forbids simulated order progress and asks for an API-owned state machin
 3. **Every event names its actor.**
    - Human actors use the ADR-0016 `Principal` (user ID plus database-held grants).
    - Machine actors are `system` with a source (`payment`, `acceptance`, `dispatch`, `operations`), and each command accepts only specific sources.
-   - Replay validates the transition but not the actor, because grants change over time. Authorization happens once, when the command is applied.
+   - Grants change over time, so replay does not re-check grants. It does check that the recorded actor kind, role or source may produce that event from the prior status, and that it is the order's customer, the order's merchant or the assigned courier where the rule requires it (item 10).
+   - User IDs are the lowercase UUIDs of `users.id`; other principals are refused.
 4. **Payment and merchant acceptance stay separate** (ADR-0003). `payment_authorized` moves `payment_pending` to `confirmed`. `merchant_accepted` is recorded without changing the status; `start_preparing` requires it. Declines and auto-declines cancel a confirmed order. The decision window itself belongs to `@tazumo/merchant-ops`; this module only consumes its decided `OrderAcceptance`.
 5. **Idempotency keys are scoped to one order.** A key seen before with the same canonical command and actor returns the original event. With anything else it is a conflict. Order creation keys are scoped by the API to the caller (slice 2).
-6. **Reasons are codes, not text.** Events never carry free text, names or addresses. The customer projection drops actor identities, courier IDs, payment references and idempotency data.
+6. **Reasons are codes, not text.** Events never carry free text, names or addresses. A reason appears only on the event types that require one. The customer projection drops actor identities, courier IDs, payment references and idempotency data, and maps internal reason codes to a fixed customer-safe set (`customerReasons`).
 7. **Time never advances an order.** No function reads the clock or accepts a duration. A test enforces this.
 8. **Authorization comes before idempotency.** The actor's identity for the command (ignoring the current status) is checked first, then the idempotency key, then the transition. A revoked or unrelated actor gets `forbidden` even with a known key, so it learns nothing about the order. A replayed command returns the current state, not the state at that event.
 9. **Inputs are strict JSON values.** Unknown fields in commands, acceptances, money and creation input are rejected. The fingerprint is built from the normalised, validated command, so no free text reaches an event.
-10. **Replay checks more than transitions.** For each event type it checks:
+10. **Replay checks more than transitions.** Every event must have exactly the allowed top-level, actor and data keys for its type. For each event type it also checks:
     - which actor kind, role or source may produce it, and that it is the order's customer, the order's merchant or the assigned courier where relevant (identity does not change over time, unlike grants);
     - reason codes;
-    - the payload: payment reference, courier ID and acceptance time.
+    - the payload: payment reference, courier ID, and an acceptance time between the order's confirmation (`confirmedAt`) and the event time.
     Replay cannot detect events cut off the end of a log, so slice 2 compares the replayed sequence with the cached `orders.sequence`.
 11. **An acceptance must be consistent.**
-    - `receivedAt` must not precede the order, and `decidedAt` must fall between `receivedAt` and the command time.
-    - Accepts and declines must come before the deadline; auto-declines at or after it, with reason `window_expired`.
+    - `receivedAt` must not precede the order's confirmation, and `decidedAt` must fall between `receivedAt` and the command time.
+    - Accepts must come before the deadline without a decline reason; declines before the deadline; auto-declines at or after it, with reason `window_expired`.
     - Slice 2 must load the acceptance from the merchant-operations store, never from a request body.
 
 ## Trust boundaries and deviations
@@ -46,6 +47,7 @@ ADR-0003 forbids simulated order progress and asks for an API-owned state machin
   - The webhook handler must void the authorization and must not retry the command.
   - Courier reassignment does not exist yet; a courier dropping out needs a dispatch design.
 - **Contract:** `OrderEvent` in the contract has no `status` or `reason`. Slice 2 needs an additive contract change to serve the customer timeline.
+- **Instants:** only normalised ISO 8601 instants with hours 00 to 23 are accepted; replayed events must hold the normalised UTC form.
 - **Event IDs:** the default ID generator is `crypto.randomUUID()`. A React Native caller must pass `newId`.
 
 ## Alternatives
