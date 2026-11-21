@@ -12,6 +12,6 @@ Issue [#70](https://github.com/wopee-io-demos/tazumo/issues/70): the repository 
 iOS is recorded locally with mobile-agent's `mobilecli.py` runner and `simctl io recordVideo`. The hosted macOS queue is too congested to wait on.
 
 ## Impact
-- Demo artefacts only. The workflow is not a merge gate for app changes, and the case does not replace the Appium native smoke gate from ADR-0010 (#9, #59).
+- Demo artefacts only. The workflow is not a merge gate for app changes, and the case does not replace the Appium native smoke gate from ADR-0010 (#9, #59). `apps/mobile/tests/run-case.mjs` (#79) is that Appium executor for the same case format; `tests/demo/run-case.mjs` is the mobilecli one, because #70 asks for the demo tooling and mobile-agent's runner cannot run in public CI.
 - No app source, `testID`, contract or fixture changes. Videos stay out of git: CI artifacts and the owner's local folder.
 - When #53 adds `sut-*` identifiers to the native app, the case should switch from labels to ids.

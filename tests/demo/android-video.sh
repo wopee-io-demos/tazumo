@@ -28,7 +28,9 @@ started=$SECONDS
 DEMO_EXPECT_TEXT='Margherita pizza × 1|Subtotal €11.90|Checkout is disabled until payment and delivery integrations are ready.' \
   node "$here/run-case.mjs" "$here/flow-search-add-cart.json" android "$out" || status=$?
 node -e 'process.exit(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).outcome==="passed"?0:1)' "$out/report.json" || status=1
-if (( SECONDS - started > 170 )); then echo "The flow took longer than the 180 s screenrecord limit allows" >&2; status=1; fi
+duration=$(( SECONDS - started ))
+node -e 'const f=process.argv[1],r=JSON.parse(require("fs").readFileSync(f,"utf8"));r.durationS=Number(process.argv[2]);if(r.durationS>170){r.outcome="failed";r.error="The flow took longer than the 180 s screenrecord limit allows"}require("fs").writeFileSync(f,JSON.stringify(r,null,2)+"\n")' "$out/report.json" "$duration" || true
+if (( duration > 170 )); then echo "The flow took ${duration}s, longer than the 180 s screenrecord limit allows" >&2; status=1; fi
 sleep 2.5
 adb shell pkill -INT screenrecord || true
 wait "$recorder" || true

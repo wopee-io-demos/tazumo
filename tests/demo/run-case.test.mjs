@@ -4,6 +4,7 @@ import {readFileSync,writeFileSync,mkdtempSync,chmodSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {spawnSync} from 'node:child_process';
+import {fileURLToPath} from 'node:url';
 import {find,center,matches,validate,perform,run,textOnScreen} from './run-case.mjs';
 
 const rect=(x,y,width=40,height=40)=>({x,y,width,height});
@@ -73,6 +74,14 @@ test('perform waits for a keyboard that opens after the fill, and leaves a close
  assert.ok(!none.includes('io keyboard hide'));
 });
 
+test('perform taps Wait on a system "isn\'t responding" dialog, then carries on',async()=>{
+ const dialog={elements:[{identifier:'android:id/aerr_wait',text:'Wait',rect:rect(100,500,200,60)}]};
+ const ready={elements:[{label:'What are you looking for?',rect:rect(20,300,300,40)}]};
+ const {call,calls}=fake([dialog,ready]);
+ await perform({action:'see',by:'accessibility id',value:'What are you looking for?'},call,{screen,poll:1});
+ assert.deepEqual(calls,['dump ui','io tap 200,530','dump ui']);
+});
+
 test('perform fails on a missing element, an ambiguous locator and an element that stays present',async()=>{
  const two={elements:[{label:'Remove one Margherita pizza',rect:rect(20,100)},{label:'Remove one Margherita pizza',rect:rect(20,200)}]};
  await assert.rejects(perform({action:'see',by:'accessibility id',value:'Cart, 1'},fake([{elements:[]}]).call,{screen,timeout:20,poll:1}),/Expected see: Cart, 1/);
@@ -98,14 +107,14 @@ test('the CLI exits non-zero when mobilecli fails and refuses the iOS half',()=>
  const bin=join(dir,'mobilecli');
  writeFileSync(bin,'#!/bin/sh\necho \'{"status":"error","data":{"message":"no device"}}\'\nexit 1\n');
  chmodSync(bin,0o755);
- const script=new URL('./run-case.mjs',import.meta.url).pathname;
+ const script=fileURLToPath(new URL('./run-case.mjs',import.meta.url));
  const env={...process.env,MOBILECLI_BIN:bin,MOBILECLI_DEVICE:'emulator-5554',DEMO_PACE_MS:'0'};
- const failed=spawnSync(process.execPath,[script,casePath.pathname,'android',join(dir,'out')],{env,encoding:'utf8'});
+ const failed=spawnSync(process.execPath,[script,fileURLToPath(casePath),'android',join(dir,'out')],{env,encoding:'utf8'});
  assert.equal(failed.status,1);
  const report=JSON.parse(readFileSync(join(dir,'out','report.json'),'utf8'));
  assert.equal(report.outcome,'failed');
  assert.match(report.error,/no device/);
- assert.equal(spawnSync(process.execPath,[script,casePath.pathname,'ios',join(dir,'ios')],{env}).status,2);
+ assert.equal(spawnSync(process.execPath,[script,fileURLToPath(casePath),'ios',join(dir,'ios')],{env}).status,2);
 });
 
 test('the demo case targets the same flow on iOS and Android and ends on the cart',()=>{

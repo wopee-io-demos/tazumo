@@ -1,5 +1,6 @@
 // Runs the Android half of a mobile-agent case (tests/demo/*.json) through the mobilecli CLI, at a human pace.
-// Locator semantics follow mobile-agent's skills/wopee-mobile-run/scripts/mobilecli.py; iOS runs use that runner.
+// Locator semantics follow mobile-agent's skills/wopee-mobile-run/scripts/mobilecli.py, except that `absent` also counts
+// off-screen controls (stricter). iOS runs use that runner.
 import {execFileSync} from 'node:child_process';
 import {readFileSync,writeFileSync,mkdirSync,realpathSync} from 'node:fs';
 import {join} from 'node:path';
@@ -77,7 +78,10 @@ export async function perform(step,call,{screen,app,timeout=20000,poll=400,keybo
  const end=Date.now()+timeout;
  let settled=null;
  for(;;){
-  const found=find(call(['dump','ui']),step,{screen,app});
+  const tree=call(['dump','ui']);
+  const anrWait=flatten(tree?.elements).find(e=>e.identifier==='android:id/aerr_wait'&&sized(e));
+  if(anrWait){call(['io','tap'],[center(anrWait)]);await sleep(poll);continue;}
+  const found=find(tree,step,{screen,app});
   if(step.action==='absent'&&found.length===0)return;
   if(step.action!=='absent'&&found.length>1)throw new Error(`Ambiguous locator: ${step.value}`);
   if(step.action!=='absent'&&found.length===1){
@@ -105,7 +109,7 @@ export async function perform(step,call,{screen,app,timeout=20000,poll=400,keybo
  }
 }
 
-export async function run({spec,call,out,pace=1200,expectText=[],timeout,poll}){
+export async function run({spec,call,out,pace=1200,expectText=[],timeout,firstTimeout=90000,poll}){
  mkdirSync(out,{recursive:true});
  const report={platform:'android',app:spec.app,steps:[],outcome:'failed'};
  try{
@@ -115,7 +119,7 @@ export async function run({spec,call,out,pace=1200,expectText=[],timeout,poll}){
   await sleep(pace);
   for(const [i,step] of spec.steps.entries()){
    report.currentStep=i+1;
-   await perform(step,call,{screen,app:spec.app,timeout,poll});
+   await perform(step,call,{screen,app:spec.app,timeout:i===0?Math.max(firstTimeout,timeout??0):timeout,poll});
    report.steps.push({index:i+1,action:step.action,value:step.value,outcome:'completed'});
    await sleep(pace);
   }
