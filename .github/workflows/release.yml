@@ -1,0 +1,31 @@
+name: Release
+on:
+  push:
+    branches: [main]
+permissions: {}
+concurrency:
+  group: release
+  cancel-in-progress: false
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - id: release
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+      - name: Summary
+        env:
+          RELEASED: ${{ steps.release.outputs.release_created }}
+          TAG: ${{ steps.release.outputs.tag_name }}
+          PR: ${{ steps.release.outputs.pr }}
+        run: |
+          {
+            if [ "$RELEASED" = true ]; then echo "### Released ${TAG}"; echo "https://github.com/${GITHUB_REPOSITORY}/releases/tag/${TAG}"; fi
+            if [ -n "$PR" ]; then
+              echo "### Release PR #$(jq -r .number <<<"$PR"): $(jq -r .title <<<"$PR")"
+              echo "Checks do not start on their own for this PR. Close and reopen it to run them, then squash-merge when green (docs/RELEASING.md)."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
