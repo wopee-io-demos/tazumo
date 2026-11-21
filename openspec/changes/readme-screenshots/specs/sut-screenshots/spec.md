@@ -55,3 +55,7 @@ On pull requests the `SUT screenshots` workflow SHALL run the web capture only f
 #### Scenario: Transient Maestro failure
 - **WHEN** a Maestro flow fails on the first attempt
 - **THEN** the script force-stops and relaunches the app, deletes the partial PNGs and repeats the whole capture once
+
+#### Scenario: System ANR dialog on the hosted emulator
+- **WHEN** the emulator raises a system "isn't responding" dialog
+- **THEN** error dialogs are hidden after boot, the emulator settles for 30 s, and `CLOSE_SYSTEM_DIALOGS` is sent before every flow and before a relaunch
