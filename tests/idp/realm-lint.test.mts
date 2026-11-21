@@ -5,6 +5,7 @@ import { lintRealm } from './realm-lint.mts';
 
 const realm = () => JSON.parse(readFileSync(new URL('../../infra/idp/realm.json', import.meta.url), 'utf8'));
 const web = (r: any) => r.clients.find((c: any) => c.clientId === 'tazumo-web');
+const native = (r: any) => r.clients.find((c: any) => c.clientId === 'tazumo-native');
 
 test('the committed realm passes', () => assert.deepEqual(lintRealm(realm()), []));
 
@@ -14,6 +15,10 @@ const mutations: [string, (r: any) => void, RegExp][] = [
   ['an SMTP password', (r) => (r.smtpServer.password = 'x'), /smtpServer\.password/],
   ['a non-localhost redirect URI', (r) => web(r).redirectUris.push('https://tazumo.example/*'), /tazumo\.example\/\* is not a localhost URI/],
   ['a wildcard redirect URI', (r) => web(r).redirectUris.push('*'), /\* is not a localhost URI/],
+  ['the app scheme on the web client', (r) => web(r).redirectUris.push('tazumo://auth/callback'), /tazumo:\/\/auth\/callback is not a localhost URI/],
+  ['another path on the app scheme', (r) => native(r).redirectUris.push('tazumo://evil'), /tazumo:\/\/evil is not a localhost URI/],
+  ['a wildcard on the app scheme', (r) => native(r).redirectUris.push('tazumo://*'), /tazumo:\/\/\* is not a localhost URI/],
+  ['a non-localhost native post-logout URI', (r) => (native(r).attributes['post.logout.redirect.uris'] += '##https://evil.example/'), /evil\.example\/ is not a localhost URI/],
   ['a non-localhost web origin', (r) => web(r).webOrigins.push('https://evil.example'), /evil\.example is not a localhost URI/],
   ['a non-localhost post-logout URI', (r) => (web(r).attributes['post.logout.redirect.uris'] += '##https://evil.example/*'), /evil\.example\/\* is not a localhost URI/],
   ['a confidential client', (r) => (web(r).publicClient = false), /only public clients/],

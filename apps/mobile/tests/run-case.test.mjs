@@ -110,7 +110,7 @@ test('CLI --expect-fail accepts only an expectation failure on the last step',as
 
 test('every sut- identifier in the cases exists in the app source',()=>{
  const src=join(here,'..','src');
- const source=['App.tsx',...readdirSync(join(src,'screens')).map(f=>join('screens',f))].map(f=>readFileSync(join(src,f),'utf8')).join('\n');
+ const source=['App.tsx',...['screens','auth'].flatMap(dir=>readdirSync(join(src,dir)).map(f=>join(dir,f)))].map(f=>readFileSync(join(src,f),'utf8')).join('\n');
  const ids=smoke.platforms.android.steps.flatMap(s=>s.value.match(/sut-[a-z0-9-]+/g)??[]);
  assert.ok(ids.length>=8);
  for(const id of ids)assert.ok(source.includes(id)||source.includes(id.replace(/-pizza$/,'-${p.id}')),`missing ${id}`);

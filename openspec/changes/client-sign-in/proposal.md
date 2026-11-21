@@ -1,4 +1,4 @@
-# Client sign-in: web slice
+# Client sign-in: web and native
 
 ## Why
 Issue #88. Customers need to sign up, sign in and sign out through the identity provider's hosted pages (ADR-0017, realm from #87), and the apps need the signed-in caller from `GET /v1/me` (ADR-0016). There is no sign-in in `apps/web` or `apps/mobile`.
@@ -9,9 +9,10 @@ Issue #88. Customers need to sign up, sign in and sign out through the identity 
 - `apps/web/vite.config.ts`: dev and preview proxy `/v1` to `TAZUMO_API_URL` when it is set.
 - `packages/core/src/account.ts`: EN, CS and DE account copy.
 - Tests: `tests/web-auth/` (real Keycloak, Mailpit and API, run by `idp.yml`) and `tests/e2e/auth.spec.ts` (unconfigured build).
+- Slice 2: `apps/mobile/src/auth/` with `expo-auth-session`, `expo-secure-store` and `expo-web-browser`; `tazumo://auth/callback` on `tazumo-native` with a deliberate realm-lint extension; `tests/idp/native-client.spec.ts`; the Android smoke checks the unconfigured state; contract v0.4.0.
 
 ## Out of scope
-Native sign-in (slice 2 of #88), account and privacy screens (#89), roles UI, social login, moving `apps/backoffice` to `oauth4webapi`.
+Account and privacy screens (#89), roles UI, social login, moving `apps/backoffice` to `oauth4webapi`.
 
 ## Tracking
 Issue #88, ADR-0027, ADR-0016, ADR-0017, #87.

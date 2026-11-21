@@ -241,6 +241,32 @@ test('Keycloak refuses a redirect URI outside the client allowlist', async ({ pa
   expect(page.url().startsWith(issuer)).toBe(true);
 });
 
+test('the transient signing-in and signing-out states are announced', async ({ browser }) => {
+  const users: { name: string; email: string; password: string }[] = JSON.parse(
+    readFileSync(join(__dirname, '../../infra/idp/.local/test-users.json'), 'utf8'),
+  );
+  const customer = users.find((user) => user.name === 'customer')!;
+  const { page } = await open(browser);
+  const slow = async (route: Route) => {
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    await route.continue();
+  };
+  await page.route(oidc.token, slow);
+  await page.getByTestId('sut-auth-sign-in').click();
+  await fillLogin(page, customer.email, customer.password);
+  await expect(page.getByTestId('sut-auth-pending')).toHaveAttribute('role', 'status');
+  await recordSelectors(page);
+  await page.unroute(oidc.token);
+  await expectSignedIn(page, customer.email);
+
+  await page.route((url) => url.href.startsWith(`${issuer}/protocol/openid-connect/logout?`), slow);
+  await page.getByTestId('sut-auth-account').click();
+  await page.getByTestId('sut-auth-sign-out').click();
+  await expect(page.getByTestId('sut-auth-signing-out')).toHaveAttribute('role', 'status');
+  await recordSelectors(page);
+  await expect(page.getByTestId('sut-auth-sign-in')).toBeVisible();
+});
+
 // Relies on the serial tests above having run in this worker (workers: 1, retries: 0).
 test('every contract selector that needs a provider was visible in at least one state', () => {
   expect(providerSelectors.filter((key) => !seenSelectors.has(key))).toEqual([]);
