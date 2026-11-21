@@ -10,13 +10,13 @@ const pipeline=[/^\.github\/workflows\/(ci|test-evidence|security|codeql)\.yml$/
 
 export const outputs=['full','docs_only','code','web','mobile','deps','guard','jsts','shots_web','shots_native'];
 
-export function classify(files,{event='pull_request'}={}){
-  if(event!=='pull_request'||files.length===0){
+export function classify(files,{event='pull_request',base='main'}={}){
+  if(event!=='pull_request'||base!=='main'||files.length===0){
     return Object.fromEntries(outputs.map(k=>[k,k!=='docs_only']));
   }
   const code=files.filter(f=>!isDocs(f));
   const full=any(code,...install,...pipeline);
-  const shipped=code.filter(f=>!/\.test\.tsx?$/.test(f));
+  const shipped=code.filter(f=>!/\.test\.m?[jt]sx?$/.test(f));
   const result={
     full,
     docs_only:code.length===0,
@@ -25,7 +25,7 @@ export function classify(files,{event='pull_request'}={}){
     mobile:full||any(code,/^apps\/mobile\//,/^packages\/(core|brand)\//),
     deps:full||any(code,/(^|\/)package\.json$/,/^pnpm-lock\.yaml$/,/^pnpm-workspace\.yaml$/,/^\.npmrc$/),
     guard:full||any(code,/^\.github\/workflows\//,/^scripts\/check-runner-guard\.mjs$/),
-    jsts:full||any(code,/\.(c|m)?[jt]sx?$/,/\.(mts|cts|html|vue|json)$/,/^\.github\/codeql\//),
+    jsts:full||any(code,/\.(c|m)?[jt]sx?$/,/\.(mts|cts|html?|vue|json|ya?ml)$/,/^\.github\/codeql\//),
     shots_web:full||any(shipped,/^apps\/web\//,/^packages\/(core|brand)\//,/^scripts\/capture-web-screenshots\.sh$/,/^tests\/screenshots\/[^/]+$/,/^\.github\/workflows\/screenshots\.yml$/),
     shots_native:full||any(shipped,/^apps\/mobile\//,/^packages\/(core|brand)\//,/^tests\/screenshots\/native\//,/^\.github\/workflows\/screenshots\.yml$/)
   };
@@ -39,10 +39,11 @@ export function changedFiles(base='HEAD^1',head='HEAD'){
 const entry=process.argv[1]&&pathToFileURL(realpathSync(process.argv[1])).href;
 if(import.meta.url===entry){
   const event=process.env.GITHUB_EVENT_NAME??'pull_request';
+  const base=process.env.GITHUB_BASE_REF||'main';
   const files=event==='pull_request'?changedFiles():[];
-  const result=classify(files,{event});
+  const result=classify(files,{event,base});
   const lines=Object.entries(result).map(([k,v])=>`${k}=${v}`);
-  console.log(`Event ${event}, ${files.length} changed file(s)`);
+  console.log(`Event ${event}, base ${base}, ${files.length} changed file(s)`);
   for(const f of files.slice(0,50))console.log(`  ${f}`);
   if(files.length>50)console.log(`  ... ${files.length-50} more`);
   console.log(lines.join('\n'));

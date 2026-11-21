@@ -54,9 +54,9 @@ The required checks (`check`, `evidence`, `dependency-audit`, `CodeQL PR analysi
 | Other code (for example `apps/api/**`) | install, typecheck, unit and contract tests | skipped | as above | analysis when JS/TS changed |
 | Root `package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`, `.npmrc`, root `tsconfig*.json`, `ci.yml`, `test-evidence.yml`, `security.yml`, `codeql.yml`, the classifier | everything | everything | audit | analysis |
 
-Playwright runs once per pull request, in `evidence`; `check` no longer runs it. The runner guard runs in `evidence` when a workflow changes. Pushes to `main`, schedules and manual runs always run everything. `Secret scan` always scans the PR's commits.
+Playwright runs once per pull request, in `evidence`; `check` no longer runs it. The runner guard runs in `evidence` when a workflow changes. Pushes to `main`, schedules, manual runs and pull requests into any branch other than `main` always run everything. `Secret scan` always scans the PR's commits.
 
-The path-filtered workflows (`api.yml`, `backoffice.yml`, `screenshots.yml`, `demo-videos.yml`) start only for the files they use, and `screenshots.yml` runs its web and native jobs separately. `native-builds.yml` has its own scope (see its section). Superseded runs of the same pull request are cancelled; runs on `main` are never cancelled.
+The path-filtered workflows (`api.yml`, `backoffice.yml`, `screenshots.yml`, `demo-videos.yml`) start only for the files they use, and `screenshots.yml` runs its web and native jobs separately. `native-builds.yml` has its own scope (see its section). Superseded runs of the same pull request are cancelled; runs on `main` are never cancelled, except in `native-builds.yml` until #128 lands.
 
 ## CI evidence
 

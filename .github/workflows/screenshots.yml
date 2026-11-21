@@ -3,9 +3,11 @@ on:
   workflow_dispatch:
   pull_request:
     paths:
+      - 'apps/web/**'
+      - '!apps/web/**/*.md'
       - 'apps/mobile/**'
       - '!apps/mobile/**/*.md'
-      - '!apps/mobile/**/*.test.ts'
+      - '!apps/mobile/**/*.test.*'
       - 'packages/core/src/**'
       - 'packages/brand/src/**'
       - '!packages/**/*.test.ts'

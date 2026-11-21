@@ -8,7 +8,7 @@ The workflows behind the required checks SHALL start on every pull request and S
 - **THEN** `check`, `evidence`, `dependency-audit`, `CodeQL PR analysis` and `Secret scan` succeed, and install, build, bundling, e2e, audit and CodeQL analysis are skipped.
 
 ### Requirement: Work follows the changed files
-CI SHALL run each expensive step only for the changes that can affect it, and SHALL run everything for pushes to `main`, schedules, manual runs, root install files, required workflow files and the classifier itself.
+CI SHALL run each expensive step only for the changes that can affect it. It SHALL run everything for pushes to `main`, schedules, manual runs, pull requests into a branch other than `main`, root install files, required workflow files and the classifier itself.
 
 #### Scenario: API-only change
 - **WHEN** a pull request changes only `apps/api/**`
@@ -30,7 +30,7 @@ The `evidence` job SHALL own browser e2e and its report, and `check` SHALL NOT r
 - **THEN** exactly one job runs `pnpm test:e2e`.
 
 ### Requirement: Concurrency never cancels main
-Every workflow SHALL cancel superseded runs of the same pull request and SHALL NOT cancel or replace runs triggered on `main`.
+Every workflow except `native-builds.yml` (rescoped in #128) SHALL cancel superseded runs of the same pull request and SHALL NOT cancel or replace runs triggered on `main`.
 
 #### Scenario: Two pushes to main in quick succession
 - **WHEN** two commits land on `main` within a minute
