@@ -41,8 +41,9 @@ test('the release workflow is pinned and holds write permissions only on its pus
   const workflow=parse(read('.github/workflows/release.yml'));
   assert.deepEqual(workflow.on,{push:{branches:['main']}});
   assert.deepEqual(workflow.permissions,{});
-  const jobs=Object.values(workflow.jobs) as {permissions:unknown,'runs-on':string,steps:{uses?:string}[]}[];
+  const jobs=Object.values(workflow.jobs) as {if:string,permissions:unknown,'runs-on':string,steps:{uses?:string}[]}[];
   assert.equal(jobs.length,1);
+  assert.equal(jobs[0].if,"vars.RELEASE_PLEASE == 'enabled'");
   assert.deepEqual(jobs[0].permissions,{contents:'write','pull-requests':'write'});
   assert.equal(jobs[0]['runs-on'],'ubuntu-latest');
   const uses=jobs[0].steps.map(s=>s.uses).filter(Boolean);

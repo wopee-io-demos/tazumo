@@ -8,6 +8,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   release-please:
+    if: vars.RELEASE_PLEASE == 'enabled'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

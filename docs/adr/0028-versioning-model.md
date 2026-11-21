@@ -55,4 +55,4 @@ Tazumo is the system under test for the demo repositories. Web, mobile and the A
 - Consumers pin a contract version for compatibility and check `version.json` or `/health` for the exact build. See [RELEASING](../RELEASING.md).
 - Every merge to `main` with a releasable commit updates the release PR. Releasing is merging that PR after its checks pass.
 - A PR that edits `contracts/openapi.json` must bump `info.version` in the same PR.
-- GitHub Actions in this repository must be allowed to create pull requests (repository setting), since the release PR is opened with the workflow token.
+- GitHub Actions in this repository must be allowed to create pull requests (repository setting), since the release PR is opened with the workflow token. The release job runs only when the repository variable `RELEASE_PLEASE` is `enabled`, so the owner turns releases on after changing that setting, and `main` never carries a release job that fails by design.

@@ -8,11 +8,15 @@ The SUT SHALL have one semver product version, recorded in `.release-please-mani
 - **THEN** `pnpm test` fails in `tests/contract/versioning.test.mts`.
 
 ### Requirement: Releases through a release PR
-Pushes to `main` SHALL run release-please, pinned to a commit SHA, on a GitHub-hosted runner, in the only job holding `contents: write` and `pull-requests: write`. It SHALL maintain a release PR built from Conventional Commits, and merging that PR SHALL create the tag `vX.Y.Z`, a GitHub Release and the `CHANGELOG.md` entry. Before 1.0, features and breaking changes SHALL bump the minor version and fixes the patch version.
+When the repository variable `RELEASE_PLEASE` is `enabled`, pushes to `main` SHALL run release-please, pinned to a commit SHA, on a GitHub-hosted runner, in the only job holding `contents: write` and `pull-requests: write`. It SHALL maintain a release PR built from Conventional Commits, and merging that PR SHALL create the tag `vX.Y.Z`, a GitHub Release and the `CHANGELOG.md` entry. Before 1.0, features and breaking changes SHALL bump the minor version and fixes the patch version.
 
 #### Scenario: A feature lands on main
 - **WHEN** a `feat:` commit is pushed to `main` after `v0.1.0`
 - **THEN** release-please opens or updates a PR proposing `0.2.0` that bumps every version file and prepends the changelog entry, and nothing is pushed to `main` directly.
+
+#### Scenario: Releases not yet enabled
+- **WHEN** `RELEASE_PLEASE` is not `enabled`
+- **THEN** the release job is skipped, not failed.
 
 #### Scenario: Pull requests never get write tokens
 - **WHEN** a pull request runs CI

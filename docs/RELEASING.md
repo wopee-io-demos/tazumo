@@ -23,7 +23,14 @@ The squash commit title is the PR title for multi-commit PRs and the commit subj
 
 A PR that changes `contracts/openapi.json` must raise `info.version` in the same PR (additive change: next minor). A PR that changes `contracts/sut.json` follows [SUT-CONTRACT](SUT-CONTRACT.md).
 
-Repository prerequisite: Settings > Actions > General > "Allow GitHub Actions to create and approve pull requests" must be on, or release-please cannot open the release PR.
+Repository prerequisites, set once by the repository owner (the release job is skipped until both are in place):
+
+```sh
+gh api -X PUT repos/wopee-io-demos/tazumo/actions/permissions/workflow -f default_workflow_permissions=read -F can_approve_pull_request_reviews=true
+gh variable set RELEASE_PLEASE --body enabled --repo wopee-io-demos/tazumo
+```
+
+The first is Settings > Actions > General > "Allow GitHub Actions to create and approve pull requests"; without it release-please cannot open the release PR. To pause releases, delete the variable.
 
 ## Build identity
 
