@@ -1,0 +1,292 @@
+{
+  "schemaVersion": 1,
+  "version": "0.3.0",
+  "app": "Tazumo",
+  "status": "synthetic-only",
+  "repo": "https://github.com/wopee-io-demos/tazumo",
+  "web": {
+    "baseUrlEnv": "TAZUMO_BASE_URL",
+    "localBaseUrl": "http://127.0.0.1:4173",
+    "selectors": {
+      "search": "[data-testid=\"sut-search\"]",
+      "cartOpen": "[data-testid=\"sut-cart-open\"]",
+      "cartDialog": "[data-testid=\"sut-cart-dialog\"]",
+      "productPizza": "[data-testid=\"sut-product-pizza\"]",
+      "addPizza": "[data-testid=\"sut-add-pizza\"]",
+      "language": "[data-testid=\"sut-language\"]",
+      "palette": "[data-testid=\"sut-palette\"]",
+      "categoryAll": "[data-testid=\"sut-category-all\"]",
+      "categoryGroceries": "[data-testid=\"sut-category-groceries\"]",
+      "productLinkPizza": "[data-testid=\"sut-product-link-pizza\"]",
+      "merchantList": "[data-testid=\"sut-merchant-list\"]",
+      "merchantPiazza": "[data-testid=\"sut-merchant-piazza-local\"]",
+      "merchantLinkPiazza": "[data-testid=\"sut-merchant-link-piazza-local\"]",
+      "merchantsEmpty": "[data-testid=\"sut-merchants-empty\"]",
+      "searchReset": "[data-testid=\"sut-search-reset\"]",
+      "merchantDetail": "[data-testid=\"sut-merchant-detail\"]",
+      "merchantProductPizza": "[data-testid=\"sut-merchant-product-pizza\"]",
+      "merchantNotFound": "[data-testid=\"sut-merchant-not-found\"]",
+      "breadcrumbHome": "[data-testid=\"sut-breadcrumb-home\"]",
+      "backToMerchants": "[data-testid=\"sut-back-to-merchants\"]",
+      "detailProduct": "[data-testid=\"sut-detail-product\"]",
+      "detailPrice": "[data-testid=\"sut-detail-price\"]",
+      "detailMerchantLink": "[data-testid=\"sut-detail-merchant-link\"]",
+      "detailIncreasePizza": "[data-testid=\"sut-detail-increase-pizza\"]",
+      "detailDecreasePizza": "[data-testid=\"sut-detail-decrease-pizza\"]",
+      "detailRemovePizza": "[data-testid=\"sut-detail-remove-pizza\"]",
+      "detailQuantityPizza": "[data-testid=\"sut-detail-quantity-pizza\"]",
+      "backLink": "[data-testid=\"sut-back-link\"]",
+      "detailNotFound": "[data-testid=\"sut-detail-not-found\"]",
+      "cartLinePizza": "[data-testid=\"sut-cart-line-pizza\"]",
+      "cartIncreasePizza": "[data-testid=\"sut-cart-increase-pizza\"]",
+      "cartDecreasePizza": "[data-testid=\"sut-cart-decrease-pizza\"]",
+      "cartRemovePizza": "[data-testid=\"sut-cart-remove-pizza\"]",
+      "cartQuantityPizza": "[data-testid=\"sut-cart-quantity-pizza\"]",
+      "cartLineTotalPizza": "[data-testid=\"sut-cart-line-total-pizza\"]",
+      "cartSubtotal": "[data-testid=\"sut-cart-subtotal\"]",
+      "cartEmpty": "[data-testid=\"sut-cart-empty\"]",
+      "cartClose": "[data-testid=\"sut-cart-close\"]",
+      "checkoutDisabled": "[data-testid=\"sut-checkout-disabled\"]",
+      "favouritesFilter": "[data-testid=\"sut-favourites-filter\"]",
+      "favouritePiazza": "[data-testid=\"sut-favourite-piazza-local\"]"
+    },
+    "selectorTemplates": {
+      "product": "[data-testid=\"sut-product-{productId}\"]",
+      "add": "[data-testid=\"sut-add-{productId}\"]",
+      "productLink": "[data-testid=\"sut-product-link-{productId}\"]",
+      "category": "[data-testid=\"sut-category-{category}\"]",
+      "merchant": "[data-testid=\"sut-merchant-{merchantId}\"]",
+      "merchantLink": "[data-testid=\"sut-merchant-link-{merchantId}\"]",
+      "merchantProduct": "[data-testid=\"sut-merchant-product-{productId}\"]",
+      "detailIncrease": "[data-testid=\"sut-detail-increase-{productId}\"]",
+      "detailDecrease": "[data-testid=\"sut-detail-decrease-{productId}\"]",
+      "detailRemove": "[data-testid=\"sut-detail-remove-{productId}\"]",
+      "detailQuantity": "[data-testid=\"sut-detail-quantity-{productId}\"]",
+      "cartLine": "[data-testid=\"sut-cart-line-{productId}\"]",
+      "cartIncrease": "[data-testid=\"sut-cart-increase-{productId}\"]",
+      "cartDecrease": "[data-testid=\"sut-cart-decrease-{productId}\"]",
+      "cartRemove": "[data-testid=\"sut-cart-remove-{productId}\"]",
+      "cartQuantity": "[data-testid=\"sut-cart-quantity-{productId}\"]",
+      "cartLineTotal": "[data-testid=\"sut-cart-line-total-{productId}\"]",
+      "favourite": "[data-testid=\"sut-favourite-{merchantId}\"]"
+    },
+    "routes": {
+      "home": "#/",
+      "merchant": "#/merchant/{merchantId}",
+      "product": "#/product/{productId}"
+    },
+    "storage": {
+      "language": {
+        "key": "tazumo.language",
+        "values": [
+          "en",
+          "cs",
+          "de"
+        ],
+        "default": "en"
+      },
+      "favourites": {
+        "key": "tazumo.favourites",
+        "format": "JSON array of merchantId strings",
+        "default": []
+      }
+    },
+    "urlParameters": {
+      "lang": {
+        "values": [
+          "en",
+          "cs",
+          "de"
+        ],
+        "effect": "sets and stores the UI language"
+      }
+    }
+  },
+  "native": {
+    "androidPackage": "io.wopee.demos.tazumo",
+    "iosBundleId": "io.wopee.demos.tazumo",
+    "requiredLocale": "en",
+    "selectors": {
+      "search": "sut-search",
+      "cartOpen": "sut-cart-open",
+      "cartSummary": "sut-cart-summary",
+      "productPizza": "sut-product-pizza",
+      "addPizza": "sut-add-pizza",
+      "languageEnglish": "sut-language-en",
+      "languageCzech": "sut-language-cs",
+      "categoryGroceries": "sut-category-groceries",
+      "checkoutDisabled": "sut-checkout-disabled",
+      "openProductPizza": "sut-open-product-pizza",
+      "cartScreenOpen": "sut-cart-screen-open",
+      "navBack": "sut-nav-back",
+      "navCart": "sut-nav-cart",
+      "detailScreen": "sut-detail-screen",
+      "detailTitle": "sut-detail-title",
+      "detailPrice": "sut-detail-price",
+      "detailAdd": "sut-detail-add",
+      "detailQuantity": "sut-detail-quantity",
+      "cartScreen": "sut-cart-screen",
+      "cartEmpty": "sut-cart-empty",
+      "cartLinePizza": "sut-cart-line-pizza",
+      "cartIncreasePizza": "sut-cart-increase-pizza",
+      "cartDecreasePizza": "sut-cart-decrease-pizza",
+      "cartRemovePizza": "sut-cart-remove-pizza",
+      "cartQuantityPizza": "sut-cart-quantity-pizza",
+      "cartSubtotal": "sut-cart-subtotal",
+      "cartPrototypeNote": "sut-cart-prototype-note",
+      "cartCheckoutDisabled": "sut-cart-checkout-disabled"
+    },
+    "selectorTemplates": {
+      "product": "sut-product-{productId}",
+      "add": "sut-add-{productId}",
+      "openProduct": "sut-open-product-{productId}",
+      "category": "sut-category-{category}",
+      "language": "sut-language-{language}",
+      "cartLine": "sut-cart-line-{productId}",
+      "cartIncrease": "sut-cart-increase-{productId}",
+      "cartDecrease": "sut-cart-decrease-{productId}",
+      "cartRemove": "sut-cart-remove-{productId}",
+      "cartQuantity": "sut-cart-quantity-{productId}"
+    },
+    "locatorStrategies": {
+      "ios": "accessibility id",
+      "android": "id"
+    }
+  },
+  "fixtures": {
+    "synthetic": true,
+    "products": [
+      {
+        "id": "pizza",
+        "name": "Margherita pizza",
+        "merchant": "Piazza Local",
+        "priceMinor": 1190,
+        "currency": "EUR",
+        "merchantId": "piazza-local"
+      },
+      {
+        "id": "bread",
+        "name": "Sourdough loaf",
+        "priceMinor": 450,
+        "currency": "EUR"
+      }
+    ],
+    "merchants": [
+      {
+        "id": "piazza-local",
+        "name": "Piazza Local"
+      },
+      {
+        "id": "morning-market",
+        "name": "Morning Market"
+      }
+    ]
+  },
+  "journeys": [
+    {
+      "id": "discovery-search",
+      "steps": [
+        "open marketplace",
+        "search Piazza",
+        "assert Margherita pizza visible"
+      ],
+      "platforms": [
+        "web",
+        "ios",
+        "android"
+      ]
+    },
+    {
+      "id": "cart-no-checkout",
+      "steps": [
+        "add pizza",
+        "open cart",
+        "assert Margherita pizza and subtotal",
+        "assert checkout disabled",
+        "assert native checkout control is disabled, not only warning text"
+      ],
+      "platforms": [
+        "web",
+        "ios",
+        "android"
+      ]
+    },
+    {
+      "id": "category-filter",
+      "steps": [
+        "choose Groceries",
+        "assert Sourdough loaf visible"
+      ],
+      "platforms": [
+        "web",
+        "ios",
+        "android"
+      ]
+    },
+    {
+      "id": "locale-maintenance",
+      "steps": [
+        "select Czech",
+        "assert localized headings",
+        "assert cart preserved"
+      ],
+      "platforms": [
+        "web",
+        "ios",
+        "android"
+      ]
+    },
+    {
+      "id": "merchant-detail-cart",
+      "platforms": [
+        "web"
+      ],
+      "steps": [
+        "open merchant Piazza Local from the merchant list",
+        "add Margherita pizza",
+        "open the pizza product page",
+        "assert price and quantity 1",
+        "open cart",
+        "remove Margherita pizza",
+        "assert empty cart"
+      ]
+    },
+    {
+      "id": "native-detail-cart",
+      "platforms": [
+        "ios",
+        "android"
+      ],
+      "steps": [
+        "open Margherita pizza detail",
+        "add to cart",
+        "open cart screen",
+        "increase quantity",
+        "decrease quantity",
+        "remove Margherita pizza",
+        "assert empty cart and checkout disabled"
+      ]
+    },
+    {
+      "id": "favourites-filter",
+      "platforms": [
+        "web"
+      ],
+      "steps": [
+        "favourite Piazza Local from its merchant card",
+        "assert the favourite toggle is pressed",
+        "turn on the Favourites filter",
+        "assert only Piazza Local and its products are listed",
+        "reload and assert the favourite is kept",
+        "un-favourite Piazza Local and assert the favourites empty state"
+      ]
+    }
+  ],
+  "capabilities": {
+    "realCheckout": false,
+    "realDeliveryTracking": false,
+    "serverReset": false,
+    "cartPersistence": false
+  },
+  "isolation": "Create a fresh browser context or restart native app with cleared app data for each independent test. Do not require shared customer accounts."
+}
