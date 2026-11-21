@@ -48,3 +48,4 @@ function loadAuthConfig(env: NodeJS.ProcessEnv): AuthOptions | undefined {
   }
   return { issuer, audience, jwksUrl, logSalt, maxTokenLifetimeSeconds, ...(tokenType ? { tokenType } : {}) };
 }
+
