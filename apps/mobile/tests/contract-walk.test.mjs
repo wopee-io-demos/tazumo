@@ -17,16 +17,22 @@ const tmp=()=>{const d=mkdtempSync(join(tmpdir(),'tazumo-walk-'));temps.push(d);
 test.after(()=>{for(const d of temps)rmSync(d,{recursive:true,force:true})});
 const clone=x=>JSON.parse(JSON.stringify(x));
 
-// In-memory Appium over a model of the Tazumo app screens. Off-screen IDs appear only after a UiScrollable lookup
-// of the right orientation (category pills scroll horizontally, everything else vertically).
-function fakeApp({missing=[],enabledCheckout=false,ready=true}={}){
- const s={screen:'catalogue',basket:false,qty:0,revealed:new Set()},log=[];
- const offscreen=['sut-category-shops','sut-category-gifts','sut-product-bread','sut-add-bread','sut-open-product-bread','sut-language-en','sut-language-cs','sut-language-de'];
- const ids=()=>{
+// In-memory Appium over a model of the Tazumo app. The catalogue is a vertical ScrollView with a viewport: IDs at the
+// bottom (mini-cart buttons, bread, languages) are hidden until a vertical UiScrollable reaches them, and that scroll
+// hides the top (header, category pills, pizza). The pills are a HorizontalScrollView: shops and gifts need a
+// horizontal UiScrollable, which errors unless the pill list is on screen. The first render and each screen change
+// take a few polls, and a UiScrollable over a scrollable that is not on screen is an HTTP error, like UiAutomator2.
+function fakeApp({missing=[],enabledCheckout=false,ready=true,coldPolls=3,staleLine=false,screenshotFails=false,settingsIgnored=false}={}){
+ const s={screen:'catalogue',basket:false,qty:0,pos:'top',hpos:'start',pendingPolls:coldPolls},log=[];
+ const top=['sut-search','sut-cart-open','sut-category-all','sut-category-food','sut-category-groceries','sut-category-shops','sut-category-gifts','sut-product-pizza','sut-add-pizza','sut-open-product-pizza'];
+ const pills={start:['sut-category-all','sut-category-food','sut-category-groceries'],end:['sut-category-groceries','sut-category-shops','sut-category-gifts']};
+ const bottom=()=>[...(s.basket?['sut-cart-summary','sut-checkout-disabled','sut-cart-screen-open']:[]),'sut-product-bread','sut-add-bread','sut-open-product-bread','sut-language-en','sut-language-cs','sut-language-de'];
+ const content=()=>s.screen==='catalogue'?[...top,...bottom()]:onScreen();
+ const onScreen=()=>{
   let v;
   if(s.screen==='catalogue'){
-   v=['sut-search','sut-cart-open','sut-product-pizza','sut-add-pizza','sut-open-product-pizza','sut-category-all','sut-category-food','sut-category-groceries',...offscreen.filter(x=>s.revealed.has(x))];
-   if(s.basket)v.push('sut-cart-summary','sut-checkout-disabled','sut-cart-screen-open');
+   v=s.pos==='top'?top.filter(x=>!x.startsWith('sut-category-')||pills[s.hpos].includes(x)):bottom();
+   if(s.basket&&s.pos==='top')v=[...v,'sut-cart-summary'];
   }else if(s.screen==='detail')v=['sut-detail-screen','sut-detail-title','sut-detail-price','sut-detail-add','sut-detail-quantity','sut-nav-back','sut-nav-cart'];
   else{
    v=['sut-cart-screen','sut-cart-subtotal','sut-cart-prototype-note','sut-cart-checkout-disabled','sut-nav-back'];
@@ -34,36 +40,62 @@ function fakeApp({missing=[],enabledCheckout=false,ready=true}={}){
   }
   return v.filter(x=>!missing.includes(x));
  };
+ const rendered=()=>s.pendingPolls>0?[]:onScreen();
+ const text=id=>id==='sut-detail-quantity'?`In your cart: ${s.qty}`:id==='sut-cart-quantity-pizza'?String(s.qty):'';
+ const enabled=id=>id.includes('checkout-disabled')?enabledCheckout:true;
  const tap=id=>{
+  const before=s.screen;
   if(id==='sut-add-pizza'||id==='sut-detail-add'||id==='sut-cart-increase-pizza')s.qty++;
   else if(id==='sut-cart-decrease-pizza')s.qty=Math.max(0,s.qty-1);
   else if(id==='sut-cart-remove-pizza')s.qty=0;
   else if(id==='sut-cart-open')s.basket=!s.basket;
   else if(id==='sut-open-product-pizza')s.screen='detail';
-  else if(id==='sut-nav-cart'){s.screen='cart';s.revealed.clear()}
+  else if(id==='sut-nav-cart')s.screen='cart';
+  if(s.screen!==before)s.pendingPolls=2;
+ };
+ const scroll=value=>{
+  const target=/resourceId\("([^"]+)"\)/.exec(value)?.[1],toPills=/scrollIntoView\(new UiSelector\(\)\.className\("android.widget.HorizontalScrollView"\)\)/.test(value);
+  if(s.screen!=='catalogue')return onScreen().includes(target)?[target]:[];
+  if(value.includes('setAsHorizontalList')){
+   if(s.pos!=='top')throw new Error('Appium HTTP 500: UiObjectNotFoundException: HorizontalScrollView');
+   if(pills.end.includes(target)&&!pills.start.includes(target))s.hpos='end';
+   else if(pills.start.includes(target))s.hpos='start';
+   return onScreen().includes(target)?[target]:[];
+  }
+  if(toPills){s.pos='top';return ['pills']}
+  if(top.includes(target)&&!target.startsWith('sut-category-')){s.pos='top';return onScreen().includes(target)?[target]:[]}
+  if(bottom().includes(target)){s.pos='bottom';return onScreen().includes(target)?[target]:[]}
+  s.pos='bottom';
+  return [];
  };
  const call=async(method,path,body)=>{
   log.push(`${method} ${path}`);
   if(path==='/status')return {ready};
   if(method==='POST'&&path==='/session')return {sessionId:'s1'};
+  if(path.endsWith('/appium/settings'))return method==='GET'?(settingsIgnored?{}:{disableIdLocatorAutocompletion:true}):null;
   if(path.endsWith('/elements')){
-   if(body.using==='id')return ids().filter(x=>x===body.value).map(x=>({[ELEMENT]:`${x}#0`}));
-   const target=/resourceId\("([^"]+)"\)/.exec(body.value)[1],horizontal=body.value.includes('setAsHorizontalList');
-   if(s.screen==='catalogue'&&offscreen.includes(target)&&!missing.includes(target)&&horizontal===target.startsWith('sut-category-'))s.revealed.add(target);
-   return ids().includes(target)?[{[ELEMENT]:`${target}#0`}]:[];
+   if(body.using==='id'){
+    if(s.pendingPolls>0){s.pendingPolls--;return []}
+    const stale=staleLine&&body.value==='sut-cart-line-pizza'&&s.screen==='cart'&&s.qty===0;
+    return [...rendered().filter(x=>x===body.value),...(stale?[body.value]:[])].map(x=>({[ELEMENT]:`${x}#0`}));
+   }
+   return scroll(body.value).map(x=>({[ELEMENT]:`${x}#ui`}));
   }
   const id=decodeURIComponent(path.split('/element/')[1]??'').split('#')[0];
-  if(path.endsWith('/displayed'))return ids().includes(id);
+  if(path.endsWith('/displayed'))return rendered().includes(id);
   if(path.endsWith('/click')){tap(id);return null}
-  if(path.endsWith('/enabled'))return id.includes('checkout-disabled')?enabledCheckout:true;
-  if(path.endsWith('/text'))return id==='sut-detail-quantity'?`In your cart: ${s.qty}`:id==='sut-cart-quantity-pizza'?String(s.qty):'';
-  if(path.endsWith('/source'))return `<hierarchy>${ids().map(x=>`<node resource-id="${x}"/>`).join('')}</hierarchy>`;
-  if(path.endsWith('/screenshot'))return Buffer.from('png').toString('base64');
+  if(path.endsWith('/enabled'))return enabled(id);
+  if(path.endsWith('/text'))return text(id);
+  if(path.endsWith('/source')){
+   const nodes=[...rendered(),...(staleLine&&s.screen==='cart'&&s.qty===0?['sut-cart-line-pizza']:[])];
+   return `<hierarchy>${nodes.map(x=>`<android.view.View index="0" text="${text(x)}" resource-id="${x}" enabled="${enabled(x)}" displayed="true"/>`).join('')}</hierarchy>`;
+  }
+  if(path.endsWith('/screenshot')){if(screenshotFails)throw new Error('Appium HTTP 500: screenshot failed');return Buffer.from('png').toString('base64')}
   return null;
  };
- return {call,log};
+ return {call,log,state:s,content};
 }
-const run=async(opts,c=contract)=>{const out=tmp(),{call,log}=fakeApp(opts);const report=await walk(c,core,call,out,{timeout:30});return {out,log,report,verdict:verifyWalk(c,core,report,out)}};
+const run=async(opts,c=contract)=>{const out=tmp(),{call,log}=fakeApp(opts);const report=await walk(c,core,call,out,{timeout:200,firstTimeout:5000});return {out,log,report,verdict:verifyWalk(c,core,report,out)}};
 
 test('the walk plan gives every native contract ID of v0.2.0 a screen',()=>{
  const values=placeholderValues(contract,core),ids=expectedIds(contract,values);
@@ -88,13 +120,16 @@ test('a full walk resolves every ID by id, scrolls only for off-screen ones and 
  assert.ok(verdict.ok,verdict.reason);
  assert.equal(report.ids.length,report.expected);
  assert.deepEqual(report.states.map(s=>s.name),PLAN.map(s=>s.name));
- assert.deepEqual(report.ids.filter(e=>e.scrolled).map(e=>e.id).sort(),['sut-add-bread','sut-category-gifts','sut-category-shops','sut-language-cs','sut-language-de','sut-language-en','sut-open-product-bread','sut-product-bread']);
+ const scrolled=report.ids.filter(e=>e.scrolled).map(e=>e.id);
+ const offscreen=['sut-category-shops','sut-category-gifts','sut-product-bread','sut-add-bread','sut-open-product-bread','sut-language-en','sut-language-cs','sut-language-de','sut-checkout-disabled','sut-cart-screen-open'];
+ assert.ok(scrolled.every(id=>offscreen.includes(id)),scrolled.join());
+ assert.ok(scrolled.includes('sut-category-shops')&&scrolled.includes('sut-checkout-disabled'),scrolled.join());
  assert.ok(log.indexOf('POST /session/s1/appium/settings')<log.findIndex(l=>l.endsWith('/elements')));
  assert.ok(log.includes('DELETE /session/s1'));
  for(const e of report.ids)assert.match(readFileSync(join(out,e.file),'utf8'),new RegExp(`resource-id="${e.id}"`));
  assert.ok(readdirSync(out).filter(f=>f.endsWith('.xml')).length>=PLAN.length);
  assert.deepEqual(report.checks.filter(c=>c.check==='disabled').map(c=>[c.id,c.actual]),[['sut-checkout-disabled',false],['sut-cart-checkout-disabled',false],['sut-cart-checkout-disabled',false]]);
- assert.deepEqual(report.checks.filter(c=>c.check==='text').map(c=>c.actual),['In your cart: 1','2','3','2']);
+ assert.deepEqual(report.checks.filter(c=>c.check==='text').map(c=>c.actual),['In your cart: 1','In your cart: 2','2','3','2']);
 });
 
 test('a contract ID missing from the app fails the walk and the verifier',async()=>{
@@ -128,7 +163,7 @@ test('the verifier fails closed on a missing, foreign, empty or tampered report'
  assert.match(verifyWalk(contract,core,{...report,settings:{}},out).reason,/disableIdLocatorAutocompletion/);
  assert.match(verifyWalk(contract,core,{...report,assertions:0},out).reason,/zero assertions/);
  assert.match(verifyWalk(contract,core,{...report,ids:report.ids.slice(1)},out).reason,/not resolved/);
- assert.match(verifyWalk(contract,core,{...report,checks:report.checks.filter(c=>c.id!=='sut-cart-checkout-disabled')},out).reason,/not proven disabled/);
+ assert.match(verifyWalk(contract,core,{...report,checks:report.checks.filter(c=>c.id!=='sut-cart-checkout-disabled')},out).reason,/disabled sut-cart-checkout-disabled on cart-screen not proven/);
  const victim=report.ids.find(e=>e.id==='sut-nav-cart');
  writeFileSync(join(out,victim.file),readFileSync(join(out,victim.file),'utf8').replace('resource-id="sut-nav-cart"',''));
  assert.match(verifyWalk(contract,core,report,out).reason,/sut-nav-cart absent from/);
@@ -162,4 +197,38 @@ test('the walker and verifier CLIs exit 0 only for a complete walk',async()=>{
  const empty=await cli('verify-contract-walk.mjs',[contractPath,tmp()]);
  assert.equal(empty.code,1);
  assert.match(empty.output,/report\.json missing/);
+});
+
+test('the verifier requires every planned check, proven in the saved tree',async()=>{
+ const {out,report}=await run({});
+ const onlyDisabled=report.checks.filter(c=>c.check==='disabled');
+ assert.match(verifyWalk(contract,core,{...report,checks:onlyDisabled,assertions:report.expected+onlyDisabled.length},out).reason,/text sut-detail-quantity on product-detail not proven/);
+ const proof=report.checks.find(c=>c.check==='disabled'&&c.state==='mini-cart');
+ writeFileSync(join(out,proof.file),readFileSync(join(out,proof.file),'utf8').replace(/(resource-id="sut-checkout-disabled" enabled=")false/,'$1true'));
+ assert.match(verifyWalk(contract,core,report,out).reason,/tree does not show enabled="false"/);
+ const moved={...report,ids:report.ids.map(e=>e.id==='sut-nav-back'?{...e,file:report.states[0].files[0]}:e)};
+ assert.match(verifyWalk(contract,core,moved,out).reason,/sut-nav-back evidence .* is not from product-detail/);
+});
+
+test('a cart line that stays in the tree after removal fails the gone check',async()=>{
+ const {report,verdict}=await run({staleLine:true});
+ assert.equal(report.outcome,'failed');
+ assert.match(report.error,/gone sut-cart-line-pizza on cart-empty/);
+ assert.equal(verdict.ok,false);
+});
+
+test('screenshot errors, ignored settings and a missing pill are never a pass',async()=>{
+ assert.equal((await run({screenshotFails:true})).report.outcome,'infrastructure-failed');
+ const ignored=await run({settingsIgnored:true});
+ assert.equal(ignored.report.outcome,'infrastructure-failed');
+ assert.match(ignored.report.error,/disableIdLocatorAutocompletion/);
+ const pill=await run({missing:['sut-category-gifts']});
+ assert.equal(pill.report.outcome,'failed');
+ assert.match(pill.report.error,/missing sut-category-gifts on catalogue/);
+});
+
+test('a slow cold start is waited for before the first tree is captured',async()=>{
+ const {report,out}=await run({coldPolls:6});
+ assert.equal(report.outcome,'passed',report.error);
+ assert.match(readFileSync(join(out,report.states[0].files[0]),'utf8'),/resource-id="sut-search"/);
 });
