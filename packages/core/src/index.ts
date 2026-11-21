@@ -26,4 +26,6 @@ export {languages,languageNames,t,categoryLabel,formatLocalizedPrice} from './lo
 export type {Language,MessageKey} from './localization.ts';
 export {merchants,findMerchant,findProduct,merchantForProduct,productsForMerchant,filterMerchants,setQuantity,removeFromCart,cartLines} from './discovery.ts';
 export type {Merchant,CartLine} from './discovery.ts';
+export {accountMessageKeys,accountText} from './account.ts';
+export type {AccountMessageKey} from './account.ts';
 export {parseFavourites,toggleFavourite,serializeFavourites} from './favourites.ts';

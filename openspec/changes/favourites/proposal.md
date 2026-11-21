@@ -10,7 +10,7 @@ Shoppers cannot save the merchants they like. The earlier prototype had favourit
 - `apps/web/src/discovery/favourites.tsx`: a `useFavourites` hook (`localStorage` key `tazumo.favourites`, `storage` event sync across tabs, in-memory fallback) and a `FavouriteButton` with `aria-pressed`, the issue's add/remove labels and `sut-favourite-<merchantId>`.
 - Heart buttons on merchant cards and the merchant page. A Favourites filter button (`sut-favourites-filter`) next to the categories narrows products and merchants. Its empty state reuses the reset control.
 - `tests/e2e/favourites.spec.ts`.
-- SUT contract v0.3.0 (minor): favourite selectors and template, `web.storage`, `web.urlParameters`, journey `favourites-filter`.
+- SUT contract v0.4.0 (minor): favourite selectors and template, `web.storage`, `web.urlParameters`, journey `favourites-filter`.
 
 ## Out of scope
 Native favourites, account sync, favourite products.

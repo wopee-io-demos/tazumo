@@ -4,4 +4,4 @@
 - [x] Web hook, heart button on card and detail, Favourites filter with empty state and reset. Existing keyboard test updated for the new tab stop.
 - [x] `tests/e2e/favourites.spec.ts`: 9 tests (toggle and labels in EN/CS/DE, filter and reload, empty state and reset, cross-tab sync, corrupted value from another tab, corrupted storage and unknown ids kept in storage but hidden, blocked storage, focus after un-favouriting under the filter, scoped axe scan). Local Playwright passes all specs.
 - [ ] Current-head CI green and review findings resolved (recorded in the PR before merge).
-- [x] New ids, storage keys and `?lang=` registered in `contracts/sut.json` v0.3.0 (minor) with `docs/SUT-CONTRACT.md`; `pnpm check:sut --base origin/main` reports a minor change.
+- [x] New ids, storage keys and `?lang=` registered in `contracts/sut.json` v0.4.0 (minor, on top of the 0.3.0 auth selectors) with `docs/SUT-CONTRACT.md`; `pnpm check:sut --base origin/main` reports a minor change.
