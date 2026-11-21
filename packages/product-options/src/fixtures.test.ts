@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { products } from '@tazumo/core';
 import { priceSelection, validateOptionGroups } from './index.ts';
-import { syntheticOptionsFor, syntheticProductOptions } from './fixtures.ts';
+import { syntheticOptionLabel, syntheticOptionLabels, syntheticOptionsFor, syntheticProductOptions } from './fixtures.ts';
 
 test('synthetic fixtures are valid, marked synthetic and use existing product IDs only', () => {
   assert.ok(syntheticProductOptions.length >= 2);
@@ -27,4 +27,13 @@ test('every fixture prices its defaults from the core catalogue price', () => {
 test('looks up fixtures by product id', () => {
   assert.equal(syntheticOptionsFor('pizza')?.productId, 'pizza');
   assert.equal(syntheticOptionsFor('headphones'), undefined);
+});
+
+test('every fixture label key has a label in every language', () => {
+  const keys = syntheticProductOptions.flatMap((def) => def.groups.flatMap((g) => [g.labelKey, ...g.options.map((o) => o.labelKey)]));
+  for (const language of ['en', 'cs', 'de'] as const) {
+    for (const key of keys) assert.notEqual(syntheticOptionLabel(language, key), key, `${language} ${key}`);
+    assert.deepEqual(Object.keys(syntheticOptionLabels[language]).sort(), [...keys].sort(), language);
+  }
+  assert.equal(syntheticOptionLabel('cs', 'options.unknown'), 'options.unknown');
 });

@@ -83,3 +83,22 @@ The API SHALL store option groups per product and return them on `GET /v1/mercha
 #### Scenario: Broken catalogue definition
 - **WHEN** a stored definition fails `validateOptionGroups` or cannot be priced
 - **THEN** the response is 500 `internal_error` with no details
+
+### Requirement: Web option picker
+The web product page SHALL let a customer choose options for a product that has option groups, show the unit price of the current selection, and add each configuration as its own cart line.
+
+#### Scenario: Price follows the selection
+- **WHEN** the customer opens a product with options
+- **THEN** the defaults are selected, the price shows the default unit price, and choosing options updates it to `priceSelection` of the new selection
+
+#### Scenario: Invalid or unavailable choices
+- **WHEN** the customer chooses more options than a group allows
+- **THEN** a validation message is shown and Add is disabled; an unavailable option is disabled and labelled unavailable
+
+#### Scenario: Configurations in the cart
+- **WHEN** the customer adds two different configurations of one product
+- **THEN** the cart shows two lines with their options, unit prices and exact line totals, the default configuration keeps the product-keyed test IDs, and the subtotal is the sum of the line totals
+
+#### Scenario: Stale cart keys
+- **WHEN** a cart key is malformed, not canonical, or names a selection that no longer validates
+- **THEN** it is not priced or shown

@@ -108,3 +108,92 @@ export const syntheticProductOptions: readonly SyntheticProductOptions[] = [
 export function syntheticOptionsFor(productId: string): SyntheticProductOptions | undefined {
   return syntheticProductOptions.find((def) => def.productId === productId);
 }
+
+export type OptionLabelLanguage = 'en' | 'cs' | 'de';
+
+/** Synthetic display labels for the fixture label keys. */
+export const syntheticOptionLabels: Readonly<Record<OptionLabelLanguage, Readonly<Record<string, string>>>> = {
+  en: {
+    'options.pizza.size': 'Size',
+    'options.pizza.size.small': 'Small',
+    'options.pizza.size.medium': 'Medium',
+    'options.pizza.size.large': 'Large',
+    'options.pizza.extras': 'Extras',
+    'options.pizza.extras.olives': 'Olives',
+    'options.pizza.extras.mushrooms': 'Mushrooms',
+    'options.pizza.extras.extraMozzarella': 'Extra mozzarella',
+    'options.pizza.extras.chilliOil': 'Chilli oil',
+    'options.pizza.extras.truffle': 'Truffle',
+    'options.burger.sauce': 'Sauce',
+    'options.burger.sauce.house': 'House sauce',
+    'options.burger.sauce.bbq': 'BBQ',
+    'options.burger.sauce.garlicMayo': 'Garlic mayo',
+    'options.burger.toppings': 'Toppings',
+    'options.burger.toppings.cheddar': 'Cheddar',
+    'options.burger.toppings.bacon': 'Bacon',
+    'options.burger.toppings.jalapenos': 'Jalapeños',
+    'options.bowl.base': 'Base',
+    'options.bowl.base.grains': 'Grains',
+    'options.bowl.base.greens': 'Greens',
+    'options.bowl.protein': 'Protein',
+    'options.bowl.protein.tofu': 'Tofu',
+    'options.bowl.protein.halloumi': 'Halloumi'
+  },
+  cs: {
+    'options.pizza.size': 'Velikost',
+    'options.pizza.size.small': 'Malá',
+    'options.pizza.size.medium': 'Střední',
+    'options.pizza.size.large': 'Velká',
+    'options.pizza.extras': 'Přísady navíc',
+    'options.pizza.extras.olives': 'Olivy',
+    'options.pizza.extras.mushrooms': 'Žampiony',
+    'options.pizza.extras.extraMozzarella': 'Mozzarella navíc',
+    'options.pizza.extras.chilliOil': 'Chilli olej',
+    'options.pizza.extras.truffle': 'Lanýž',
+    'options.burger.sauce': 'Omáčka',
+    'options.burger.sauce.house': 'Domácí omáčka',
+    'options.burger.sauce.bbq': 'BBQ',
+    'options.burger.sauce.garlicMayo': 'Česneková majonéza',
+    'options.burger.toppings': 'Přísady',
+    'options.burger.toppings.cheddar': 'Čedar',
+    'options.burger.toppings.bacon': 'Slanina',
+    'options.burger.toppings.jalapenos': 'Jalapeños',
+    'options.bowl.base': 'Základ',
+    'options.bowl.base.grains': 'Obiloviny',
+    'options.bowl.base.greens': 'Zelený salát',
+    'options.bowl.protein': 'Bílkovina',
+    'options.bowl.protein.tofu': 'Tofu',
+    'options.bowl.protein.halloumi': 'Halloumi'
+  },
+  de: {
+    'options.pizza.size': 'Größe',
+    'options.pizza.size.small': 'Klein',
+    'options.pizza.size.medium': 'Mittel',
+    'options.pizza.size.large': 'Groß',
+    'options.pizza.extras': 'Extras',
+    'options.pizza.extras.olives': 'Oliven',
+    'options.pizza.extras.mushrooms': 'Champignons',
+    'options.pizza.extras.extraMozzarella': 'Extra Mozzarella',
+    'options.pizza.extras.chilliOil': 'Chiliöl',
+    'options.pizza.extras.truffle': 'Trüffel',
+    'options.burger.sauce': 'Soße',
+    'options.burger.sauce.house': 'Haussoße',
+    'options.burger.sauce.bbq': 'BBQ',
+    'options.burger.sauce.garlicMayo': 'Knoblauchmayo',
+    'options.burger.toppings': 'Beläge',
+    'options.burger.toppings.cheddar': 'Cheddar',
+    'options.burger.toppings.bacon': 'Speck',
+    'options.burger.toppings.jalapenos': 'Jalapeños',
+    'options.bowl.base': 'Basis',
+    'options.bowl.base.grains': 'Getreide',
+    'options.bowl.base.greens': 'Blattsalat',
+    'options.bowl.protein': 'Protein',
+    'options.bowl.protein.tofu': 'Tofu',
+    'options.bowl.protein.halloumi': 'Halloumi'
+  }
+};
+
+/** Display label for a label key, or the key itself when it has no label. */
+export function syntheticOptionLabel(language: OptionLabelLanguage, labelKey: string): string {
+  return syntheticOptionLabels[language][labelKey] ?? labelKey;
+}

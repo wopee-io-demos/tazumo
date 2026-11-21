@@ -51,3 +51,14 @@
 .favouriteButton[aria-pressed="true"]{background:var(--primary);color:var(--tint);border-color:var(--primary)}
 .app .favouriteButton:focus-visible{outline:3px solid var(--ink);outline-offset:3px}
 .detailHero .favouriteButton{margin-left:auto}
+.optionPicker{display:grid;gap:12px;margin:12px 0}
+.optionGroup{border:1px solid color-mix(in srgb,var(--ink) 25%,transparent);border-radius:12px;padding:8px 14px 12px;margin:0;display:grid;gap:6px}
+.optionGroup legend{font-weight:800;padding:0 4px}
+.optionGroup label{display:flex;flex-wrap:wrap;gap:4px;align-items:center;min-height:32px;cursor:pointer}
+.optionGroup input{width:20px;height:20px;accent-color:var(--primary)}
+.optionGroup input:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
+.optionHint{font-weight:400}
+.optionDelta{font-weight:700}
+.optionUnavailable{opacity:.7;cursor:not-allowed}
+.optionsError{font-weight:700;color:var(--ink);border-left:4px solid var(--accent);padding-left:8px;margin:0}
+.cartLine .cartLineOptions{display:block;color:#5c5661}

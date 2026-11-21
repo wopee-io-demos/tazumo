@@ -1,6 +1,6 @@
 # Tazumo, canonical system under test (SUT)
 
-Version: `0.5.0`. Source of truth: [contract](../contracts/sut.json). Tracking: [#32](https://github.com/wopee-io-demos/tazumo/issues/32). Pin the contract `version` and the Tazumo commit you tested against.
+Version: `0.6.0`. Source of truth: [contract](../contracts/sut.json). Tracking: [#32](https://github.com/wopee-io-demos/tazumo/issues/32). Pin the contract `version` and the Tazumo commit you tested against.
 
 Use Tazumo web, Android and iOS as the common application for Wopee demos. Its catalogue is synthetic, checkout is **disabled**, and order tracking is **not operational**. No dummy order should ever be reported as a real purchase.
 
@@ -32,7 +32,7 @@ From the Tazumo monorepo run `pnpm install && pnpm dev:sut`. This intentionally 
 | Key | Meaning |
 | --- | --- |
 | `web.selectors`, `native.selectors` | Named, concrete IDs. Web values are CSS selectors on `data-testid`; native values are raw `testID`s for the `native.locatorStrategies`. |
-| `web.selectorTemplates`, `native.selectorTemplates` | ID families with a placeholder: `{productId}` and `{merchantId}` from `fixtures` / `@tazumo/core`, `{category}` (`all`, `food`, `groceries`, `shops`, `gifts`) and `{language}` (`en`, `cs`, `de`). |
+| `web.selectorTemplates`, `native.selectorTemplates` | ID families with a placeholder: `{productId}` and `{merchantId}` from `fixtures` / `@tazumo/core`, `{category}` (`all`, `food`, `groceries`, `shops`, `gifts`), `{language}` (`en`, `cs`, `de`), `{groupId}` and `{optionId}` from the synthetic option fixtures in `@tazumo/product-options`, and `{lineId}` (a cart line, see product options below). |
 | `web.routes` | Hash routes: `#/`, `#/merchant/{merchantId}`, `#/product/{productId}` (ADR-0012). |
 | `web.storage`, `web.urlParameters` | Browser state that survives reloads (`localStorage` keys, their format and defaults) and URL parameters the web app reads (`?lang=`). |
 | `fixtures` | Synthetic products and merchants with stable IDs, names and prices. |
@@ -88,7 +88,15 @@ Every Tazumo build reports this contract version, the OpenAPI version, the produ
 
 IDs that are in the code but not registered are printed as a note. `tests/contract/sut-contract.test.mts` covers the checker with mutations: it removes each registered ID's attribute, comments an element out, moves an ID to another attribute or the wrong platform's prop, and re-enables checkout, plus semantic-version cases. `tests/e2e/sut-contract.spec.ts` runs the `merchant-detail-cart` journey in Chromium using only contract selectors and routes, and asserts that every web selector and template is visible in at least one app state. Native IDs are verified statically only; there is no Appium run against them in this repository.
 
+Web product options (#82, slice 3a): the product page of `pizza`, `burger` and `bowl` shows option groups. `selectorTemplates.optionGroup` (`sut-option-group-{groupId}`) is a fieldset; `option` (`sut-option-{optionId}`) is its radio or checkbox input, disabled when the option is unavailable (the pizza `truffle` extra); `optionNone` (`sut-option-none-{groupId}`) chooses nothing in an optional single-choice group. `sut-detail-price` shows the unit price of the current selection. `optionsError` (`sut-options-error`) appears when the selection is invalid (for example a third pizza extra), and the add button is then disabled. Every configuration is its own cart line. The default configuration keeps the product-keyed cart IDs (`sut-cart-line-pizza` and the other `{productId}` cart templates). Another configuration uses `{lineId}` = `{productId}-{chosen option IDs in menu order}` (`none` when nothing is chosen) in the same cart templates, for example `sut-cart-line-pizza-large-olives-mushrooms`. `cartLineOptions` (`sut-cart-line-options-{lineId}`) lists the chosen options. The detail-page quantity IDs (`sut-detail-*-{productId}`) refer to the configuration currently selected.
+
 ## Changelog
+
+### 0.6.0 (additive)
+- Web product options (#82): `optionsError`, `selectorTemplates.optionGroup`, `option`, `optionNone`, `cartLineOptions`, placeholders `{groupId}`, `{optionId}` and `{lineId}`, and journey `product-options`.
+- `web.placeholders.lineId` defines the cart line placeholder; every `{productId}` cart template accepts a `lineId`.
+- No ID from 0.5.0 was renamed or removed. The default configuration of every product keeps its existing cart IDs.
+- Visible changes for text and visual assertions: the `pizza`, `burger` and `bowl` product pages gain option fieldsets, and their cart lines show the chosen options, including the defaults ("Medium", "House sauce", "Grains").
 
 ### 0.5.0 (additive)
 - Native sign-in (#88): `native.selectors` `authUnavailable`, `authSignIn`, `authSignUp`, `authNotice`, `authPending`, `authSigningOut`, `authUser`, `authSignOut`. A new `native.requiresAuth` lists every one except `authUnavailable`.

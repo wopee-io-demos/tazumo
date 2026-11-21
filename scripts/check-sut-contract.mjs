@@ -24,9 +24,10 @@ export function sourcesIn(dir){
 
 export async function loadRepo(){
   const core=await import('../packages/core/src/index.ts');
+  const {syntheticProductOptions}=await import('../packages/product-options/src/fixtures.ts');
   return {
     contract:JSON.parse(read('contracts/sut.json')),
-    core:{products:core.products,merchants:core.merchants,categories:core.categories,languages:core.languages},
+    core:{products:core.products,merchants:core.merchants,categories:core.categories,languages:core.languages,options:syntheticProductOptions},
     sources:{web:sourcesIn('apps/web/src'),native:sourcesIn('apps/mobile/src')}
   };
 }

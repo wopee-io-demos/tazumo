@@ -19,7 +19,10 @@ export function domains(core){
     productId:core.products.map(p=>p.id),
     merchantId:core.merchants.map(m=>m.id),
     category:['all',...core.categories.map(c=>c.toLowerCase())],
-    language:[...core.languages]
+    language:[...core.languages],
+    groupId:(core.options??[]).flatMap(o=>o.groups.map(g=>g.id)),
+    optionId:(core.options??[]).flatMap(o=>o.groups.flatMap(g=>g.options.map(x=>x.id))),
+    lineId:core.products.map(p=>p.id)
   };
 }
 

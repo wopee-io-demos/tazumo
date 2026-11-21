@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "version": "0.5.0",
+  "version": "0.6.0",
   "app": "Tazumo",
   "status": "synthetic-only",
   "repo": "https://github.com/wopee-io-demos/tazumo",
@@ -58,7 +58,8 @@
       "favouritesFilter": "[data-testid=\"sut-favourites-filter\"]",
       "favouritePiazza": "[data-testid=\"sut-favourite-piazza-local\"]",
       "authPending": "[data-testid=\"sut-auth-pending\"]",
-      "authSigningOut": "[data-testid=\"sut-auth-signing-out\"]"
+      "authSigningOut": "[data-testid=\"sut-auth-signing-out\"]",
+      "optionsError": "[data-testid=\"sut-options-error\"]"
     },
     "requiresAuth": [
       "authSignIn",
@@ -89,7 +90,11 @@
       "cartRemove": "[data-testid=\"sut-cart-remove-{productId}\"]",
       "cartQuantity": "[data-testid=\"sut-cart-quantity-{productId}\"]",
       "cartLineTotal": "[data-testid=\"sut-cart-line-total-{productId}\"]",
-      "favourite": "[data-testid=\"sut-favourite-{merchantId}\"]"
+      "favourite": "[data-testid=\"sut-favourite-{merchantId}\"]",
+      "optionGroup": "[data-testid=\"sut-option-group-{groupId}\"]",
+      "option": "[data-testid=\"sut-option-{optionId}\"]",
+      "optionNone": "[data-testid=\"sut-option-none-{groupId}\"]",
+      "cartLineOptions": "[data-testid=\"sut-cart-line-options-{lineId}\"]"
     },
     "routes": {
       "home": "#/",
@@ -121,6 +126,9 @@
         ],
         "effect": "sets and stores the UI language"
       }
+    },
+    "placeholders": {
+      "lineId": "A cart line: the productId for the product's default configuration (and for a product without options), otherwise productId-{chosen option IDs in menu order}, or productId-none when nothing is chosen. Every cart template that takes {productId} accepts a lineId."
     }
   },
   "native": {
@@ -317,6 +325,21 @@
         "assert only Piazza Local and its products are listed",
         "reload and assert the favourite is kept",
         "un-favourite Piazza Local and assert the favourites empty state"
+      ]
+    },
+    {
+      "id": "product-options",
+      "steps": [
+        "open #/product/pizza",
+        "choose sut-option-large, sut-option-olives and sut-option-mushrooms",
+        "assert sut-detail-price contains 17.20",
+        "add, then add the default pizza from the catalogue",
+        "open cart",
+        "assert sut-cart-line-pizza and sut-cart-line-pizza-large-olives-mushrooms and subtotal 29.10",
+        "choose a fourth extra and assert sut-options-error and a disabled add"
+      ],
+      "platforms": [
+        "web"
       ]
     }
   ],
