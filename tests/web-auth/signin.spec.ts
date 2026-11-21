@@ -15,18 +15,20 @@ const secondPassword = `Second-${randomBytes(12).toString('base64url')}`;
 const jwt = /eyJ[\w-]+\.[\w-]+\.[\w-]+/;
 let userId: string;
 
-type Watched = { page: Page; tokens: string[]; console: string[]; meCalls: number };
+type Watched = { page: Page; tokens: string[]; console: string[]; meCalls: number; tokenCalls: number; expiresIn: number };
 
 async function open(browser: Browser, setup?: (page: Page) => Promise<void>): Promise<Watched> {
   const page = await (await browser.newContext()).newPage();
-  const watched: Watched = { page, tokens: [], console: [], meCalls: 0 };
+  const watched: Watched = { page, tokens: [], console: [], meCalls: 0, tokenCalls: 0, expiresIn: 0 };
   page.on('console', (message) => watched.console.push(message.text()));
   page.on('request', (request) => {
     if (request.url() === new URL('/v1/me', webApp).href) watched.meCalls++;
+    if (request.url() === oidc.token) watched.tokenCalls++;
   });
   page.on('response', async (response) => {
     if (response.url() !== oidc.token || !response.ok()) return;
     const body = await response.json();
+    watched.expiresIn = body.expires_in;
     watched.tokens.push(...['access_token', 'refresh_token', 'id_token'].map((key) => body[key]).filter(Boolean));
   });
   await setup?.(page);
@@ -34,7 +36,7 @@ async function open(browser: Browser, setup?: (page: Page) => Promise<void>): Pr
   return watched;
 }
 
-async function expectNoTokenLeak({ page, tokens, console }: Watched) {
+async function expectNoTokenLeak({ page, tokens, console }: Watched, onTazumo = true) {
   expect(tokens.length).toBeGreaterThan(0);
   const storage = await page.evaluate(() => JSON.stringify([Object.entries(localStorage), Object.entries(sessionStorage)]));
   expect(storage).not.toMatch(jwt);
@@ -44,7 +46,7 @@ async function expectNoTokenLeak({ page, tokens, console }: Watched) {
     expect(page.url()).not.toContain(token);
     expect(console.join('\n')).not.toContain(token);
   }
-  await expect(page.locator('input[type=password]')).toHaveCount(0);
+  if (onTazumo) await expect(page.locator('input[type=password]')).toHaveCount(0);
 }
 
 async function fillLogin(page: Page, user: string, password: string) {
@@ -60,6 +62,19 @@ async function expectSignedIn(page: Page, user: string) {
   await page.keyboard.press('Escape');
   await expect(page.getByTestId('sut-auth-account-menu')).toBeHidden();
   await expect(page.getByTestId('sut-auth-account')).toBeFocused();
+}
+
+/** Signs out through the menu and waits for the IdP's end-session redirect to land back on the app. */
+async function signOut(page: Page) {
+  await page.getByTestId('sut-auth-account').click();
+  const logout = page.waitForRequest((request) => request.url().startsWith(`${issuer}/protocol/openid-connect/logout?`));
+  const back = page.waitForEvent('framenavigated', { predicate: (frame) => frame === page.mainFrame() && frame.url() === webApp });
+  await page.getByTestId('sut-auth-sign-out').click();
+  const url = new URL((await logout).url());
+  expect(url.searchParams.get('post_logout_redirect_uri')).toBe(webApp);
+  expect(url.searchParams.get('id_token_hint')).toMatch(jwt);
+  await back;
+  await expect(page.getByTestId('sut-auth-sign-in')).toBeVisible();
 }
 
 const meResponse = (page: Page) => page.waitForResponse((response) => response.url() === new URL('/v1/me', webApp).href);
@@ -96,10 +111,8 @@ test('sign-up on the hosted page with e-mail verification ends signed in, with t
 
 test('sign-out is RP-initiated and ends the IdP session', async () => {
   const { page } = shared;
-  await page.getByTestId('sut-auth-account').click();
-  await page.getByTestId('sut-auth-sign-out').click();
-  await page.waitForURL(webApp);
-  await expect(page.getByTestId('sut-auth-sign-in')).toBeVisible();
+  await signOut(page);
+  await expectNoTokenLeak(shared);
   await page.getByTestId('sut-auth-sign-in').click();
   await page.waitForURL((url) => url.href.startsWith(issuer));
   await expect(page.locator('#username')).toBeVisible();
@@ -120,9 +133,7 @@ test('forgot password stays on the IdP and returns signed in; sign-in returns to
   expect((await (await reset).json()).userId).toBe(userId);
   await expectSignedIn(page, email);
 
-  await page.getByTestId('sut-auth-account').click();
-  await page.getByTestId('sut-auth-sign-out').click();
-  await page.waitForURL(webApp);
+  await signOut(page);
   await page.goto(`${webApp}#/product/pizza`);
   await page.getByTestId('sut-auth-sign-in').click();
   await fillLogin(page, email, secondPassword);
@@ -139,7 +150,8 @@ test('the session refreshes in memory before the access token expires; a reload 
   await fillLogin(page, email, secondPassword);
   await expectSignedIn(page, email);
   const refresh = page.waitForResponse((response) => response.url() === oidc.token && /grant_type=refresh_token/.test(response.request().postData() ?? ''));
-  await page.clock.fastForward('04:40');
+  expect(watched.expiresIn).toBeGreaterThan(60);
+  await page.clock.fastForward((watched.expiresIn - 30 + 10) * 1000);
   expect((await refresh).status()).toBe(200);
   await expectSignedIn(page, email);
   expect(watched.tokens.length).toBeGreaterThanOrEqual(6);
@@ -151,7 +163,7 @@ test('the session refreshes in memory before the access token expires; a reload 
   await expectSignedIn(page, email);
 });
 
-type Mutation = [name: string, intercept: (route: Route) => Promise<void>, notice: RegExp];
+type Mutation = [name: string, intercept: (route: Route) => Promise<void>, notice: RegExp, tokenCalls: number];
 
 const rewriteCallback = (mutate: (callback: URL) => void) => async (route: Route) => {
   const response = await route.fetch({ maxRedirects: 0 });
@@ -166,10 +178,10 @@ const rewriteRequest = (mutate: (authorize: URL) => void) => async (route: Route
 };
 
 const mutations: Mutation[] = [
-  ['a tampered state', rewriteCallback((url) => url.searchParams.set('state', 'tampered')), /could not be completed/],
-  ['a wrong issuer', rewriteCallback((url) => url.searchParams.set('iss', `${issuer}-evil`)), /could not be completed/],
-  ['a nonce mismatch', rewriteRequest((url) => url.searchParams.set('nonce', 'not-the-stored-nonce')), /could not be completed/],
-  ['missing PKCE', rewriteRequest((url) => ['code_challenge', 'code_challenge_method'].forEach((key) => url.searchParams.delete(key))), /cancelled or refused/],
+  ['a tampered state', rewriteCallback((url) => url.searchParams.set('state', 'tampered')), /could not be completed/, 0],
+  ['a wrong issuer', rewriteCallback((url) => url.searchParams.set('iss', `${issuer}-evil`)), /could not be completed/, 0],
+  ['a nonce mismatch', rewriteRequest((url) => url.searchParams.set('nonce', 'not-the-stored-nonce')), /could not be completed/, 1],
+  ['missing PKCE', rewriteRequest((url) => ['code_challenge', 'code_challenge_method'].forEach((key) => url.searchParams.delete(key))), /cancelled or refused/, 0],
 ];
 
 test('a tampered state, a wrong issuer, a nonce mismatch and missing PKCE are rejected without a session', async ({ browser }) => {
@@ -183,10 +195,11 @@ test('a tampered state, a wrong issuer, a nonce mismatch and missing PKCE are re
   await fillLogin(page, customer.email, customer.password);
   await expectSignedIn(page, customer.email);
 
-  for (const [name, intercept, notice] of mutations) {
+  for (const [name, intercept, notice, tokenCalls] of mutations) {
     await test.step(name, async () => {
       await page.reload();
       const calls = watched.meCalls;
+      const exchanges = watched.tokenCalls;
       await page.route((url) => url.href.startsWith(oidc.authorize), intercept);
       await page.getByTestId('sut-auth-sign-in').click();
       await expect(page.getByTestId('sut-auth-notice')).toHaveText(notice);
@@ -195,6 +208,7 @@ test('a tampered state, a wrong issuer, a nonce mismatch and missing PKCE are re
       await expect(page.getByTestId('sut-auth-account')).toHaveCount(0);
       expect(page.url()).not.toMatch(/[?&](code|state)=/);
       expect(watched.meCalls).toBe(calls);
+      expect(watched.tokenCalls - exchanges).toBe(tokenCalls);
     });
   }
 });

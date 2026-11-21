@@ -52,5 +52,6 @@ The redirect is the app scheme `tazumo://auth/callback` plus the Expo developmen
 - `oauth4webapi` adds about 19 kB minified (6.5 kB gzip) to the web bundle, including builds that have no sign-in.
 - Each reload or new tab starts signed out locally. This is the price of memory-only tokens. Revisit if customers find it disruptive (for example with a backend-for-frontend holding an HTTP-only session cookie).
 - The refresh token is as exposed to injected script as the access token. The content security policy and dependency audit are the defences; a backend-for-frontend would remove it from the browser altogether.
+- Slice 1 sends the bearer token only on `GET /v1/me`. The first other protected call (the account screens, #89) adds an authorised fetch to the same module, which ends the session on a 401.
 - `apps/backoffice` keeps its hand-written flow for now. Moving it to `oauth4webapi` would add the `iss` and nonce checks.
 - E2E runs against the real realm and API in `.github/workflows/idp.yml` (`tests/web-auth/`).

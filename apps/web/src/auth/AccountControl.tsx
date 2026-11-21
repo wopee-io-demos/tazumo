@@ -35,6 +35,9 @@ export function AccountControl({ lang }: { lang: Language }) {
   if (state.status === 'pending') {
     return <p className="authNote" role="status" data-testid="sut-auth-pending">{text('signingIn')}</p>;
   }
+  if (state.status === 'signing-out') {
+    return <p className="authNote" role="status" data-testid="sut-auth-pending">{text('signingOut')}</p>;
+  }
   if (state.status === 'signed-out') {
     return (
       <div className="account">

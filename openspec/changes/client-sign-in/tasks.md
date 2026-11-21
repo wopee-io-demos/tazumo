@@ -10,7 +10,7 @@
 - [x] Unconfigured build: `tests/e2e/auth.spec.ts` (EN, CS and DE text, no sign-in button, forged `code`/`state` ignored, no discovery, token or `/v1/me` request). Evidence: `pnpm test:e2e` 39/39 locally, including the a11y scans and the phone-width header check.
 - [x] `.github/workflows/idp.yml` runs `tests/web-auth/` after the IdP suite.
 - [ ] `idp.yml`, `check` and `evidence` green on the PR head.
-- [ ] Independent review findings resolved.
+- [x] Independent review (fresh reviewer agent, head `7a18f48`): no blockers. Fixed: a failed discovery is no longer cached; sign-out shows "Signing you out…" until the end-session redirect, and a session generation counter drops late refresh results; the tests wait for the end-session request and the redirect back; the tests count token requests per rejected callback (0 for state, `iss` and PKCE, 1 for the nonce); the refresh fast-forward is derived from `expires_in`; a leak check runs after sign-out; `authConfig` reads `BASE_URL` from its `env`. Deferred to #89: an authorised fetch for further protected calls (recorded in ADR-0027). Evidence after the fixes: `tests/web-auth/` 6/6 three runs in a row, `pnpm test:e2e` 39/39.
 - [ ] Selectors registered: listed on #32 while contract v0.2.0 (#90) is unmerged.
 
 ## Slice 2: native (separate PR)

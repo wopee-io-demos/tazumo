@@ -6,6 +6,7 @@ export type Notice = 'signInFailed' | 'signInRefused' | 'sessionEnded' | 'accoun
 export type AuthState =
   | { status: 'unconfigured' }
   | { status: 'pending' }
+  | { status: 'signing-out' }
   | { status: 'signed-out'; notice?: Notice }
   | { status: 'signed-in'; me: Me; email?: string };
 
@@ -39,17 +40,25 @@ export function createAuth(config: AuthConfig | null): Auth {
   let refreshTimer: ReturnType<typeof setTimeout> | undefined;
   let started: Promise<void> | null = null;
   let server: Promise<oauth.AuthorizationServer> | null = null;
+  let generation = 0;
 
   const issuer = config && new URL(config.issuer);
   const client: oauth.Client = { client_id: config?.clientId ?? '' };
   const http = { [oauth.allowInsecureRequests]: issuer?.protocol === 'http:' && loopbackHosts.has(issuer.hostname) };
   const discover = () =>
-    (server ??= oauth.discoveryRequest(issuer!, http).then((response) => oauth.processDiscoveryResponse(issuer!, response)));
+    (server ??= oauth
+      .discoveryRequest(issuer!, http)
+      .then((response) => oauth.processDiscoveryResponse(issuer!, response))
+      .catch((error) => {
+        server = null;
+        throw error;
+      }));
 
-  const endSession = (notice?: Notice) => {
+  const endSession = (notice?: Notice, next: AuthState = { status: 'signed-out', notice }) => {
+    generation++;
     clearTimeout(refreshTimer);
     tokens = null;
-    set({ status: 'signed-out', notice });
+    set(next);
   };
 
   const accept = (result: oauth.TokenEndpointResponse) => {
@@ -59,12 +68,14 @@ export function createAuth(config: AuthConfig | null): Auth {
   };
 
   async function refresh() {
+    const turn = generation;
     try {
       const as = await discover();
       const response = await oauth.refreshTokenGrantRequest(as, client, oauth.None(), tokens!.refresh!, http);
-      accept(await oauth.processRefreshTokenResponse(as, client, response));
+      const result = await oauth.processRefreshTokenResponse(as, client, response);
+      if (turn === generation) accept(result);
     } catch {
-      endSession('sessionEnded');
+      if (turn === generation) endSession('sessionEnded');
     }
   }
 
@@ -139,9 +150,9 @@ export function createAuth(config: AuthConfig | null): Auth {
     },
     async signOut() {
       const idToken = tokens?.idToken;
-      endSession();
+      endSession(undefined, { status: 'signing-out' });
       const as = await discover().catch(() => null);
-      if (!config || !as?.end_session_endpoint) return;
+      if (!config || !as?.end_session_endpoint) return set({ status: 'signed-out' });
       const url = new URL(as.end_session_endpoint);
       url.search = new URLSearchParams({
         client_id: config.clientId,

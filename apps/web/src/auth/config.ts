@@ -5,5 +5,5 @@ export function authConfig(env: ImportMetaEnv = import.meta.env): AuthConfig | n
   const issuer = env.VITE_OIDC_ISSUER?.trim();
   const clientId = env.VITE_OIDC_CLIENT_ID?.trim();
   if (!issuer || !clientId) return null;
-  return { issuer, clientId, scope: env.VITE_OIDC_SCOPE?.trim() || 'openid', redirectUri: new URL(import.meta.env.BASE_URL, location.origin).href };
+  return { issuer, clientId, scope: env.VITE_OIDC_SCOPE?.trim() || 'openid', redirectUri: new URL(env.BASE_URL, location.origin).href };
 }
