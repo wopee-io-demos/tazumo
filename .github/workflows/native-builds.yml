@@ -108,7 +108,7 @@ jobs:
           retention-days: 7
   android-smoke:
     name: Android emulator smoke
-    needs: [changes, android-release]
+    needs: android-release
     if: ${{ !cancelled() && needs.android-release.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -130,16 +130,16 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
-      - name: AVD cache
+      - name: Restore the AVD snapshot
         id: avd-cache
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: |
             ~/.android/avd/*
             ~/.android/adb*
-          key: avd-api34-x86_64-google_apis-pixel_6-v1
-      - name: Create the AVD and a boot snapshot for the cache
-        if: steps.avd-cache.outputs.cache-hit != 'true'
+          key: avd-api34-x86_64-google_apis-pixel_6-${{ env.ImageOS }}-${{ env.ImageVersion }}-v1
+      - name: Create the AVD and a boot snapshot (main only)
+        if: steps.avd-cache.outputs.cache-hit != 'true' && github.ref == 'refs/heads/main'
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
           api-level: 34
@@ -149,7 +149,15 @@ jobs:
           force-avd-creation: false
           disable-animations: false
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          script: echo "AVD snapshot created"
+          script: bash -c 'adb shell settings put global hide_error_dialogs 1; sleep 30; adb shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS >/dev/null || true'
+      - name: Save the AVD snapshot (main only)
+        if: steps.avd-cache.outputs.cache-hit != 'true' && github.ref == 'refs/heads/main'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+          key: ${{ steps.avd-cache.outputs.cache-primary-key }}
       - name: Smoke path on the emulator (browse, product, add, cart)
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
