@@ -15,6 +15,7 @@
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
+    "@tazumo/commerce": "workspace:*",
     "@tazumo/core": "workspace:*",
     "typescript": "^5.8.3",
     "@types/node": "^22.15.0"

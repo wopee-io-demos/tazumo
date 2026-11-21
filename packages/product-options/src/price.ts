@@ -3,7 +3,7 @@ import { isRecord, validateSelection } from './validate.ts';
 
 const MAX_SAFE = BigInt(Number.MAX_SAFE_INTEGER);
 
-/** Mirrors `MAX_LINE_QUANTITY` in `@tazumo/commerce`, so a line priced here is not rejected at the quote. */
+/** Equals `MAX_LINE_QUANTITY` in `@tazumo/commerce` (asserted by the contract test), so a line priced here is not rejected at the quote. */
 export const MAX_LINE_QUANTITY = 999;
 
 const fail = (code: PricingErrorCode, path: OptionsError['path'], message: string): PriceResult => ({
