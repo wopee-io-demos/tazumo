@@ -3,24 +3,48 @@ on:
   workflow_dispatch:
   pull_request:
     paths:
-      - '.github/workflows/screenshots.yml'
       - 'apps/mobile/**'
-      - 'packages/**'
+      - '!apps/mobile/**/*.md'
+      - '!apps/mobile/**/*.test.ts'
+      - 'packages/core/src/**'
+      - 'packages/brand/src/**'
+      - '!packages/**/*.test.ts'
       - 'scripts/capture-web-screenshots.sh'
       - 'tests/screenshots/**'
+      - 'package.json'
+      - 'pnpm-workspace.yaml'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/screenshots.yml'
 permissions:
   contents: read
 concurrency:
-  group: screenshots-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: screenshots-${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 env:
   MAESTRO_VERSION: 1.41.0
   MAESTRO_SHA256: 0b87a2eed8c1594fe572c5f29d6d64af389f4b7231ddde714179bbcb05f0fe0c
   MAESTRO_CLI_NO_ANALYTICS: '1'
   MAESTRO_CLI_ANALYSIS_NOTIFICATION_DISABLED: 'true'
 jobs:
+  changes:
+    name: Classify changed files
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      web: ${{ steps.changes.outputs.shots_web }}
+      native: ${{ steps.changes.outputs.shots_native }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - id: changes
+        run: node scripts/ci-changes.mjs
+
   web:
     name: Web (Playwright Chromium)
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -48,6 +72,8 @@ jobs:
 
   ios:
     name: iOS simulator
+    needs: changes
+    if: needs.changes.outputs.native == 'true'
     runs-on: macos-15
     timeout-minutes: 90
     steps:
@@ -99,6 +125,8 @@ jobs:
 
   android:
     name: Android emulator
+    needs: changes
+    if: needs.changes.outputs.native == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:

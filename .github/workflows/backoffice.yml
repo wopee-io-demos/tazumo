@@ -3,27 +3,37 @@ on:
   pull_request:
     paths:
       - 'apps/backoffice/**'
+      - '!apps/backoffice/**/*.md'
       - 'tests/backoffice/**'
-      - 'apps/api/**'
-      - 'packages/brand/**'
+      - 'apps/api/src/**'
+      - 'apps/api/migrations/**'
+      - 'apps/api/package.json'
+      - 'packages/brand/src/**'
+      - 'packages/brand/package.json'
       - 'package.json'
       - 'pnpm-workspace.yaml'
+      - 'pnpm-lock.yaml'
       - '.github/workflows/backoffice.yml'
   push:
     branches: [main]
     paths:
       - 'apps/backoffice/**'
+      - '!apps/backoffice/**/*.md'
       - 'tests/backoffice/**'
-      - 'apps/api/**'
-      - 'packages/brand/**'
+      - 'apps/api/src/**'
+      - 'apps/api/migrations/**'
+      - 'apps/api/package.json'
+      - 'packages/brand/src/**'
+      - 'packages/brand/package.json'
       - 'package.json'
       - 'pnpm-workspace.yaml'
+      - 'pnpm-lock.yaml'
       - '.github/workflows/backoffice.yml'
 permissions:
   contents: read
 concurrency:
-  group: backoffice-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: backoffice-${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   backoffice:
     runs-on: ${{ (vars.RUNNER_MODE == 'hosted' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository)) && 'ubuntu-latest' || fromJSON('["self-hosted","linux","x64","demos"]') }}

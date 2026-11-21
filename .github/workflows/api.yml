@@ -3,27 +3,35 @@ on:
   pull_request:
     paths:
       - 'apps/api/**'
-      - 'packages/core/**'
+      - '!apps/api/**/*.md'
+      - 'packages/core/src/**'
+      - '!packages/core/src/**/*.test.ts'
+      - 'packages/core/package.json'
       - 'contracts/openapi.json'
       - 'scripts/validate-openapi.mjs'
       - 'package.json'
       - 'pnpm-workspace.yaml'
+      - 'pnpm-lock.yaml'
       - '.github/workflows/api.yml'
   push:
     branches: [main]
     paths:
       - 'apps/api/**'
-      - 'packages/core/**'
+      - '!apps/api/**/*.md'
+      - 'packages/core/src/**'
+      - '!packages/core/src/**/*.test.ts'
+      - 'packages/core/package.json'
       - 'contracts/openapi.json'
       - 'scripts/validate-openapi.mjs'
       - 'package.json'
       - 'pnpm-workspace.yaml'
+      - 'pnpm-lock.yaml'
       - '.github/workflows/api.yml'
 permissions:
   contents: read
 concurrency:
-  group: api-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: api-${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   api:
     runs-on: ${{ (vars.RUNNER_MODE == 'hosted' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository)) && 'ubuntu-latest' || fromJSON('["self-hosted","linux","x64","demos"]') }}
