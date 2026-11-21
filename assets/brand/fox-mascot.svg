@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 280" role="img" aria-labelledby="title">
+  <title id="title">Fox mascot, sitting</title>
+  <polygon points="164,258 222,222 232,150 204,196 168,228" fill="#D2561A"/>
+  <polygon points="232,150 226,186 214,174" fill="#FFF3E3"/>
+  <polygon points="84,128 156,128 178,262 62,262" fill="#E8641B"/>
+  <polygon points="120,128 156,128 178,262 120,262" fill="#D2561A"/>
+  <polygon points="98,128 142,128 120,206" fill="#FFF3E3"/>
+  <rect x="80" y="240" width="28" height="22" rx="8" fill="#2A1A14"/>
+  <rect x="132" y="240" width="28" height="22" rx="8" fill="#2A1A14"/>
+  <g transform="translate(60 26)">
+    <polygon points="22,14 46,40 74,40 98,14 104,62 60,104 16,62" fill="#E8641B"/>
+    <polygon points="74,40 98,14 104,62 76,60 60,78 60,40" fill="#D2561A"/>
+    <polygon points="25,24 40,40 21,49" fill="#2A1A14"/>
+    <polygon points="95,24 80,40 99,49" fill="#2A1A14"/>
+    <polygon points="16,62 44,60 60,78 76,60 104,62 60,104" fill="#FFF3E3"/>
+    <circle cx="42" cy="52" r="4.5" fill="#2A1A14"/>
+    <circle cx="78" cy="52" r="4.5" fill="#2A1A14"/>
+    <circle cx="43.5" cy="50.5" r="1.4" fill="#FFFFFF"/>
+    <circle cx="79.5" cy="50.5" r="1.4" fill="#FFFFFF"/>
+    <polygon points="53,91 67,91 60,100" fill="#2A1A14" stroke="#2A1A14" stroke-width="2" stroke-linejoin="round"/>
+  </g>
+</svg>

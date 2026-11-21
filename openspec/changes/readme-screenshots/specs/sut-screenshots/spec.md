@@ -44,3 +44,18 @@ The `SUT screenshots` workflow SHALL build the Expo app for the iOS simulator an
 #### Scenario: App does not reach the expected state
 - **WHEN** the catalogue text, the cart button or the subtotal €46.20 is not found
 - **THEN** the job fails and uploads no screenshot artifact for that platform
+
+### Requirement: Captures run only where a change can alter them
+On pull requests the `SUT screenshots` workflow SHALL run the web capture only for changes under `apps/web/**` or the web capture files, and the Android capture only for changes under `apps/mobile/**` or `tests/screenshots/native/**`. The iOS capture SHALL NOT run on pull requests; it runs on pushes to `main`, nightly and on manual dispatch, on the self-hosted `mac-ios` runner when `IOS_RUNNER` selects it and on hosted `macos-15` otherwise, in a dedicated simulator that is deleted afterwards. Pushes to `main`, the nightly schedule and manual dispatch SHALL run every capture. A native capture SHALL relaunch the app and retry once before failing.
+
+#### Scenario: Unrelated pull request
+- **WHEN** a pull request changes only `packages/**`, `apps/api/**` or documentation
+- **THEN** no capture job runs and the workflow reports no failure
+
+#### Scenario: Transient Maestro failure
+- **WHEN** a Maestro flow fails on the first attempt
+- **THEN** the script force-stops and relaunches the app, deletes the partial PNGs and repeats the whole capture once
+
+#### Scenario: System ANR dialog on the hosted emulator
+- **WHEN** the emulator raises a system "isn't responding" dialog
+- **THEN** error dialogs are hidden after boot, the emulator settles for 30 s, and `CLOSE_SYSTEM_DIALOGS` is sent before every flow and before a relaunch

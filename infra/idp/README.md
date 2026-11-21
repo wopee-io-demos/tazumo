@@ -53,14 +53,28 @@ BACKOFFICE_API_URL=http://127.0.0.1:3001 \
 pnpm --filter @tazumo/backoffice dev --port 5174 --strictPort
 ```
 
-For the preview build use `preview --port 4174 --strictPort` (the realm allows 5174 and 4174, not Vite's default 4173). The IdP suite builds and serves the unchanged app exactly this way and signs a seeded user in through it. Leave `VITE_OIDC_RESOURCE` unset: Keycloak refuses `resource=tazumo-api` with `invalid_target` (and ignores absolute-URI resources), and the audience comes from the client's mapper. Wiring web, native and the back office into their sign-in screens is #88.
+For the preview build use `preview --port 4174 --strictPort` (the realm allows 5174 and 4174, not Vite's default 4173). The IdP suite builds and serves the unchanged app exactly this way and signs a seeded user in through it. Leave `VITE_OIDC_RESOURCE` unset: Keycloak refuses `resource=tazumo-api` with `invalid_target` (and ignores absolute-URI resources), and the audience comes from the client's mapper.
+
+## Pointing the web app at this realm
+
+`apps/web` signs customers in with this realm ([ADR-0027](../../docs/adr/0027-client-auth.md)). Serve it on port 5173, the port the `tazumo-web` client allows:
+
+```bash
+VITE_OIDC_ISSUER=http://127.0.0.1:48180/realms/tazumo \
+VITE_OIDC_CLIENT_ID=tazumo-web \
+TAZUMO_API_URL=http://127.0.0.1:3001 \
+pnpm --filter @tazumo/web dev --host 127.0.0.1 --port 5173 --strictPort
+```
+
+`TAZUMO_API_URL` makes the dev and preview servers proxy `/v1` to the API. Without `VITE_OIDC_ISSUER` and `VITE_OIDC_CLIENT_ID` the header says sign-in isn't available in this build. Native sign-in is slice 2 of #88.
 
 ## Tests
 
-`.github/workflows/idp.yml` runs the realm lint, the password-field check (`tests/idp/no-password-fields.test.mts`) and the Playwright suite in `tests/idp/` against this stack and a real `apps/api` server. Locally, with the stack up and a disposable database:
+`.github/workflows/idp.yml` runs the realm lint, the password-field check (`tests/idp/no-password-fields.test.mts`), the Playwright suite in `tests/idp/` and the web sign-in suite in `tests/web-auth/` against this stack and a real `apps/api` server. Locally, with the stack up and a disposable database:
 
 ```bash
 DATABASE_URL=postgres://... pnpm exec playwright test -c tests/idp/playwright.config.ts
+DATABASE_URL=postgres://... pnpm exec playwright test -c tests/web-auth/playwright.config.ts
 ```
 
-The suite also occupies `127.0.0.1:5173` (a stub for the web client's callback) and `127.0.0.1:4174` (the back-office preview), so stop any dev server on those ports first. The last test waits until the registration token has expired (300 s plus the API's 60 s clock tolerance).
+The IdP suite occupies `127.0.0.1:5173` (a stub for the web client's callback) and `127.0.0.1:4174` (the back-office preview), and the web suite serves the web app on `127.0.0.1:5173`, so run them one after the other and stop any dev server on those ports first. The last test waits until the registration token has expired (300 s plus the API's 60 s clock tolerance).

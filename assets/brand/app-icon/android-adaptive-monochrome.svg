@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024"><g transform="translate(512 512) scale(4.8) translate(-60 -59)"><defs><mask id="cut"><g fill="#fff" stroke="none">
+  
+  <polygon points="22,14 46,40 74,40 98,14 104,62 60,104 16,62" fill="#fff"/>
+  <polygon points="74,40 98,14 104,62 76,60 60,78 60,40" fill="#fff"/>
+  <polygon points="25,24 40,40 21,49" fill="#000"/>
+  <polygon points="95,24 80,40 99,49" fill="#000"/>
+  <polygon points="16,62 44,60 60,78 76,60 104,62 60,104" fill="#fff"/>
+  <circle cx="42" cy="52" r="4.5" fill="#000"/>
+  <circle cx="78" cy="52" r="4.5" fill="#000"/>
+  <polygon points="53,91 67,91 60,100" fill="#000" stroke="#000" stroke-width="2" stroke-linejoin="round"/>
+</g><polyline points="16,62 44,60 60,78 76,60 104,62" fill="none" stroke="#000" stroke-width="3"/></mask></defs><rect width="120" height="120" fill="#FFFFFF" mask="url(#cut)"/></g></svg>

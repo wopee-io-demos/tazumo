@@ -59,7 +59,8 @@ test('every catalogue fixture is addressable through the product and add templat
 
 test('every web selector and template is visible in at least one app state',async({page})=>{
   const values={productId:'pizza',merchantId:'piazza-local',category:'groceries'};
-  const all=[...Object.entries(selectors).map(([k,s])=>[`selectors.${k}`,s]),...Object.entries(selectorTemplates).map(([k,s])=>[`selectorTemplates.${k}`,fill(s,values)])];
+  const needsProvider=new Set<string>(contract.web.requiresAuth);
+  const all=[...Object.entries(selectors).filter(([k])=>!needsProvider.has(k)).map(([k,s])=>[`selectors.${k}`,s]),...Object.entries(selectorTemplates).map(([k,s])=>[`selectorTemplates.${k}`,fill(s,values)])];
   const seen=new Set<string>();
   const record=async()=>{for(const [name,selector] of all)if(!seen.has(name)&&await page.locator(selector).first().isVisible())seen.add(name)};
   await page.goto('/');
