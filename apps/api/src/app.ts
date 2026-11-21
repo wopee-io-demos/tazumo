@@ -11,6 +11,7 @@ import { healthRoutes } from './routes/health.ts';
 import { identityRoutes } from './routes/identity.ts';
 import { adminRoutes } from './routes/admin.ts';
 import { privacyRoutes } from './routes/privacy.ts';
+import { quoteRoutes } from './routes/quotes.ts';
 
 export type AppOptions = {
   pool: pg.Pool;
@@ -102,5 +103,6 @@ export function buildApp({ pool, logger = false, auth, rateLimits, trustProxy = 
   app.register(identityRoutes, { pool });
   app.register(adminRoutes, { pool });
   app.register(privacyRoutes, { pool, pseudonymizer });
+  app.register(quoteRoutes, { pool });
   return app;
 }

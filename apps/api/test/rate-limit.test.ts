@@ -209,7 +209,7 @@ describe('rate limits on public and health routes', () => {
     });
     try {
       await app.ready();
-      assert.equal(routes.length, 18, '10 contract operations, /health, and a HEAD route for every GET');
+      assert.equal(routes.length, 19, '11 contract operations, /health, and a HEAD route for every GET');
       for (const [index, route] of routes.entries()) {
         const remoteAddress = `198.19.${Math.floor(index / 250)}.${(index % 250) + 1}`;
         const call = () => app.inject({ method: route.method as 'GET', url: route.url, remoteAddress });

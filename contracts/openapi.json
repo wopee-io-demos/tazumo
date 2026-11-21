@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Tazumo Marketplace API",
-    "version": "0.6.0-draft",
-    "description": "Contract proposal. The read-only Discovery operations and the Identity, Admin role-grant and Privacy (erasure, export) operations have a reference implementation in apps/api (synthetic fixture data, not deployed). All prices are server-calculated. Checkout is disabled in the current clients."
+    "version": "0.7.0-draft",
+    "description": "Contract proposal. The read-only Discovery operations and the Identity, Admin role-grant, Privacy (erasure, export) and quote (synthetic fees, VAT rates to re-verify) operations have a reference implementation in apps/api (synthetic fixture data, not deployed). All prices are server-calculated. Checkout is disabled in the current clients."
   },
   "servers": [
     {
@@ -237,6 +237,16 @@
           },
           "400": {
             "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown market, merchant or product",
             "content": {
               "application/json": {
                 "schema": {
@@ -1577,10 +1587,20 @@
             "minItems": 1,
             "items": {
               "$ref": "#/components/schemas/OrderItem"
-            }
+            },
+            "maxItems": 100
           },
           "deliveryAddress": {
             "$ref": "#/components/schemas/DeliveryAddress"
+          },
+          "paymentMethod": {
+            "type": "string",
+            "enum": [
+              "card",
+              "cash"
+            ],
+            "default": "card",
+            "description": "Only cash applies the market's cash rounding (whole crowns for CZK)"
           }
         },
         "additionalProperties": false
@@ -1626,8 +1646,173 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          "payable": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "rounding": {
+            "$ref": "#/components/schemas/SignedMoney"
+          },
+          "smallOrderSurcharge": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "paymentMethod": {
+            "type": "string",
+            "enum": [
+              "card",
+              "cash"
+            ]
+          },
+          "pricesIncludeVat": {
+            "type": "boolean"
+          },
+          "commerceMarket": {
+            "type": "string",
+            "description": "Commerce rule set applied (ISO country code)"
+          },
+          "vat": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "rateId",
+                "basisPoints",
+                "label",
+                "net",
+                "vat",
+                "gross",
+                "explanation"
+              ],
+              "properties": {
+                "rateId": {
+                  "type": "string"
+                },
+                "basisPoints": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "label": {
+                  "type": "string"
+                },
+                "net": {
+                  "$ref": "#/components/schemas/Money"
+                },
+                "vat": {
+                  "$ref": "#/components/schemas/Money"
+                },
+                "gross": {
+                  "$ref": "#/components/schemas/Money"
+                },
+                "explanation": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "components": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "kind",
+                "amount",
+                "addsToPayable",
+                "synthetic",
+                "explanation"
+              ],
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "line",
+                    "subtotal",
+                    "delivery_fee",
+                    "small_order_surcharge",
+                    "vat",
+                    "total",
+                    "rounding",
+                    "payable"
+                  ]
+                },
+                "amount": {
+                  "$ref": "#/components/schemas/SignedMoney"
+                },
+                "addsToPayable": {
+                  "type": "boolean"
+                },
+                "synthetic": {
+                  "type": "boolean"
+                },
+                "explanation": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "deliveryDistance": {
+            "type": "object",
+            "required": [
+              "meters",
+              "synthetic",
+              "explanation"
+            ],
+            "properties": {
+              "meters": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "synthetic": {
+                "type": "boolean",
+                "const": true
+              },
+              "explanation": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "dataStatus": {
+            "type": "object",
+            "required": [
+              "vatRates",
+              "vatRetrievedOn",
+              "feesSynthetic",
+              "notice",
+              "distanceSynthetic",
+              "redeemable"
+            ],
+            "properties": {
+              "vatRates": {
+                "type": "string",
+                "enum": [
+                  "reverify"
+                ]
+              },
+              "vatRetrievedOn": {
+                "type": "string",
+                "format": "date"
+              },
+              "feesSynthetic": {
+                "type": "boolean",
+                "const": true
+              },
+              "notice": {
+                "type": "string"
+              },
+              "distanceSynthetic": {
+                "type": "boolean"
+              },
+              "redeemable": {
+                "type": "boolean",
+                "description": "false until quotes are persisted for order creation"
+              }
+            },
+            "additionalProperties": false
           }
-        }
+        },
+        "description": "Server-authoritative price breakdown. total is the exact total; payable and rounding differ from it only for cash payments. Fees are synthetic and VAT rates are research data to re-verify."
       },
       "CreateOrderRequest": {
         "type": "object",
@@ -1900,6 +2085,24 @@
           }
         },
         "additionalProperties": false
+      },
+      "SignedMoney": {
+        "type": "object",
+        "required": [
+          "currency",
+          "minorUnits"
+        ],
+        "properties": {
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "minorUnits": {
+            "type": "integer"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Money that may be negative, such as a rounding adjustment"
       }
     }
   }
