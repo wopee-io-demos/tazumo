@@ -11,3 +11,12 @@
 - [x] Independent review: 8737db1 (no blockers, 5 should-fix, nits) and re-review 792d52b (no blockers, 3 nits); all fixed except the ADR index entry, which is in #122.
 - [ ] Current-head CI green on the final head.
 - [ ] Replace the local `checkDelivery` copy with the `@tazumo/merchant-ops` dependency once PR #76 merges (slice 2 or 3).
+
+## Slice 2 (Nominatim adapter and infrastructure, after the owner accepted ADR-0023 on 2026-11-21)
+
+- [x] ADR-0023 set to Accepted (decided by the repository owner, 2026-11-21); index entry added to `docs/adr/README.md`.
+- [x] `NominatimGeocoder`. Evidence: `src/nominatim.test.ts` replays responses recorded from a local Nominatim 5.3.3 (Bremen extract) through a loopback HTTP server: found per precision, exact query parameters and User-Agent, not_found for empty/coarse/other-country/unsupported-country (no request sent), unavailable for 5xx, 429, 400, HTML, broken JSON, object body, bad or numeric coordinates, oversized body, redirect, timeout, connection reset and refused port; log entries carry only redacted data; invalid configuration rejected.
+- [x] `infra/geocoding/`: digest-pinned compose file (`address` style, no flatnode, loopback bind, capped logs), `prepare-extract.sh` (Geofabrik download, MD5 check, `osmium merge`), sizing, update cadence and privacy notes.
+- [x] Live integration check `integration/nominatim.test.ts` (skips without `NOMINATIM_URL`). Evidence: 2/2 pass against the local Bremen import; container logs and `/var/log` contain none of the queried streets. CI job `.github/workflows/geocoding-integration.yml` runs the same import and tests on GitHub-hosted Ubuntu (PRs touching the package or infra, weekly).
+- [x] Infrastructure issue #146 (status:blocked, owner action): sizing, Hetzner AX41 option, monthly blue/green re-import, cost estimate.
+- [ ] Current-head CI green on the PR, including the geocoding integration job.

@@ -1,0 +1,62 @@
+name: Geocoding integration
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 4 * * 1'
+  pull_request:
+    paths:
+      - '.github/workflows/geocoding-integration.yml'
+      - 'infra/geocoding/**'
+      - 'packages/address/**'
+permissions:
+  contents: read
+concurrency:
+  group: geocoding-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  nominatim:
+    name: Nominatim (Bremen extract)
+    # Needs Docker, so it stays on GitHub-hosted runners.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      NOMINATIM_PASSWORD: ci-only-not-a-secret
+      NOMINATIM_DATA_DIR: ${{ github.workspace }}/geo-data
+      NOMINATIM_PORT: '8080'
+      NOMINATIM_THREADS: '4'
+      NOMINATIM_WORKERS: '2'
+      NOMINATIM_SHM_SIZE: 1g
+      NOMINATIM_PG_SHARED_BUFFERS: 1GB
+      NOMINATIM_PG_MAINTENANCE_WORK_MEM: 2GB
+      NOMINATIM_PG_EFFECTIVE_CACHE_SIZE: 4GB
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - id: week
+        run: echo "iso=$(date -u +%G-%V)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        with:
+          path: geo-data/extracts
+          key: geofabrik-bremen-${{ steps.week.outputs.iso }}
+      - run: REGIONS=europe/germany/bremen bash infra/geocoding/prepare-extract.sh
+      - run: docker compose -f infra/geocoding/compose.yaml up -d
+      - name: Wait for the import
+        run: |
+          for _ in $(seq 1 180); do
+            curl -fsS http://127.0.0.1:8080/status >/dev/null 2>&1 && exit 0
+            [ "$(docker compose -f infra/geocoding/compose.yaml ps -q nominatim | xargs docker inspect -f '{{.State.Running}}')" = true ] || break
+            sleep 10
+          done
+          docker compose -f infra/geocoding/compose.yaml logs --tail 50
+          exit 1
+      - run: node --experimental-strip-types --test packages/address/integration/*.test.ts
+        env:
+          NOMINATIM_URL: http://127.0.0.1:8080
+      - name: Search parameters never reach the container log
+        run: |
+          docker compose -f infra/geocoding/compose.yaml logs > nominatim.log 2>&1
+          if grep -nE 'Am(%20|\+| )Markt|Erfundene' nominatim.log; then exit 1; fi
+      - if: always()
+        run: docker compose -f infra/geocoding/compose.yaml down -v
