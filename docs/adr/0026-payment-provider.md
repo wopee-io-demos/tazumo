@@ -1,0 +1,62 @@
+# ADR-0026: Stripe in test mode as the payment provider
+
+Status: Accepted (provider chosen by the repository owner on 2026-11-21, recorded on #85)
+Date: 2026-11-21
+Tracking: issue #85, OpenSpec `checkout-payments`; builds on ADR-0003 (no simulated payment presented as real), ADR-0005 (idempotent order creation, payment token boundary) and ADR-0018 (integer minor units)
+
+## Context
+
+Checkout must turn a quote into an order and take a payment, without Tazumo ever handling card data and without real money moving. The provider must serve SK, CZ, DE and AT, offer a test mode, SCA/3-D Secure test cards and signed webhooks. The order state machine (`@tazumo/orders`, PR #105) expects `payment_authorized { paymentReference }` and `payment_failed { reason }` from a system `payment` actor.
+
+## Decision
+
+1. **Provider:** Stripe, in **test mode only**, with keys from a dedicated test or sandbox Stripe account, never the owner's live business account.
+2. **Package:** `@tazumo/payments` holds a provider port (`createPaymentIntent`, `retrievePaymentIntent`, `cancelPaymentIntent`), a Stripe adapter on the official `stripe` Node SDK (pinned to 23.1.0, API version `2026-10-28.endive`), webhook verification and event mapping. `apps/api` will depend on the port, not on Stripe.
+3. **Live keys cannot run:** the adapter refuses at construction any key that does not match `sk_test_…` or `rk_test_…`. `sk_live_`/`rk_live_` keys get `live_key_refused`, and publishable keys get `invalid_key`. Provider objects and events with `livemode` other than `false` are refused (`live_mode`). A plain-http `endpoint` (stripe-mock) is accepted only for loopback hosts, so a key never travels in cleartext.
+4. **Data flow, no card data at Tazumo:**
+   1. The client shows Stripe's Payment Element (web, Stripe.js) or PaymentSheet (`@stripe/stripe-react-native`). Card fields live in Stripe-hosted frames or the Stripe SDK.
+   2. The client creates a ConfirmationToken (`ctoken_…`) with Stripe and sends only that token plus the quote id to `POST /v1/orders` (the contract's `CreateOrderRequest` has exactly `quoteId` and `paymentMethodToken`, with `additionalProperties: false`).
+   3. The API takes the amount from the server-side quote, never from the client, and calls `createPaymentIntent` with the order id in `metadata.tazumo_order_id`, `automatic_payment_methods` with `allow_redirects: 'never'` and `confirm: true`. This is a deliberate cards-and-wallets MVP: redirect methods (EPS in AT, iDEAL, Bancontact, Klarna, PayPal) are excluded until a `return_url` flow is designed.
+   4. If 3-D Secure is needed, the API returns the PaymentIntent's client secret to the paying customer only, and the client finishes the challenge with Stripe (`handleNextAction`). Tazumo never sees the challenge.
+   5. Stripe sends `payment_intent.succeeded` or `payment_intent.payment_failed` to the webhook, which verifies the signature and maps it to an orders command.
+   Tokens that look like card data (anything but `ctoken_…` or `pm_…`) are rejected, and errors never contain keys, tokens, client secrets or provider messages.
+5. **Webhooks:** Stripe's `Stripe-Signature` scheme (`t=<unix seconds>,v1=<hex HMAC-SHA256 of "t.rawBody">`, several `v1` during secret rotation), verified with `node:crypto` and a constant-time comparison over the **raw request bytes**, before any JSON parsing. The timestamp must lie within 300 seconds in **both** directions (configurable from 1 to 600). The Stripe SDK's own signer is used in the tests to prove interoperability.
+6. **Event mapping:** `payment_intent.succeeded` → `payment_authorized { paymentReference: pi_… }`; `payment_intent.payment_failed` → `payment_failed { reason }`, where the reason is Stripe's `decline_code` or `code` if it is a plain slug, otherwise `payment_failed`. Every other event type is acknowledged and ignored. Capture is automatic. Manual capture (authorise at order, capture at merchant acceptance) needs a `capture` port method and is left for later.
+7. **Replays:** `processStripeWebhook` hands a command to the caller's `apply` through a `ReplayGuard`, which runs it at most once per event id and records the id only if `apply` resolves; a later delivery of a recorded id returns `duplicate` (acknowledge with 2xx), and a concurrent delivery of an id still being applied returns `in_flight` (answer non-2xx so Stripe retries). `apply` must throw whenever the command was not applied, which for @tazumo/orders means any `ok: false` result, except a deliberate acknowledgement (an orders replay, or a late success audited as `refund_required`). In the API the guard is constructed per request from the same transaction `apply` uses, so recording the id and applying the command commit or roll back together, and a failed delivery is retried by Stripe rather than lost. The command's idempotency key is `stripe-<event id>`, which @tazumo/orders de-duplicates as a second line of defence.
+8. **Idempotency towards Stripe:** every create and cancel carries an `Idempotency-Key`, derived per order and operation (`tazumo-create-<orderId>`, `tazumo-cancel-<orderId>`). A retried `POST /v1/orders` for the same order reuses Stripe's stored response. A key reused with different parameters maps to `idempotency_conflict`.
+9. **Money:** `{ currency, minorUnits }` as in @tazumo/commerce. Only the commerce market currencies (EUR, CZK) can be charged. Stripe amounts equal minor units for both. Provider amounts are read only for two-decimal ISO currencies, and `assertPaymentMatchesOrder` rejects a payment whose currency (`currency_mismatch`) or amount (`amount_mismatch`) differs from the order total.
+10. **Testing:** CI runs the official `stripe/stripe-mock` image pinned by digest (v0.206.0, `sha256:aeb96b83e87a893d2ac005e363ac01ffa6e59a5ad85b49c155dfc9129de02e78`) as a service on a GitHub-hosted runner. Webhook secrets are generated per test run. No real keys exist in CI for this slice.
+
+## Provider comparison (retrieved 2026-11-21, re-verify before real use)
+
+Fees are left out on purpose: the MVP moves no real money.
+
+| | Stripe | Adyen | Mollie |
+| --- | --- | --- | --- |
+| Merchants in SK, CZ, DE, AT | Yes, all four listed on [stripe.com/global](https://stripe.com/global) | EU acquirer covering all four; onboarding is sales-led (to re-verify for a small demo account) | EEA merchants; DE and AT certain, SK and CZ onboarding to re-verify |
+| Test mode | Separate test keys (`sk_test_`/`rk_test_`) and sandboxes; key prefix tells test from live | Separate test Customer Area and endpoints; API keys have no test/live prefix, so a guard must rely on the endpoint | `test_` and `live_` API keys |
+| SCA / 3-D Secure test cards | Documented cards and PaymentMethods, e.g. `4000 0027 6000 3184` (`pm_card_authenticationRequired`), `4000 0000 0000 3220` (`pm_card_threeDSecure2Required`), `4242 4242 4242 4242` (no challenge), `4000 0000 0000 9995` (insufficient funds), see [docs.stripe.com/testing](https://docs.stripe.com/testing) | Documented 3-D Secure 2 test cards | Test mode shows a hosted page to pick the payment outcome; 3-D Secure test-card coverage to re-verify |
+| Signed webhooks | `Stripe-Signature`, HMAC-SHA256 over timestamp and raw body, timestamp tolerance | Standard webhooks: HMAC-SHA256 in `additionalData.hmacSignature` over concatenated fields (`pspReference`, `merchantReference`, `value`, …), not the raw body; some webhooks sign the raw body in an `hmacsignature` header ([docs](https://docs.adyen.com/development-resources/webhooks/secure-webhooks/verify-hmac-signatures)) | Classic webhooks carry only the resource id and are unsigned, so the receiver must fetch the payment; next-gen webhooks, which cover the `payment.*` status events (authorized, paid, failed, canceled, expired), add `X-Mollie-Signature: sha256=…` over the raw body ([docs](https://docs.mollie.com/reference/webhooks-new)) |
+| Card data stays with the provider | Payment Element / PaymentSheet, ConfirmationTokens | Drop-in / Components, React Native SDK | Mollie Components (web), hosted checkout |
+| Local CI stand-in | Official `stripe/stripe-mock` image | None official | None official |
+| Live-key guard by prefix | Yes | No | Yes |
+
+## Alternatives considered
+
+| Option | Why not |
+| --- | --- |
+| Adyen | Strong EU coverage and marketplace features, but sales-led onboarding, no test/live key prefix to enforce test mode, field-based webhook HMAC that is easy to get subtly wrong, and no official mock server for CI. |
+| Mollie | Simple self-service and EU focus, but signed webhooks require the newer next-gen webhook API (classic ones are unsigned and need a status fetch), no official mock for CI, and the native-app story relies on hosted checkout. |
+| Let the client submit card data to the API | Puts Tazumo in full PCI DSS scope and contradicts #85 ("no card data ever reaches Tazumo"). The contract already rejects raw card fields. |
+| Use the SDK's `constructEvent` for webhooks | Works, but accepts timestamps in the future, treats a tolerance of 0 as "no check" and reports failures only as message text. Own verification gives typed error codes, two-sided tolerance and an injectable clock; the SDK signer is still used in tests. |
+| Charges API / legacy `tok_` tokens | Superseded by PaymentIntents, which handle SCA. |
+| Simulate payments with no provider | Contradicts ADR-0003; the issue requires a real provider in test mode. |
+
+## Consequences
+
+- **Secrets the owner adds later** (not needed for slice 1): `STRIPE_TEST_SECRET_KEY` (an `rk_test_` restricted key limited to PaymentIntents is preferred, `sk_test_` accepted), `STRIPE_TEST_WEBHOOK_SECRET` (`whsec_…` from the test-mode webhook endpoint or `stripe listen`), and for the UI slice `STRIPE_TEST_PUBLISHABLE_KEY` (`pk_test_…`). They live in a GitHub Actions **environment** (for example `stripe-test`) whose deployment branch policy allows only `main`, with no environment secrets on `pull_request` jobs. Jobs that need them run on `push` to `main`, `schedule` or `workflow_dispatch` only, so fork PRs never see them; jobs without them report the test-mode E2E as skipped, never as passed. `scripts/check-runner-guard.mjs` already fails any `pull_request` job that references secrets.
+- **Slice 2** (after PR #105 merges): `POST /v1/orders` in `apps/api`, built per the API conventions on #75 (`routeSchema`, `authenticated` rate-limit tier, `can()` policy action, audit event in the same transaction, next free migration, `429`/`401`/`503` responses, contract minor bump). It requires `Idempotency-Key` (missing → 400, same key with another body → 422, same key and body → the original order), binds an unexpired, unused quote to the caller (otherwise 409), creates the order (`created` → `payment_pending`) and the PaymentIntent with `pspIdempotencyKey(orderId, 'create')`, and stores the PaymentIntent id. A webhook route takes the raw body, calls `processStripeWebhook` with a database-backed `ReplayGuard`, checks `assertPaymentMatchesOrder` against the stored total and applies the command with `paymentActor`. A bad signature returns 400 with no state change. The service refuses to start unless the key passes `assertTestModeKey`.
+- **UI slice:** checkout on web and native stays disabled until a build is configured with a test publishable key, and then shows "Test mode: no real payment".
+- stripe-mock is stateless: it does not replay idempotent responses, run 3-D Secure or send webhooks. Those behaviours are covered by request-level assertions, a recording proxy and signed fixture events, and need the owner's test-mode keys for end-to-end evidence.
+- A failure is final for the order: `payment_failed` moves it to `failed`. Because Stripe leaves the PaymentIntent reusable (`requires_payment_method`) and the client holds its client secret, slice 2 cancels the PaymentIntent (`cancelPaymentIntent` with `pspIdempotencyKey(orderId, 'cancel')`) when it applies `payment_failed`, and also when an order is cancelled before payment. A `payment_intent.succeeded` that still arrives for a failed or cancelled order (orders answers `illegal_transition`) is acknowledged, audited as `refund_required` and listed for support; refunds themselves stay out of scope. Retrying with another card on the same order is a later decision.
+- Money: amounts above Stripe's maximum (99,999,999 minor units) are refused locally; per-currency minimum charges (for example EUR 0.50, CZK 15) are left to Stripe and surface as `provider_rejected`.
