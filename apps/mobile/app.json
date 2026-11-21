@@ -13,6 +13,8 @@
     "android": {
       "package": "io.wopee.demos.tazumo"
     },
-    "plugins": []
+    "plugins": [
+      "./plugins/with-fmt-cxx17"
+    ]
   }
 }

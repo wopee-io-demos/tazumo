@@ -1,0 +1,26 @@
+# Tasks
+
+- [x] Migration `0005` (VAT category and override) and the seed's per-product VAT categories.
+- [x] `POST /v1/order-quotes`: country-based market resolution, server-side prices, `priceBreakdown`, error mapping (404, 400, 422; server data errors give 500, logged by code only).
+- [x] Synthetic distance from the postal code (SHA-256, 0 to 8,000 m), labelled in the response.
+- [x] Contract `0.7.0-draft`, additive, plus contract-driven request body validation.
+- [x] Tests (`test/quotes.test.ts`):
+  - SK mixed basket matches the package exactly;
+  - CZK cash rounding against card;
+  - client prices ignored;
+  - 404, 400 and 422 cases including the IE demo market;
+  - unavailable items;
+  - a 500 on bad server data, with no address in the logs.
+- [x] Independent review on 48cf90a: 1 blocker, 3 should-fix and 7 nits.
+  - Blocker fixed: the `vat_rate_id` CHECK rejected `basicFood`. The CHECK now allows capitals, every commerce override id is tested, and end-to-end tests cover the SK `reduced5` and AT `basicFood` overrides.
+  - Should-fix, all fixed:
+    - body UUIDs are lowercased, and `urn:uuid` is rejected with 400;
+    - the beyond-band 422 is labelled synthetic;
+    - the client-price test is strict.
+  - Nits fixed:
+    - per-country postal code formats;
+    - the backfill covers synthetic rows only;
+    - the fixture VAT map throws on unmapped products;
+    - preview semantics are documented in the spec;
+    - migration constraint tests.
+- [ ] Current-head CI green (record run URLs).
