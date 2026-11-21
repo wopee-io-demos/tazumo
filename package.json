@@ -1,5 +1,6 @@
 {
   "name": "tazumo",
+  "version": "0.1.0",
   "private": true,
   "packageManager": "pnpm@10.11.0",
   "scripts": {
@@ -10,6 +11,7 @@
     "test": "pnpm -r --filter './packages/**' test && pnpm test:contract && node --test apps/mobile/tooling/image-size-v1-compat/test.cjs",
     "test:contract": "node --experimental-strip-types --test tests/contract/*.test.mts",
     "check:sut": "node --experimental-strip-types scripts/check-sut-contract.mjs",
+    "check:openapi": "node scripts/check-openapi-version.mjs",
     "test:e2e": "playwright test",
     "bundle:mobile": "pnpm --filter @tazumo/mobile exec expo export --platform ios && pnpm --filter @tazumo/mobile exec expo export --platform android && pnpm --filter @tazumo/mobile run bundle:dev",
     "dev:sut": "pnpm --filter @tazumo/web dev --host 127.0.0.1 --port 4173 --strictPort"

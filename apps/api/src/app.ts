@@ -6,6 +6,7 @@ import { createPseudonymizer } from './auth/pseudonym.ts';
 import { componentSchemas, requiresBearer } from './contract.ts';
 import { createRateLimits, type RateLimitOptions } from './rate-limit.ts';
 import { apiError } from './errors.ts';
+import { buildIdentity } from './build-info.ts';
 import { catalogueRoutes } from './routes/catalogue.ts';
 import { healthRoutes } from './routes/health.ts';
 import { identityRoutes } from './routes/identity.ts';
@@ -98,7 +99,7 @@ export function buildApp({ pool, logger = false, auth, rateLimits, trustProxy = 
 
   app.setNotFoundHandler({ preHandler: limits.publicByIp }, (request, reply) => reply.code(404).send(apiError(request, 'not_found', 'Resource not found')));
 
-  app.register(healthRoutes, { pool });
+  app.register(healthRoutes, { pool, build: buildIdentity() });
   app.register(catalogueRoutes, { pool });
   app.register(identityRoutes, { pool });
   app.register(adminRoutes, { pool });

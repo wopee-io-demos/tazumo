@@ -13,6 +13,8 @@ on:
   schedule:
     - cron: '17 2 * * *'
   workflow_dispatch:
+env:
+  TAZUMO_BUILD_NUMBER: ${{ github.run_number }}
 permissions:
   contents: read
 concurrency:
@@ -35,7 +37,7 @@ jobs:
         run: |
           changed="$(git diff --name-only HEAD^1 HEAD)"
           printf '%s\n' "$changed" | sed 's/^/  /'
-          native='^(apps/mobile/(app\.json|package\.json|eas\.json|(babel|metro)\.config\.[^/]+)$|apps/mobile/(assets|plugins)/|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|\.npmrc$|\.github/workflows/native-builds\.yml$)'
+          native='^(apps/mobile/(app\.json|app\.config\.[^/]+|package\.json|eas\.json|(babel|metro)\.config\.[^/]+)$|apps/mobile/(assets|plugins)/|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|\.npmrc$|\.github/workflows/native-builds\.yml$)'
           smoke='^(apps/mobile/(src|tests)/|apps/mobile/index\.ts$|packages/core/)'
           if printf '%s\n' "$changed" | grep -Eq "$native"; then n=true; else n=false; fi
           if [ "$n" = true ] || printf '%s\n' "$changed" | grep -Eq "$smoke"; then m=true; else m=false; fi
@@ -64,6 +66,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @tazumo/mobile test
       - run: pnpm --filter @tazumo/mobile exec expo prebuild --platform android --non-interactive --no-install
+      - run: grep -E "versionCode $TAZUMO_BUILD_NUMBER\b" apps/mobile/android/app/build.gradle
       - name: Assemble debug APK
         working-directory: apps/mobile/android
         run: ./gradlew assembleDebug --no-daemon
