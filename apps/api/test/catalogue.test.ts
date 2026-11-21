@@ -1,5 +1,6 @@
 import { after, before, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
+import { syntheticOptionsFor } from '@tazumo/product-options/fixtures';
 import { buildApp } from '../src/app.ts';
 import { contract, routeSchema, toFastifyPath } from '../src/contract.ts';
 import { uuidV5 } from '../src/fixtures.ts';
@@ -58,11 +59,16 @@ describe('catalogue API against PostgreSQL', () => {
     assert.ok(merchants.every((m: { acceptingOrders: boolean; synthetic: boolean }) => !m.acceptingOrders && m.synthetic));
   });
 
-  test('GET /v1/merchants/{id}/products serves the pizza fixture in minor units', async () => {
+  test('GET /v1/merchants/{id}/products serves the pizza fixture in minor units, with its option groups', async () => {
     const res = await app.inject({ method: 'GET', url: `/v1/merchants/${pizzaMerchant}/products` });
     assert.equal(res.statusCode, 200);
     assertMatchesContract('get', '/v1/merchants/{merchantId}/products', 200, res.json());
-    assert.deepEqual(res.json(), [
+    const [{ optionGroups, ...pizza }] = res.json();
+    assert.deepEqual(
+      optionGroups,
+      syntheticOptionsFor('pizza')!.groups.map((g) => ({ ...g, options: g.options.map((o) => ({ ...o, isDefault: o.isDefault === true })) }))
+    );
+    assert.deepEqual([pizza], [
       {
         id: uuidV5('product:pizza'),
         slug: 'pizza',

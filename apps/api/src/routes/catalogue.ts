@@ -3,6 +3,7 @@ import type pg from 'pg';
 import { rateLimitTier } from '../rate-limit.ts';
 import { apiError } from '../errors.ts';
 import { routeSchema, toFastifyPath } from '../contract.ts';
+import { loadOptionGroups } from '../product-options.ts';
 
 const marketCode = { pattern: '^[a-z0-9-]{1,64}$' };
 
@@ -51,7 +52,8 @@ export async function catalogueRoutes(app: FastifyInstance, { pool }: { pool: pg
           ORDER BY name, id`,
         [request.params.merchantId]
       );
-      return rows;
+      const optionGroups = await loadOptionGroups(pool, rows.map((row) => row.id));
+      return rows.map((row) => (optionGroups.has(row.id) ? { ...row, optionGroups: optionGroups.get(row.id) } : row));
     }
   );
 }

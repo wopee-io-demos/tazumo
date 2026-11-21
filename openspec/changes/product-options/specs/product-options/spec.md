@@ -49,3 +49,37 @@ The package SHALL produce a cart line key that is identical for the same product
 #### Scenario: Reordered selection
 - **WHEN** the same groups and options are given in a different order
 - **THEN** `lineKey` returns the same key
+
+### Requirement: Catalogue serves option groups
+The API SHALL store option groups per product and return them on `GET /v1/merchants/{merchantId}/products` as `optionGroups`, with each option's availability resolved when the response is built.
+
+#### Scenario: Product with options
+- **WHEN** a product has option groups
+- **THEN** the response lists them in their stored order, they pass `validateOptionGroups`, and an `out_of_stock` option or a `scheduled` option outside its window has `available: false`
+
+#### Scenario: Product without options
+- **WHEN** a product has no option groups
+- **THEN** the response has no `optionGroups` field
+
+### Requirement: Quote prices the selected options
+`POST /v1/order-quotes` SHALL accept `selectedOptions` per item, validate and price it through `@tazumo/product-options`, use the resulting unit price for the commerce totals, and return a snapshot of each priced line.
+
+#### Scenario: Defaults and explicit choices
+- **WHEN** an item omits `selectedOptions`, or chooses options
+- **THEN** defaults apply to every group that is left out, the line's unit price equals `priceSelection` for that selection, and `lines[]` lists the resolved selection, each chosen option with its delta, the base price, the unit price and the line total
+
+#### Scenario: Two configurations of one product
+- **WHEN** a request has the same product twice with different resolved selections
+- **THEN** both are separate quote lines; with the same resolved selection the request is rejected with 400 `duplicate_line`
+
+#### Scenario: Invalid selection
+- **WHEN** a selection names an unknown group or option, an option from another group, a duplicate, too few or too many options, or leaves out a required group with no default
+- **THEN** the response is 400 `invalid_options` with the product ID and each package error code and path, and no quote
+
+#### Scenario: Unavailable option
+- **WHEN** every selection error is `option_unavailable`
+- **THEN** the response is 409 `option_unavailable` and no quote
+
+#### Scenario: Broken catalogue definition
+- **WHEN** a stored definition fails `validateOptionGroups` or cannot be priced
+- **THEN** the response is 500 `internal_error` with no details

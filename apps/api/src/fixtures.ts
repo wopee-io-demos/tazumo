@@ -1,6 +1,8 @@
 import { createHash } from 'node:crypto';
 import { categories, products } from '@tazumo/core';
 import type { VatCategory } from '@tazumo/commerce';
+import { validateOptionGroups, type OptionGroup } from '@tazumo/product-options';
+import { syntheticProductOptions } from '@tazumo/product-options/fixtures';
 
 export const fixtureNamespace = '6f1c2b9e-4d1a-5c3e-9b7a-2d8e0f4a6c11';
 
@@ -47,6 +49,19 @@ function vatCategoryFor(productId: string): VatCategory {
   return category;
 }
 
+export type ProductOptionsRow = { productId: string; groups: readonly OptionGroup[] };
+
+function optionRows(productRows: ProductRow[]): ProductOptionsRow[] {
+  return syntheticProductOptions.map((def) => {
+    const product = productRows.find((row) => row.slug === def.productId);
+    if (!product) throw new Error(`Option fixture ${def.productId} has no fixture product`);
+    const id = uuidV5(`product:${def.productId}`);
+    const errors = validateOptionGroups({ ...def, productId: id, currency: product.currency });
+    if (errors.length) throw new Error(`Option fixture ${def.productId} is invalid: ${errors.map((e) => e.code).join(', ')}`);
+    return { productId: id, groups: def.groups };
+  });
+}
+
 export const demoMarket: MarketRow = { code: 'demo-eu', countryCode: 'IE', currency: 'EUR', locale: 'en-IE' };
 
 export function buildSeed() {
@@ -70,5 +85,11 @@ export function buildSeed() {
       currency: demoMarket.currency
     };
   });
-  return { markets: [demoMarket], categories: categoryRows, merchants: [...merchantRows.values()], products: productRows };
+  return {
+    markets: [demoMarket],
+    categories: categoryRows,
+    merchants: [...merchantRows.values()],
+    products: productRows,
+    productOptions: optionRows(productRows)
+  };
 }

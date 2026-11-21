@@ -30,6 +30,7 @@ Quotes: `POST /v1/order-quotes` prices a basket with `@tazumo/commerce` rules fo
 - The seeded IE demo market has no rules and returns 422 `unsupported_market`.
 - Fees and the distance (derived from the postal code) are synthetic. VAT rates are research data to re-verify.
 - `total` is exact. `payable` differs from it only for cash payments in CZK.
+- Product options ([ADR-0022](../../docs/adr/0022-product-option-storage.md)): the catalogue returns `optionGroups`; each quote item may send `selectedOptions`, which `@tazumo/product-options` validates and prices (400 `invalid_options`, 409 `option_unavailable`). `lines` is the per-line snapshot with the resolved options and unit price.
 - Quotes are not stored yet.
 
 GDPR: `POST /v1/me/erasure` (self-service) and `POST /v1/admin/users/{userId}/erasure` (admin or support) pseudonymise the user, delete their grants and audit the erasure. Tokens issued before the erasure are rejected afterwards. `GET /v1/me/export` returns the caller's data. Deleting the account at the identity provider is a separate operator step until a provider is wired in. Erasure recognition depends on `AUTH_LOG_SALT`, so rotate it deliberately. Schedule `pnpm db:forget-erased` daily with owner credentials; it replaces keyed-hash tombstones older than 24 h 2 min with random ones.

@@ -1,15 +1,17 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { CommerceRuleError, getMarket, priceBreakdown, type MarketConfig, type PriceBreakdown, type VatCategory } from '@tazumo/commerce';
+import { lineKey, priceSelection, type PricedSelection, type Selection } from '@tazumo/product-options';
 import type { FastifyInstance } from 'fastify';
 import type pg from 'pg';
 import { routeSchema } from '../contract.ts';
 import { apiError } from '../errors.ts';
+import { loadOptionGroups } from '../product-options.ts';
 import { rateLimitTier } from '../rate-limit.ts';
 
 type QuoteBody = {
   marketCode: string;
   merchantId: string;
-  items: Array<{ productId: string; quantity: number }>;
+  items: Array<{ productId: string; quantity: number; selectedOptions?: Selection }>;
   deliveryAddress: { countryCode: string; postalCode: string };
   paymentMethod?: 'card' | 'cash';
 };
@@ -39,7 +41,9 @@ export function syntheticDistanceMeters(postalCode: string): number {
   return createHash('sha256').update(normalised).digest().readUInt32BE(0) % (SYNTHETIC_MAX_METERS + 1);
 }
 
-function toQuote(market: MarketConfig, breakdown: PriceBreakdown, distance: number, unavailable: string[]) {
+type PricedLine = PricedSelection & { productId: string };
+
+function toQuote(market: MarketConfig, breakdown: PriceBreakdown, distance: number, unavailable: string[], lines: PricedLine[]) {
   const money = (minorUnits: number) => ({ currency: breakdown.currency, minorUnits });
   return {
     id: randomUUID(),
@@ -77,6 +81,15 @@ function toQuote(market: MarketConfig, breakdown: PriceBreakdown, distance: numb
       synthetic: true,
       explanation: 'Synthetic distance derived from the postal code until server-side geocoding or delivery zones exist.'
     },
+    lines: lines.map((line) => ({
+      productId: line.productId,
+      quantity: line.quantity,
+      selectedOptions: line.selection,
+      options: line.breakdown,
+      basePrice: line.basePrice,
+      unitPrice: line.unitPrice,
+      lineTotal: line.lineTotal
+    })),
     dataStatus: { ...breakdown.dataStatus, distanceSynthetic: true, redeemable: false }
   };
 }
@@ -128,16 +141,37 @@ export async function quoteRoutes(app: FastifyInstance, { pool }: { pool: pg.Poo
         return reply.code(404).send(apiError(request, 'product_not_found', 'Unknown product for this merchant', { productIds: missing }));
       }
 
+      const optionGroups = await loadOptionGroups(pool, productIds);
+      const lines: PricedLine[] = [];
+      for (const item of body.items) {
+        const product = byId.get(item.productId)!;
+        const definition = { productId: item.productId, currency: product.currency, groups: optionGroups.get(item.productId) ?? [] };
+        const priced = priceSelection(definition, { currency: product.currency, minorUnits: product.priceMinor }, item.selectedOptions, item.quantity);
+        if (priced.ok) {
+          lines.push({ ...priced, productId: item.productId });
+          continue;
+        }
+        if (priced.stage !== 'selection') {
+          request.log.error({ optionsStage: priced.stage, codes: priced.errors.map((e) => e.code) }, 'product options failed on server data');
+          return reply.code(500).send(apiError(request, 'internal_error', 'Internal server error'));
+        }
+        const errors = priced.errors.map(({ code, path }) => ({ code, path }));
+        if (errors.every((e) => e.code === 'option_unavailable')) {
+          return reply.code(409).send(apiError(request, 'option_unavailable', 'A selected option is not available', { productId: item.productId, errors }));
+        }
+        return reply.code(400).send(apiError(request, 'invalid_options', 'The selected options are not valid for this product', { productId: item.productId, errors }));
+      }
+
       const distance = syntheticDistanceMeters(body.deliveryAddress.postalCode);
       let breakdown: PriceBreakdown;
       try {
         breakdown = priceBreakdown(market, {
-          lines: body.items.map((item) => {
-            const product = byId.get(item.productId)!;
+          lines: lines.map((line) => {
+            const product = byId.get(line.productId)!;
             return {
-              id: item.productId,
-              quantity: item.quantity,
-              unitPrice: { currency: product.currency, minorUnits: product.priceMinor },
+              id: lineKey(line.productId, line.selection),
+              quantity: line.quantity,
+              unitPrice: line.unitPrice,
               vatCategory: product.vatCategory,
               ...(product.vatRateId ? { vatRateId: product.vatRateId } : {})
             };
@@ -157,12 +191,15 @@ export async function quoteRoutes(app: FastifyInstance, { pool }: { pool: pg.Poo
             })
           );
         }
+        if (error.code === 'duplicate_line') {
+          return reply.code(400).send(apiError(request, error.code, 'The same product with the same options appears on more than one line'));
+        }
         if (status) return reply.code(status).send(apiError(request, error.code, error.message));
         request.log.error({ commerceError: error.code }, 'pricing failed on server data');
         return reply.code(500).send(apiError(request, 'internal_error', 'Internal server error'));
       }
       const unavailable = productIds.filter((id) => !byId.get(id)!.available);
-      return toQuote(market, breakdown, distance, unavailable);
+      return toQuote(market, breakdown, distance, unavailable, lines);
     }
   );
 }

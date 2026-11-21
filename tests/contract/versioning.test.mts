@@ -110,13 +110,15 @@ test('semver precedence follows the specification',()=>{
 test('the OpenAPI version must change, and increase, whenever the contract changes',()=>{
   const spec=json('contracts/openapi.json');
   const edit=(version:string,change=true)=>{const next=structuredClone(spec);next.info.version=version;if(change)next.info.description+=' Changed.';return next};
+  const [major,minor]=spec.info.version.split('.').map(Number);
+  const v=(m:number,suffix='')=>`${major}.${m}.0${suffix}`;
   assert.deepEqual(checkOpenapiVersion(null,spec),[]);
   assert.deepEqual(checkOpenapiVersion(spec,structuredClone(spec)),[]);
   assert.match(checkOpenapiVersion(spec,edit(spec.info.version)).join(),/changed but info.version is still/);
-  assert.deepEqual(checkOpenapiVersion(spec,edit('0.8.0-draft')),[]);
-  assert.deepEqual(checkOpenapiVersion(spec,edit('0.7.0',false)),[]);
-  assert.match(checkOpenapiVersion(spec,edit('0.6.0-draft')).join(),/must be greater than/);
-  assert.match(checkOpenapiVersion(spec,edit('0.7.0-alpha',false)).join(),/must be greater than/);
+  assert.deepEqual(checkOpenapiVersion(spec,edit(v(minor+1,'-draft'))),[]);
+  assert.deepEqual(checkOpenapiVersion(spec,edit(v(minor),false)),[]);
+  assert.match(checkOpenapiVersion(spec,edit(v(minor-1,'-draft'))).join(),/must be greater than/);
+  assert.match(checkOpenapiVersion(spec,edit(v(minor,'-alpha'),false)).join(),/must be greater than/);
   const legacy=edit('draft-7',false);
   assert.match(checkOpenapiVersion(legacy,edit('draft-7')).join(),/is not a semantic version/);
   assert.deepEqual(checkOpenapiVersion(legacy,edit('0.1.0')),[]);
