@@ -34,6 +34,21 @@ jobs:
           version: 10.11.0
       - if: steps.changes.outputs.code == 'true'
         run: pnpm install --no-frozen-lockfile
+      - name: SUT contract (IDs in both apps, semantic version against the previous contract)
+        if: steps.changes.outputs.code == 'true'
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          if [ -n "$BASE_REF" ]; then
+            git fetch --no-tags --depth=1 origin -- "$BASE_REF"
+            pnpm check:sut --base FETCH_HEAD
+          elif [ -n "$BEFORE" ] && [ "$BEFORE" != "0000000000000000000000000000000000000000" ]; then
+            git fetch --no-tags --depth=1 origin -- "$BEFORE"
+            pnpm check:sut --base FETCH_HEAD
+          else
+            pnpm check:sut
+          fi
       - if: steps.changes.outputs.code == 'true'
         run: pnpm typecheck
       - if: steps.changes.outputs.code == 'true'

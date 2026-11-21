@@ -30,7 +30,7 @@ The `evidence` job SHALL own browser e2e and its report, and `check` SHALL NOT r
 - **THEN** exactly one job runs `pnpm test:e2e`.
 
 ### Requirement: Concurrency never cancels main
-Every workflow except `native-builds.yml` (rescoped in #128) SHALL cancel superseded runs of the same pull request and SHALL NOT cancel or replace runs triggered on `main`.
+Every workflow except `native-builds.yml` (owned by the native track) and the `pages.yml` deploy queue SHALL cancel superseded runs of the same pull request and SHALL NOT cancel or replace runs triggered on `main`.
 
 #### Scenario: Two pushes to main in quick succession
 - **WHEN** two commits land on `main` within a minute

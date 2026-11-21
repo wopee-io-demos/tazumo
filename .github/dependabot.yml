@@ -17,6 +17,8 @@ updates:
       prefix: chore
       include: scope
     ignore:
+      - dependency-name: '*'
+        update-types: [version-update:semver-major]
       - dependency-name: expo
         update-types: [version-update:semver-major, version-update:semver-minor]
       - dependency-name: react-native
@@ -58,6 +60,9 @@ updates:
     open-pull-requests-limit: 3
     commit-message:
       prefix: ci
+    ignore:
+      - dependency-name: '*'
+        update-types: [version-update:semver-major]
     groups:
       github-actions:
         patterns: ['*']
