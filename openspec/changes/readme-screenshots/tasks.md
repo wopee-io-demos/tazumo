@@ -20,7 +20,7 @@
 - [x] Native flows extended to the product screen and the cart screen from #45 (`product-detail.yaml`, `back-to-catalogue.yaml`, `cart-screen.yaml`), using canonical `sut-*` testIDs.
 - [x] Android PNGs from [run 44902715301](https://github.com/wopee-io-demos/tazumo/actions/runs/44902715301) on `7e629c3` (SUT `be970e2`) committed byte-identical with `SHA256SUMS` (matches `pngSha256` in provenance); all four opened: catalogue, product, inline basket, cart screen, clean 9:41 status bar.
 - [ ] iOS product and cart-screen PNGs (iOS flow code unverified until the first green iOS run): blocked by the iOS 27 launch crash (#171) until #172 pins the capture to iOS 26.x; iOS gallery stays on run 44817080915 (pre-#45) and says so.
-- [x] README regenerate block removes old files before `gh run download` and rebuilds `SHA256SUMS`; provenance splits `os` and `toolchain`.
+- [x] README regenerate block downloads the artifact into a temp directory first, then replaces the platform folder and rebuilds `SHA256SUMS`; provenance splits `os` and `toolchain`.
 - [ ] Current-head CI green, independent review recorded, merged; merge SHA on #37.
 
 ## Downstream
