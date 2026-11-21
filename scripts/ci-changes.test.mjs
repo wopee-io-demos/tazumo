@@ -26,19 +26,19 @@ test('docs-only changes skip all code work',()=>{
 });
 
 test('web-only changes build and test the web, not the mobile bundle',()=>{
-  assert.deepEqual(on(classify(['apps/web/src/main.tsx'])),['code','jsts','shots_web','web']);
+  assert.deepEqual(on(classify(['apps/web/src/main.tsx'])),['code','jsts','web']);
   assert.deepEqual(on(classify(['tests/e2e/a11y.spec.ts'])),['code','jsts','web']);
   assert.deepEqual(on(classify(['contracts/sut.json'])),['code','jsts','web']);
 });
 
 test('shared packages trigger web; only core and brand trigger mobile',()=>{
-  assert.deepEqual(on(classify(['packages/core/src/index.ts'])),['code','jsts','mobile','shots_native','shots_web','web']);
-  assert.deepEqual(on(classify(['packages/brand/src/index.ts'])),['code','jsts','mobile','shots_native','shots_web','web']);
+  assert.deepEqual(on(classify(['packages/core/src/index.ts'])),['code','jsts','mobile','web']);
+  assert.deepEqual(on(classify(['packages/brand/src/index.ts'])),['code','jsts','mobile','web']);
   assert.deepEqual(on(classify(['packages/address/src/index.ts'])),['code','jsts','web']);
 });
 
 test('mobile-only changes bundle mobile without web e2e',()=>{
-  assert.deepEqual(on(classify(['apps/mobile/src/App.tsx'])),['code','jsts','mobile','shots_native']);
+  assert.deepEqual(on(classify(['apps/mobile/src/App.tsx'])),['code','jsts','mobile']);
 });
 
 test('api-only changes run typecheck and tests but no web or mobile work',()=>{
@@ -61,38 +61,17 @@ test('root install files and pipeline files run everything',()=>{
 });
 
 test('other workflow changes run the runner guard only',()=>{
-  assert.deepEqual(on(classify(['.github/workflows/screenshots.yml'])),['code','guard','shots_native','shots_web']);
+  assert.deepEqual(on(classify(['.github/workflows/screenshots.yml'])),['code','guard']);
   assert.deepEqual(on(classify(['scripts/check-runner-guard.mjs'])),['code','guard','jsts']);
 });
 
-test('screenshot jobs follow the shipped web or native code, not tests',()=>{
-  const web=classify(['apps/web/src/main.tsx']);
-  assert.equal(web.shots_web,true);
-  assert.equal(web.shots_native,false);
-  const mobile=classify(['apps/mobile/src/App.tsx']);
-  assert.equal(mobile.shots_web,false);
-  assert.equal(mobile.shots_native,true);
-  const shared=classify(['packages/core/src/index.ts']);
-  assert.equal(shared.shots_web&&shared.shots_native,true);
-  const tests=classify(['packages/core/src/index.test.ts','apps/mobile/src/shopping.test.ts']);
-  assert.equal(tests.shots_web||tests.shots_native,false);
-  assert.equal(classify(['tests/screenshots/native/ios.sh']).shots_web,false);
-  assert.equal(classify(['packages/address/src/index.ts']).shots_native,false);
-});
-
 test('a docs file next to code does not hide the code',()=>{
-  assert.deepEqual(on(classify(['README.md','apps/mobile/src/App.tsx'])),['code','jsts','mobile','shots_native']);
+  assert.deepEqual(on(classify(['README.md','apps/mobile/src/App.tsx'])),['code','jsts','mobile']);
 });
 
 test('CodeQL runs for JS, TS, HTML, JSON and YAML, not for shell, Python or SQL',()=>{
   for(const f of ['apps/web/index.html','contracts/sut.json','scripts/x.cjs','apps/api/src/x.mts','tests/demo/flow.yaml'])assert.equal(classify([f]).jsts,true,f);
   for(const f of ['scripts/issue-status.sh','scripts/audit_issue_board.py','apps/api/migrations/0004_x.sql'])assert.equal(classify([f]).jsts,false,f);
-});
-
-test('test files in apps do not start screenshot jobs',()=>{
-  const r=classify(['apps/mobile/tests/run-case.test.mjs']);
-  assert.equal(r.shots_native,false);
-  assert.equal(r.code,true);
 });
 
 test('changedFiles lists additions, edits, deletions and both sides of a rename on a merge commit',()=>{

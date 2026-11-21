@@ -8,7 +8,7 @@ const isDocs=(f)=>docs.some(p=>p.test(f));
 const install=[/^package\.json$/,/^pnpm-workspace\.yaml$/,/^pnpm-lock\.yaml$/,/^\.npmrc$/,/^tsconfig[^/]*\.json$/];
 const pipeline=[/^\.github\/workflows\/(ci|test-evidence|security|codeql)\.yml$/,/^scripts\/ci-changes(\.test)?\.mjs$/];
 
-export const outputs=['full','docs_only','code','web','mobile','deps','guard','jsts','shots_web','shots_native'];
+export const outputs=['full','docs_only','code','web','mobile','deps','guard','jsts'];
 
 export function classify(files,{event='pull_request',base='main'}={}){
   if(event!=='pull_request'||base!=='main'||files.length===0){
@@ -16,7 +16,6 @@ export function classify(files,{event='pull_request',base='main'}={}){
   }
   const code=files.filter(f=>!isDocs(f));
   const full=any(code,...install,...pipeline);
-  const shipped=code.filter(f=>!/\.test\.m?[jt]sx?$/.test(f));
   const result={
     full,
     docs_only:code.length===0,
@@ -25,9 +24,7 @@ export function classify(files,{event='pull_request',base='main'}={}){
     mobile:full||any(code,/^apps\/mobile\//,/^packages\/(core|brand)\//),
     deps:full||any(code,/(^|\/)package\.json$/,/^pnpm-lock\.yaml$/,/^pnpm-workspace\.yaml$/,/^\.npmrc$/),
     guard:full||any(code,/^\.github\/workflows\//,/^scripts\/check-runner-guard\.mjs$/),
-    jsts:full||any(code.filter(f=>!/^\.github\/workflows\//.test(f)),/\.(c|m)?[jt]sx?$/,/\.(mts|cts|html?|vue|json|ya?ml)$/,/^\.github\/codeql\//),
-    shots_web:full||any(shipped,/^apps\/web\//,/^packages\/(core|brand)\//,/^scripts\/capture-web-screenshots\.sh$/,/^tests\/screenshots\/[^/]+$/,/^\.github\/workflows\/screenshots\.yml$/),
-    shots_native:full||any(shipped,/^apps\/mobile\//,/^packages\/(core|brand)\//,/^tests\/screenshots\/native\//,/^\.github\/workflows\/screenshots\.yml$/)
+    jsts:full||any(code.filter(f=>!/^\.github\/workflows\//.test(f)),/\.(c|m)?[jt]sx?$/,/\.(mts|cts|html?|vue|json|ya?ml)$/,/^\.github\/codeql\//)
   };
   return result;
 }

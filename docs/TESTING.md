@@ -56,7 +56,7 @@ The required checks (`check`, `evidence`, `dependency-audit`, `CodeQL PR analysi
 
 Playwright runs once per pull request, in `evidence`; `check` no longer runs it. The runner guard runs in `evidence` when a workflow changes. Pushes to `main`, schedules, manual runs and pull requests into any branch other than `main` always run everything. `Secret scan` always scans the PR's commits.
 
-The path-filtered workflows (`api.yml`, `backoffice.yml`, `screenshots.yml`, `demo-videos.yml`, `idp.yml`, `payments.yml`) start only for the files they use, and `screenshots.yml` runs its web and native jobs separately. `native-builds.yml` has its own scope (see its section). Superseded runs of the same pull request are cancelled; runs on `main` are never cancelled, except in `native-builds.yml` and the deploy queue in `pages.yml`.
+The path-filtered workflows (`api.yml`, `backoffice.yml`, `screenshots.yml`, `demo-videos.yml`, `idp.yml`, `payments.yml`) start only for the files they use; `screenshots.yml` selects its web and native captures with `tests/screenshots/scope.sh` (#157). `native-builds.yml` has its own scope (see its section). Superseded runs of the same pull request are cancelled; runs on `main` are never cancelled, except in `native-builds.yml` and the deploy queue in `pages.yml`.
 
 ## Native CI scope
 

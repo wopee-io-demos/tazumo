@@ -1,8 +1,8 @@
 # Tasks
 
-- [x] Classifier `scripts/ci-changes.mjs` with 15 unit tests, including a temporary git repo with a merge commit, a rename and a deletion (`node --test scripts/ci-changes.test.mjs`, pass locally).
+- [x] Classifier `scripts/ci-changes.mjs` with 13 unit tests, including a temporary git repo with a merge commit, a rename and a deletion (`node --test scripts/ci-changes.test.mjs`, pass locally).
 - [x] Gate steps in `ci.yml`, `test-evidence.yml`, `security.yml` and `codeql.yml`; move Playwright to `evidence`; keep `Secret scan` unchanged.
-- [x] Tighten paths in `api.yml`, `backoffice.yml`, `screenshots.yml` (separate web and native jobs) and `demo-videos.yml`.
+- [x] Tighten paths in `api.yml`, `backoffice.yml` and `demo-videos.yml`. `screenshots.yml` takes #157's scoping from `main`, plus the concurrency rule.
 - [x] PR-only cancel-in-progress with SHA groups outside pull requests on every workflow except `native-builds.yml` (#128).
 - [x] `actionlint` clean; `node scripts/check-runner-guard.mjs` passes for 18 jobs.
 - [x] Demonstration PRs against this branch, with the classifier at 2c415b4 (same category rules; later commits added commerce paths, the stacked-PR rule and tests). All five required checks succeeded on each:
