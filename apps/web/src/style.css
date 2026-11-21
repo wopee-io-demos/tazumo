@@ -3,3 +3,4 @@
 
 .cartDialog{padding:0;border:0;margin:0 0 0 auto;max-width:min(440px,100vw);width:440px;max-height:100dvh;height:100dvh;box-shadow:-8px 0 30px #0002}.cartDialog::backdrop{background:#1b112a70}.cartDialog .drawer{box-shadow:none;width:100%}
 .product h3 a{color:inherit;text-decoration:underline;text-decoration-color:var(--primary);text-underline-offset:3px}.app .product h3 a:focus-visible{outline:3px solid var(--ink);outline-offset:3px;border-radius:4px}
+
