@@ -10,3 +10,7 @@ All workspaces SHALL type-check with the same TypeScript major, declared in each
 #### Scenario: SUT contract check parses TSX
 - **WHEN** `pnpm check:sut` or the contract tests run
 - **THEN** `scripts/sut-contract.mjs` parses the app sources through `@typescript/typescript6` and reports the same selectors as before the upgrade
+
+#### Scenario: Mobile bundle on TypeScript 7
+- **WHEN** `pnpm bundle:mobile` or an Android release build bundles the Expo app
+- **THEN** Metro bundles without calling the TypeScript compiler API, because `experiments.tsconfigPaths` is off
