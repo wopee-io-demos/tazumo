@@ -1,0 +1,46 @@
+{
+  "recordedFrom": "Local Nominatim 5.3.3 (mediagis/nominatim:5.3.3@sha256:168c30e2, infra/geocoding/compose.yaml), Geofabrik Bremen extract 2026-11-20, recorded 2026-11-21. OSM data (c) OpenStreetMap contributors, ODbL 1.0.",
+  "query": {
+    "street": "Obernstraße 999",
+    "city": "Bremen",
+    "postalcode": "28195",
+    "countrycodes": "de"
+  },
+  "status": 200,
+  "body": [
+    {
+      "place_id": 212060,
+      "licence": "Data © OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright",
+      "osm_type": "way",
+      "osm_id": 245340348,
+      "lat": "53.0773705",
+      "lon": "8.8048852",
+      "category": "highway",
+      "type": "pedestrian",
+      "place_rank": 26,
+      "importance": 0.0533433333333333,
+      "addresstype": "road",
+      "name": "Obernstraße",
+      "display_name": "Obernstraße, Ansgari-Viertel, Altstadt, Mitte, Bremen-Mitte, Bremen, 28195, Deutschland",
+      "address": {
+        "road": "Obernstraße",
+        "neighbourhood": "Ansgari-Viertel",
+        "quarter": "Altstadt",
+        "suburb": "Mitte",
+        "city_district": "Bremen-Mitte",
+        "city": "Bremen",
+        "state": "Bremen",
+        "ISO3166-2-lvl4": "DE-HB",
+        "postcode": "28195",
+        "country": "Deutschland",
+        "country_code": "de"
+      },
+      "boundingbox": [
+        "53.0764505",
+        "53.0783578",
+        "8.8031420",
+        "8.8066674"
+      ]
+    }
+  ]
+}
