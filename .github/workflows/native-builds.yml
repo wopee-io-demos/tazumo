@@ -10,6 +10,8 @@ on:
       - 'pnpm-lock.yaml'
   push:
     branches: [main]
+  schedule:
+    - cron: '17 2 * * *'
   workflow_dispatch:
 permissions:
   contents: read
@@ -17,8 +19,30 @@ concurrency:
   group: native-builds-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
+  changes:
+    name: iOS-relevant changes
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      ios: ${{ steps.diff.outputs.ios }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: diff
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          git fetch --no-tags --depth=1 origin "$BASE_SHA"
+          changed="$(git diff --name-only "$BASE_SHA" HEAD)"
+          echo "$changed"
+          if echo "$changed" | grep -Eq '^(apps/mobile/|packages/(core|brand)/|\.github/workflows/native-builds\.yml$|package\.json$|pnpm-workspace\.yaml$|pnpm-lock\.yaml$)'; then
+            echo "ios=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ios=false" >> "$GITHUB_OUTPUT"
+          fi
   android:
     name: Android debug APK
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     timeout-minutes: 75
     steps:
@@ -46,6 +70,7 @@ jobs:
           retention-days: 7
   android-smoke:
     name: Android emulator smoke
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
@@ -95,6 +120,8 @@ jobs:
           retention-days: 7
   ios:
     name: iOS simulator build
+    needs: changes
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.ios == 'true') }}
     runs-on: macos-15
     timeout-minutes: 90
     steps:
