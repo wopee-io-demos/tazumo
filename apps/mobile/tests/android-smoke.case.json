@@ -1,0 +1,21 @@
+{
+  "id": "tazumo-android-smoke",
+  "intent": "Browse the catalogue, open the pizza, add it, open the cart and see the subtotal with checkout disabled.",
+  "platforms": {
+    "android": {
+      "app": "io.wopee.demos.tazumo",
+      "steps": [
+        {"action": "see", "by": "id", "value": "sut-open-product-pizza"},
+        {"action": "tap", "by": "id", "value": "sut-open-product-pizza"},
+        {"action": "see", "by": "id", "value": "sut-detail-screen"},
+        {"action": "tap", "by": "id", "value": "sut-detail-add"},
+        {"action": "see", "by": "xpath", "value": "//*[@resource-id=\"sut-detail-quantity\" and @text=\"In your cart: 1\"]"},
+        {"action": "tap", "by": "id", "value": "sut-nav-cart"},
+        {"action": "see", "by": "id", "value": "sut-cart-screen"},
+        {"action": "see", "by": "id", "value": "sut-cart-line-pizza"},
+        {"action": "see", "by": "xpath", "value": "//*[@resource-id=\"sut-cart-subtotal\" and @text=\"Subtotal €11.90\"]"},
+        {"action": "see", "by": "xpath", "value": "//*[@resource-id=\"sut-cart-checkout-disabled\" and @enabled=\"false\"]"}
+      ]
+    }
+  }
+}
