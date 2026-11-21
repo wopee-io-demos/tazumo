@@ -1,26 +1,55 @@
 name: SUT screenshots
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/screenshots.yml'
+      - 'apps/mobile/**'
+      - 'apps/web/**'
+      - 'packages/**'
+      - 'scripts/capture-web-screenshots.sh'
+      - 'tests/screenshots/**'
   pull_request:
     paths:
       - '.github/workflows/screenshots.yml'
       - 'apps/mobile/**'
-      - 'packages/**'
+      - 'apps/web/**'
       - 'scripts/capture-web-screenshots.sh'
       - 'tests/screenshots/**'
 permissions:
   contents: read
 concurrency:
-  group: screenshots-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: screenshots-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 env:
   MAESTRO_VERSION: 1.41.0
   MAESTRO_SHA256: 0b87a2eed8c1594fe572c5f29d6d64af389f4b7231ddde714179bbcb05f0fe0c
   MAESTRO_CLI_NO_ANALYTICS: '1'
   MAESTRO_CLI_ANALYSIS_NOTIFICATION_DISABLED: 'true'
 jobs:
+  scope:
+    name: Select captures
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      web: ${{ steps.scope.outputs.web }}
+      native: ${{ steps.scope.outputs.native }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - id: scope
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: bash tests/screenshots/scope.sh "$BASE" >> "$GITHUB_OUTPUT"
+
   web:
     name: Web (Playwright Chromium)
+    needs: scope
+    if: needs.scope.outputs.web == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -48,6 +77,8 @@ jobs:
 
   ios:
     name: iOS simulator
+    needs: scope
+    if: needs.scope.outputs.native == 'true'
     runs-on: macos-15
     timeout-minutes: 90
     steps:
@@ -99,6 +130,8 @@ jobs:
 
   android:
     name: Android emulator
+    needs: scope
+    if: needs.scope.outputs.native == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
