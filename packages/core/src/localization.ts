@@ -13,5 +13,6 @@ const categoryLabels={
  de:{Food:'Essen',Groceries:'Lebensmittel',Shops:'Geschäfte',Gifts:'Geschenke'}
 } as const;
 export const categoryLabel=(lang:Language,category:keyof typeof categoryLabels.en):string=>categoryLabels[lang][category];
+export const languageNames:Record<Language,string>={en:'English',cs:'Čeština',de:'Deutsch'};
 export const languageLocale:Record<Language,string>={en:'en-IE',cs:'cs-CZ',de:'de-DE'};
 export const formatLocalizedPrice=(cents:number,lang:Language,currency='EUR')=>new Intl.NumberFormat(languageLocale[lang],{style:'currency',currency}).format(cents/100);

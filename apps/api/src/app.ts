@@ -1,7 +1,8 @@
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import Fastify, { type FastifyError, type FastifyRequest, type FastifyServerOptions } from 'fastify';
 import type pg from 'pg';
 import { createAuthenticate, type AuthOptions } from './auth/plugin.ts';
+import { createPseudonymizer } from './auth/pseudonym.ts';
 import { componentSchemas, requiresBearer } from './contract.ts';
 import { createRateLimits, type RateLimitOptions } from './rate-limit.ts';
 import { apiError } from './errors.ts';
@@ -9,6 +10,7 @@ import { catalogueRoutes } from './routes/catalogue.ts';
 import { healthRoutes } from './routes/health.ts';
 import { identityRoutes } from './routes/identity.ts';
 import { adminRoutes } from './routes/admin.ts';
+import { privacyRoutes } from './routes/privacy.ts';
 
 export type AppOptions = {
   pool: pg.Pool;
@@ -51,7 +53,9 @@ export function buildApp({ pool, logger = false, auth, rateLimits, trustProxy = 
   for (const schema of componentSchemas()) app.addSchema(schema);
   app.decorateRequest('principal', null);
 
-  const authenticate = createAuthenticate(pool, auth);
+  if (auth && !auth.logSalt) throw new Error('auth.logSalt is required when authentication is configured');
+  const pseudonymizer = createPseudonymizer(auth?.logSalt ?? randomBytes(32).toString('hex'));
+  const authenticate = createAuthenticate(pool, auth, pseudonymizer);
   const limits = createRateLimits(rateLimits);
   app.addHook('onRoute', (route) => {
     if (requiresBearer(route.method, route.url)) {
@@ -91,5 +95,6 @@ export function buildApp({ pool, logger = false, auth, rateLimits, trustProxy = 
   app.register(catalogueRoutes, { pool });
   app.register(identityRoutes, { pool });
   app.register(adminRoutes, { pool });
+  app.register(privacyRoutes, { pool, pseudonymizer });
   return app;
 }

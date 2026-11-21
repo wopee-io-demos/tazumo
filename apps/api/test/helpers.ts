@@ -50,3 +50,23 @@ export function assertMatchesContract(method: string, path: string, status: numb
   if (!validate) throw new Error(`No contract schema for ${method.toUpperCase()} ${path} ${status}`);
   if (!validate(body)) throw new Error(`Response violates contract ${ref}: ${ajv.errorsText(validate.errors)}`);
 }
+
+export async function createAppRolePool(db: TestDb): Promise<{ pool: pg.Pool; drop: () => Promise<void> }> {
+  const role = `tazumo_api_test_${randomBytes(4).toString('hex')}`;
+  const password = randomBytes(16).toString('hex');
+  await db.pool.query(`CREATE ROLE ${role} LOGIN PASSWORD '${password}' IN ROLE tazumo_api`);
+  const url = new URL(databaseUrl());
+  url.username = role;
+  url.password = password;
+  const pool = createPool({ databaseUrl: url.toString(), schema: db.schema });
+  return {
+    pool,
+    drop: async () => {
+      try {
+        await pool.end();
+      } finally {
+        await db.pool.query(`DROP ROLE IF EXISTS ${role}`);
+      }
+    }
+  };
+}

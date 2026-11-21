@@ -78,3 +78,41 @@ The service SHALL be runnable as a database role that can read the catalogue, ma
 #### Scenario: Tampering with the audit log
 - WHEN the runtime role tries to update, delete, truncate or read audit events, disable their triggers or drop the table
 - THEN the database refuses.
+
+### Requirement: GDPR erasure
+The service SHALL let users erase themselves and let admin or support users erase others. In one transaction it SHALL replace the stored subject with a keyed hash, delete all role grants and write an audit event without personal data. It SHALL be idempotent, SHALL refuse erasure while dependent records exist, and SHALL reject tokens issued at or before the erasure.
+
+#### Scenario: Self-service erasure
+- WHEN an authenticated user requests erasure
+- THEN their subject is pseudonymised, their grants are deleted, one `user:erase` audit event records only the initiator, and their existing tokens are rejected with 401.
+
+#### Scenario: Repeated erasure
+- WHEN an admin erases an already-erased user
+- THEN the original `erasedAt` is returned and no second audit event is written.
+
+#### Scenario: Erasing without permission
+- WHEN a customer or merchant staff member asks to erase another user
+- THEN the service responds 403 and nothing changes.
+
+#### Scenario: Dependent records
+- WHEN the target still holds an `admin` grant
+- THEN the service responds 409 `erasure_blocked` with the list of blockers.
+
+#### Scenario: Token issued after erasure
+- WHEN a token for the same subject is issued after the erasure plus the clock tolerance
+- THEN a new, unlinked user with only the `customer` role is provisioned, and erasing that user again succeeds.
+
+#### Scenario: Support erasing staff
+- WHEN a support user asks to erase a user with a support, merchant staff or courier grant
+- THEN the service responds 409 `erasure_blocked` with blocker `staff_grant`.
+
+#### Scenario: Grants to erased users
+- WHEN anyone, including the runtime role directly, grants a role to an erased user
+- THEN the grant is refused.
+
+### Requirement: Personal data export
+The service SHALL return to an authenticated user the identity data, role grants and audit events about them that Tazumo holds, including whitelisted event details, and nothing about other users. Audit rows SHALL be read through a function that returns per-user metadata only; the runtime database role SHALL NOT be able to SELECT the audit table directly.
+
+#### Scenario: Export
+- WHEN a user requests `GET /v1/me/export`
+- THEN the response holds their issuer, subject, creation time, grants, and the audit events they caused or that concern them, marked `self` or `staff`.
