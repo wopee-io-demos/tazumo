@@ -73,7 +73,7 @@ export function cli(bin,device){
 
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 
-export async function perform(step,call,{screen,app,timeout=20000,poll=400}={}){
+export async function perform(step,call,{screen,app,timeout=20000,poll=400,keyboardWait=4000}={}){
  const end=Date.now()+timeout;
  let settled=null;
  for(;;){
@@ -88,7 +88,13 @@ export async function perform(step,call,{screen,app,timeout=20000,poll=400}={}){
     call(['io','tap'],[center(found[0])]);
     if(step.action==='type'){
      call(['io','fill'],[step.text]);
-     if(call(['io','keyboard','status'])?.visible)call(['io','keyboard','hide']);
+     // The keyboard can open after the fill returns; hide it once it shows, or it covers the results.
+     const shown=Date.now()+keyboardWait;
+     for(;;){
+      if(call(['io','keyboard','status'])?.visible){call(['io','keyboard','hide']);break;}
+      if(Date.now()>=shown)break;
+      await sleep(poll);
+     }
     }
     return;
    }

@@ -62,6 +62,17 @@ test('perform types, then hides the keyboard',async()=>{
  assert.deepEqual(calls.slice(-4),['io tap 170,320','io fill Margherita','io keyboard status','io keyboard hide']);
 });
 
+test('perform waits for a keyboard that opens after the fill, and leaves a closed one alone',async()=>{
+ const field={label:'What are you looking for?',rect:rect(20,300,300,40)};
+ const step={action:'type',by:'accessibility id',value:field.label,text:'Margherita'};
+ const late=[];let checks=0;
+ await perform(step,(args,pos=[])=>{late.push([...args,...pos].join(' '));if(args[0]==='dump')return {elements:[field]};if(args.join(' ')==='io keyboard status')return {visible:++checks>2};return {};},{screen,poll:1});
+ assert.deepEqual(late.slice(-5),['io fill Margherita','io keyboard status','io keyboard status','io keyboard status','io keyboard hide']);
+ const none=[];
+ await perform(step,(args,pos=[])=>{none.push([...args,...pos].join(' '));if(args[0]==='dump')return {elements:[field]};if(args.join(' ')==='io keyboard status')return {visible:false};return {};},{screen,poll:1,keyboardWait:10});
+ assert.ok(!none.includes('io keyboard hide'));
+});
+
 test('perform fails on a missing element, an ambiguous locator and an element that stays present',async()=>{
  const two={elements:[{label:'Remove one Margherita pizza',rect:rect(20,100)},{label:'Remove one Margherita pizza',rect:rect(20,200)}]};
  await assert.rejects(perform({action:'see',by:'accessibility id',value:'Cart, 1'},fake([{elements:[]}]).call,{screen,timeout:20,poll:1}),/Expected see: Cart, 1/);
