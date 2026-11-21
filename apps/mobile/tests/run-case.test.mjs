@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createServer} from 'node:http';
 import {spawn} from 'node:child_process';
-import {readFileSync,readdirSync,mkdtempSync,existsSync} from 'node:fs';
+import {readFileSync,readdirSync,mkdtempSync,existsSync,mkdirSync,copyFileSync,symlinkSync,writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -112,4 +112,70 @@ test('every sut- identifier in the cases exists in the app source',()=>{
  const ids=smoke.platforms.android.steps.flatMap(s=>s.value.match(/sut-[a-z0-9-]+/g)??[]);
  assert.ok(ids.length>=8);
  for(const id of ids)assert.ok(source.includes(id)||source.includes(id.replace(/-pizza$/,'-${p.id}')),`missing ${id}`);
+});
+
+function fakeServer(visible){
+ const server=createServer((req,res)=>{
+  let body='';
+  req.on('data',c=>body+=c);
+  req.on('end',()=>{
+   const send=v=>{res.writeHead(200,{'content-type':'application/json'});res.end(JSON.stringify({value:v}))};
+   if(req.url==='/status')return send({ready:true});
+   if(req.url==='/session')return send({sessionId:'s1'});
+   if(req.url.endsWith('/elements')){const {value}=JSON.parse(body);return send(visible.has(value)?[{[ELEMENT]:value}]:[])}
+   if(req.url.endsWith('/displayed'))return send(true);
+   if(req.url.endsWith('/screenshot'))return send('cG5n');
+   if(req.url.endsWith('/source'))return send('<hierarchy/>');
+   send(null);
+  });
+ });
+ return new Promise(r=>server.listen(0,'127.0.0.1',()=>r(server)));
+}
+const node=(script,args,env={})=>new Promise(r=>{
+ const child=spawn(process.execPath,[script,...args],{env:{...process.env,STEP_TIMEOUT_MS:'300',FIRST_STEP_TIMEOUT_MS:'300',...env}});
+ let out='';child.stdout.on('data',d=>out+=d);child.stderr.on('data',d=>out+=d);
+ child.on('close',code=>r({code,out}));
+});
+function copyTests(){
+ const root=mkdtempSync(join(tmpdir(),'tazumo case '));
+ const dir=join(root,'checkout with space','tests');
+ mkdirSync(dir,{recursive:true});
+ for(const f of ['run-case.mjs','verify-report.mjs','android-smoke.case.json','android-smoke.negative.case.json'])copyFileSync(join(here,f),join(dir,f));
+ symlinkSync(join(root,'checkout with space'),join(root,'linked'));
+ return {dir,linked:join(root,'linked','tests')};
+}
+
+test('the CLI runs the case from a path with a space and through a symlink, never exiting 0 without a report',async()=>{
+ const server=await fakeServer(new Set(smoke.platforms.android.steps.map(s=>s.value)));
+ const {dir,linked}=copyTests();
+ try{
+  for(const base of [dir,linked]){
+   const out=tmp();
+   const r=await node(join(base,'run-case.mjs'),[join(base,'android-smoke.case.json'),out],{APPIUM_URL:`http://127.0.0.1:${server.address().port}`});
+   assert.equal(r.code,0,r.out);
+   const report=JSON.parse(readFileSync(join(out,'report.json'),'utf8'));
+   assert.equal(report.steps.length,smoke.platforms.android.steps.length,base);
+   assert.equal((await node(join(base,'verify-report.mjs'),[join(base,'android-smoke.case.json'),out])).code,0);
+  }
+ }finally{server.close()}
+});
+
+test('the CLI without arguments prints usage and exits non-zero',async()=>{
+ const {linked}=copyTests();
+ const r=await node(join(linked,'run-case.mjs'),[]);
+ assert.equal(r.code,2);
+ assert.match(r.out,/usage/);
+});
+
+test('verify-report fails closed on a missing, zero-step, partial or mismatched report',async()=>{
+ const verify=(out,...flags)=>node(join(here,'verify-report.mjs'),[join(here,'android-smoke.case.json'),out,...flags]);
+ const write=(report)=>{const out=tmp();writeFileSync(join(out,'report.json'),JSON.stringify(report));return out};
+ const n=smoke.platforms.android.steps.length,completed=k=>Array.from({length:k},(_,i)=>({index:i+1,action:'see',outcome:'completed'}));
+ assert.equal((await verify(tmp())).code,1,'missing report.json');
+ assert.equal((await verify(write({case:smoke.id,outcome:'passed',steps:[]}))).code,1,'zero-step passed report');
+ assert.equal((await verify(write({case:smoke.id,outcome:'passed',steps:completed(n-1)}))).code,1,'one step short');
+ assert.equal((await verify(write({case:'other',outcome:'passed',steps:completed(n)}))).code,1,'case id mismatch');
+ assert.equal((await verify(write({case:smoke.id,outcome:'passed',steps:completed(n)}))).code,0);
+ assert.equal((await verify(write({case:smoke.id,outcome:'failed',currentStep:n,steps:completed(n-1)}),'--expect-fail')).code,0);
+ assert.equal((await verify(write({case:smoke.id,outcome:'failed',currentStep:1,steps:[]}),'--expect-fail')).code,1,'negative failing early');
 });

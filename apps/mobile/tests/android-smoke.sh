@@ -4,7 +4,7 @@
 set -euo pipefail
 apk="$1"
 out="$2"
-here="$(cd "$(dirname "$0")" && pwd)"
+here="$(cd "$(dirname "$0")" && pwd -P)"
 mkdir -p "$out/smoke" "$out/negative"
 
 adb wait-for-device
@@ -26,4 +26,6 @@ done
 curl -fsS http://127.0.0.1:4723/status >/dev/null
 
 node "$here/run-case.mjs" "$here/android-smoke.case.json" "$out/smoke"
+node "$here/verify-report.mjs" "$here/android-smoke.case.json" "$out/smoke"
 STEP_TIMEOUT_MS=5000 node "$here/run-case.mjs" "$here/android-smoke.negative.case.json" "$out/negative" --expect-fail
+node "$here/verify-report.mjs" "$here/android-smoke.negative.case.json" "$out/negative" --expect-fail
