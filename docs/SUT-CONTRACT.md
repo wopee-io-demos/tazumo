@@ -66,6 +66,8 @@ The contract version is checked by `pnpm check:sut --base <ref>`. CI compares a 
 - **Patch**: only prose changes (journey step wording, `isolation`, `repo`).
 - **None**: an unchanged contract keeps its version.
 
+`web.requiresAuth` is graded by effect: listing a selector that already existed is major (it disappears from builds without a provider), removing an entry is minor, and listing a new selector together with its addition is minor.
+
 Reordering arrays of IDs or values (for example `platforms`) is not a change. The push check runs after a merge and cannot block it; concurrent pull requests that each bump to the same version are caught only if branches must be up to date with `main` before merging. A force-push to `main` can make the previous commit unfetchable, which fails the push check.
 
 ## How the check works

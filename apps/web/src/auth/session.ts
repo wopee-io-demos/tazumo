@@ -80,10 +80,13 @@ export function createAuth(config: AuthConfig | null): Auth {
   }
 
   async function loadAccount(email?: string) {
+    const turn = generation;
     const response = await fetch('/v1/me', { headers: { accept: 'application/json', authorization: `Bearer ${tokens!.access}` } });
+    const me = response.ok ? ((await response.json()) as Me) : null;
+    if (turn !== generation) return;
     if (response.status === 401) return endSession('sessionEnded');
-    if (!response.ok) return endSession('accountUnavailable');
-    set({ status: 'signed-in', me: (await response.json()) as Me, email });
+    if (!me) return endSession('accountUnavailable');
+    set({ status: 'signed-in', me, email });
   }
 
   async function completeSignIn(url: URL) {

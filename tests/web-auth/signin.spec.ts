@@ -22,11 +22,11 @@ async function recordSelectors(page: Page) {
   for (const key of providerSelectors) if (await page.locator(contract.web.selectors[key]).first().isVisible()) seenSelectors.add(key);
 }
 
-type Watched = { page: Page; tokens: string[]; console: string[]; meCalls: number; tokenCalls: number; expiresIn: number };
+type Watched = { page: Page; tokens: string[]; console: string[]; meCalls: number; tokenCalls: number };
 
 async function open(browser: Browser, setup?: (page: Page) => Promise<void>): Promise<Watched> {
   const page = await (await browser.newContext()).newPage();
-  const watched: Watched = { page, tokens: [], console: [], meCalls: 0, tokenCalls: 0, expiresIn: 0 };
+  const watched: Watched = { page, tokens: [], console: [], meCalls: 0, tokenCalls: 0 };
   page.on('console', (message) => watched.console.push(message.text()));
   page.on('request', (request) => {
     if (request.url() === new URL('/v1/me', webApp).href) watched.meCalls++;
@@ -35,7 +35,6 @@ async function open(browser: Browser, setup?: (page: Page) => Promise<void>): Pr
   page.on('response', async (response) => {
     if (response.url() !== oidc.token || !response.ok()) return;
     const body = await response.json();
-    watched.expiresIn = body.expires_in;
     watched.tokens.push(...['access_token', 'refresh_token', 'id_token'].map((key) => body[key]).filter(Boolean));
   });
   await setup?.(page);
@@ -157,11 +156,13 @@ test('the session refreshes in memory before the access token expires; a reload 
   const watched = await open(browser, (page) => page.clock.install());
   const { page } = watched;
   await page.getByTestId('sut-auth-sign-in').click();
+  const issued = page.waitForResponse((response) => response.url() === oidc.token);
   await fillLogin(page, email, secondPassword);
+  const expiresIn: number = (await (await issued).json()).expires_in;
   await expectSignedIn(page, email);
   const refresh = page.waitForResponse((response) => response.url() === oidc.token && /grant_type=refresh_token/.test(response.request().postData() ?? ''));
-  expect(watched.expiresIn).toBeGreaterThan(60);
-  await page.clock.fastForward((watched.expiresIn - 30 + 10) * 1000);
+  expect(expiresIn).toBeGreaterThan(60);
+  await page.clock.fastForward((expiresIn - 30 + 10) * 1000);
   expect((await refresh).status()).toBe(200);
   await expectSignedIn(page, email);
   expect(watched.tokens.length).toBeGreaterThanOrEqual(6);
@@ -240,6 +241,7 @@ test('Keycloak refuses a redirect URI outside the client allowlist', async ({ pa
   expect(page.url().startsWith(issuer)).toBe(true);
 });
 
+// Relies on the serial tests above having run in this worker (workers: 1, retries: 0).
 test('every contract selector that needs a provider was visible in at least one state', () => {
   expect(providerSelectors.filter((key) => !seenSelectors.has(key))).toEqual([]);
 });

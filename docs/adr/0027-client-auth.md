@@ -48,7 +48,7 @@ The redirect is the app scheme `tazumo://auth/callback` plus the Expo developmen
 
 ## Consequences
 
-- Another OIDC provider is a matter of configuration as long as it supports discovery, PKCE `S256`, refresh tokens for public clients and RP-initiated logout. Without `end_session_endpoint`, sign-out is local only.
+- Another OIDC provider is a matter of configuration as long as it supports discovery, PKCE `S256`, refresh tokens for public clients and RP-initiated logout. Without `end_session_endpoint` (or when discovery fails at sign-out), sign-out is local only. The provider session survives, so the next sign-in may complete without credentials.
 - `oauth4webapi` adds about 19 kB minified (6.5 kB gzip) to the web bundle, including builds that have no sign-in.
 - Each reload or new tab starts signed out locally. This is the price of memory-only tokens. Revisit if customers find it disruptive (for example with a backend-for-frontend holding an HTTP-only session cookie).
 - The refresh token is as exposed to injected script as the access token. The content security policy and dependency audit are the defences; a backend-for-frontend would remove it from the browser altogether.
