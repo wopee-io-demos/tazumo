@@ -18,8 +18,8 @@ Hoisting improves SDK 53 native autolinking but weakens dependency isolation. Ex
 ## Dependency notes
 
 - **`image-size` (#136, 2026-11-21):**
-  - The root pnpm override keeps every consumer on `image-size@^2.0.3`, which fixes the high-severity advisories GHSA-w3rx-r6r6-pgpr, GHSA-5p2g-fcmc-qvqq and GHSA-m5qc-5hw7-8vg7. No patched 1.x release exists.
+  - The root pnpm override keeps every registry copy on `image-size@^2.0.3`, which fixes the high-severity advisories GHSA-w3rx-r6r6-pgpr, GHSA-5p2g-fcmc-qvqq and GHSA-m5qc-5hw7-8vg7. No patched 1.x release exists.
   - Metro 0.82 (Expo SDK 53) still calls the 1.x API, `require('image-size')(bufferOrPath)`. Debug bundles therefore failed with `getImageSize is not a function`. Production exports were unaffected.
-  - A scoped override `metro>image-size` points Metro at `apps/mobile/tooling/image-size-v1-compat`. That adapter keeps the 1.x call signature and delegates to the patched 2.x parser, installed under the alias `image-size-v2`.
+  - A scoped override `metro>image-size` points Metro at the in-repo adapter `@tazumo/image-size-v1-compat` (`apps/mobile/tooling/image-size-v1-compat`). That adapter keeps the 1.x call signature and delegates to the patched 2.x parser, installed under the alias `image-size-v2`.
   - `pnpm bundle:mobile`, which the required `check` job runs, now also builds the iOS and Android debug bundles (`expo export --dev`) as a regression guard.
   - Remove the adapter and the scoped override once the Expo SDK upgrade (#100) ships a Metro that uses `image-size` 2.x.

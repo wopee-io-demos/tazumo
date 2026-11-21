@@ -31,5 +31,7 @@ test('the adapter uses image-size 2.x, never a vulnerable 1.x line',()=>{
 
 test('invalid input still throws instead of returning bogus dimensions',()=>{
   assert.throws(()=>sizeOf(Buffer.from('not an image')));
+  assert.throws(()=>sizeOf(42),TypeError);
+  assert.throws(()=>sizeOf('/nonexistent/x.png'),/\/nonexistent\/x\.png/);
   sizeOf(Buffer.from('nope'),(error)=>assert.ok(error instanceof Error));
 });

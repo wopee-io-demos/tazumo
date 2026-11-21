@@ -5,8 +5,16 @@
 const {readFileSync}=require('node:fs');
 const {imageSize,disableTypes,types}=require('image-size-v2');
 
+function measure(input){
+  if(typeof input==='string'){
+    try{return imageSize(readFileSync(input))}catch(error){error.message=`${input}: ${error.message}`;throw error}
+  }
+  if(!(input instanceof Uint8Array))throw new TypeError('image-size: expected a file path, Buffer or Uint8Array');
+  return imageSize(input);
+}
+
 function sizeOf(input,callback){
-  const run=()=>imageSize(typeof input==='string'?readFileSync(input):input);
+  const run=()=>measure(input);
   if(typeof callback!=='function')return run();
   let result;
   try{result=run()}catch(error){return callback(error)}
