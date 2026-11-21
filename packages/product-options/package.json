@@ -17,7 +17,7 @@
   "devDependencies": {
     "@tazumo/commerce": "workspace:*",
     "@tazumo/core": "workspace:*",
-    "typescript": "^5.8.3",
+    "typescript": "^7.0.2",
     "@types/node": "^22.15.0"
   }
 }
