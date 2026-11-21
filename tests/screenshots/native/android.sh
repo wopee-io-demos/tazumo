@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Runs inside android-emulator-runner: installs the release-variant APK and captures catalogue and cart.
+# Runs inside android-emulator-runner: installs the release-variant APK and captures catalogue, product screen, inline basket and cart screen.
 # Usage: android.sh <path/to/app.apk> <out-dir>
 set -euo pipefail
 apk="$1" out="$2"

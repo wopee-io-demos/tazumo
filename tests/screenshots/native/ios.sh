@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Boots an iOS simulator, installs the Release simulator build and captures catalogue and cart.
+# Boots an iOS simulator, installs the Release simulator build and captures catalogue, product screen, inline basket and cart screen.
 # Usage: ios.sh <path/to/Tazumo.app> <udid> <out-dir>
 set -euo pipefail
 app="$1" udid="$2" out="$3"

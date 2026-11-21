@@ -39,7 +39,7 @@ SUT reference imagery captured from the real app. These are not Wopee or Appium 
 
 | | Desktop 1440x900 | Mobile 390x844 |
 | --- | --- | --- |
-| Catalogue | <img src="docs/screenshots/web/desktop-home.png" width="420" alt="Web catalogue on desktop: header with language switcher, hero, category chips, all eight products and the merchant list"> | <img src="docs/screenshots/web/mobile-home.png" width="200" alt="Web catalogue on mobile: header, hero and search"> |
+| Catalogue | <img src="docs/screenshots/web/desktop-home.png" width="420" alt="Web catalogue on desktop: header with language switcher, hero, category chips, all eight products and the merchant list"> | <img src="docs/screenshots/web/mobile-home.png" width="200" alt="Web catalogue on mobile: header with cart and language switcher, hero and search"> |
 | Category: Groceries | <img src="docs/screenshots/web/desktop-category-groceries.png" width="420" alt="Groceries category selected, showing Sourdough loaf and Local apples"> | <img src="docs/screenshots/web/mobile-category-groceries.png" width="200" alt="Groceries category selected on mobile"> |
 | Search: "fresh" | <img src="docs/screenshots/web/desktop-search-fresh.png" width="420" alt="Search for fresh returns three products"> | <img src="docs/screenshots/web/mobile-search-fresh.png" width="200" alt="Search for fresh on mobile"> |
 | Cart with items | <img src="docs/screenshots/web/desktop-cart.png" width="420" alt="Basket dialog with two pizzas, a loaf and flowers, line totals, subtotal 46.20 euro, checkout disabled"> | <img src="docs/screenshots/web/mobile-cart.png" width="200" alt="Basket dialog on mobile"> |

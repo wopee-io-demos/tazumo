@@ -3,5 +3,7 @@ appId: io.wopee.demos.tazumo
 - tapOn:
     id: "sut-nav-back"
 - extendedWaitUntil:
-    visible: "Preview catalogue.*"
+    notVisible:
+      id: "sut-detail-screen"
     timeout: 10000
+- assertVisible: "Explore your neighbourhood"

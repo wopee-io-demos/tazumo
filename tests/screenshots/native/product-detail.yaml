@@ -6,7 +6,9 @@ appId: io.wopee.demos.tazumo
     visible:
       id: "sut-detail-screen"
     timeout: 10000
-- assertVisible: "€11.90"
+- assertVisible:
+    id: "sut-detail-price"
+    text: "€11.90"
 - assertVisible:
     id: "sut-detail-add"
 - waitForAnimationToEnd

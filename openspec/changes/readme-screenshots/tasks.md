@@ -15,8 +15,8 @@
 - [x] Independent review of `b925225`: no blockers. Addressed: PNGs from the current-head run, README regenerate command uses `-D` per platform, checksums (committed `SHA256SUMS`; new runs write `pngSha256` and resolved Expo/React Native versions into `provenance.json`), Maestro downloaded from a pinned release with sha256 check, emulator action pinned to a commit SHA, numeric iOS runtime sort, iOS SDK/runtime stated, udid passed as an argument, Android light mode forced.
 - [x] Current-head CI green ([run 44824056454](https://github.com/wopee-io-demos/tazumo/actions/runs/44824056454)), two independent review passes, merged in #57 as `cdf4c54`.
 
-## Gallery refresh after #50, #45, #80, #81 (PR 3)
-- [ ] Web gallery recaptured on current `main` with merchant-detail and product-detail captures added; every PNG opened.
+## Gallery refresh after #45, #50, #80, #81 (PR #127)
+- [x] Web gallery recaptured on branch commit `bfffa0e` (base `cdf4c54`, web SUT `f9616f7`) with merchant-detail and product-detail captures added; 12/12 captures passed; every PNG opened.
 - [ ] Native flows extended to the product screen and the cart screen from #45 (`product-detail.yaml`, `back-to-catalogue.yaml`, `cart-screen.yaml`); native PNGs recaptured in CI and committed with `SHA256SUMS`.
 - [ ] README regenerate block removes old files before `gh run download` and rebuilds `SHA256SUMS`; provenance splits `os` and `toolchain`.
 - [ ] Current-head CI green, independent review recorded, merged; merge SHA on #37.
