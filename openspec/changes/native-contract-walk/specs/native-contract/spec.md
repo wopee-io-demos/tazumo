@@ -14,8 +14,12 @@ The Android contract walk SHALL resolve every `native.selectors` ID and every `n
 - **THEN** the walk reports it as missing and both the walk and the verifier exit non-zero
 
 #### Scenario: Contract key without a screen
-- **WHEN** the contract gains a native key that the walk plan does not assign to a screen
+- **WHEN** the contract gains a native key that the walk plan does not assign to a screen and that is not in `native.requiresAuth`
 - **THEN** the walk fails before driving the app
+
+#### Scenario: Provider-only sign-in IDs
+- **WHEN** the walk runs on a build without an identity provider
+- **THEN** every `native.requiresAuth` ID is absent from the catalogue tree, `authUnavailable` resolves, and a rendered provider-only ID fails the walk
 
 ### Requirement: Fail-closed evidence
 The verifier SHALL fail when the report is missing, is for another contract version, did not use `disableIdLocatorAutocompletion`, has zero assertions, lacks an expected ID, references a tree that does not contain that ID, or does not prove every checkout control disabled.

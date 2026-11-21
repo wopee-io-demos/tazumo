@@ -14,7 +14,7 @@ export const SETTINGS={disableIdLocatorAutocompletion:true};
 /** Screens in the order the walk reaches them. `enter` taps (by id) lead from the previous screen.
  * `horizontal` marks IDs that live in the horizontal category list inside the vertical catalogue. */
 export const PLAN=[
- {name:'catalogue',enter:[],horizontal:'sut-category-',expect:['selectors.search','selectors.cartOpen','selectors.productPizza','selectors.addPizza','selectors.openProductPizza','selectors.categoryGroceries','selectors.languageEnglish','selectors.languageCzech','selectorTemplates.product','selectorTemplates.add','selectorTemplates.openProduct','selectorTemplates.category','selectorTemplates.language']},
+ {name:'catalogue',enter:[],horizontal:'sut-category-',expect:['selectors.search','selectors.cartOpen','selectors.authUnavailable','selectors.productPizza','selectors.addPizza','selectors.openProductPizza','selectors.categoryGroceries','selectors.languageEnglish','selectors.languageCzech','selectorTemplates.product','selectorTemplates.add','selectorTemplates.openProduct','selectorTemplates.category','selectorTemplates.language']},
  {name:'mini-cart',enter:['sut-add-pizza','sut-cart-open'],expect:['selectors.cartSummary','selectors.checkoutDisabled','selectors.cartScreenOpen'],disabled:['sut-checkout-disabled']},
  {name:'product-detail',enter:['sut-open-product-pizza'],expect:['selectors.detailScreen','selectors.detailTitle','selectors.detailPrice','selectors.detailAdd','selectors.detailQuantity','selectors.navBack','selectors.navCart'],text:{'sut-detail-quantity':'In your cart: 1'}},
  {name:'detail-added',enter:['sut-detail-add'],expect:[],text:{'sut-detail-quantity':'In your cart: 2'}},
@@ -34,7 +34,8 @@ export function placeholderValues(contract,core){
 }
 const CART_TEMPLATE=/^selectorTemplates\.cart/;
 
-/** Every native contract ID with the screen it must resolve on. Throws when a contract key has no screen in PLAN. */
+/** Every native contract ID with the screen it must resolve on. Keys in native.requiresAuth are left out: the walked build has
+ * no identity provider, and requiredChecks asserts they are absent. Throws when any other contract key has no screen in PLAN. */
 export function expectedIds(contract,values){
  const screenOf=new Map(PLAN.flatMap(s=>s.expect.map(k=>[k,s.name])));
  const out=[];
@@ -44,7 +45,8 @@ export function expectedIds(contract,values){
   const same=out.find(e=>e.id===id&&e.state===state);
   if(same)same.keys.push(key);else out.push({keys:[key],id,state});
  };
- for(const [k,id] of Object.entries(contract.native.selectors))add(`selectors.${k}`,id);
+ const providerOnly=new Set(contract.native.requiresAuth??[]);
+ for(const [k,id] of Object.entries(contract.native.selectors))if(!providerOnly.has(k))add(`selectors.${k}`,id);
  for(const [k,template] of Object.entries(contract.native.selectorTemplates??{})){
   const names=[...template.matchAll(/\{(\w+)\}/g)].map(m=>m[1]);
   if(names.length!==1)throw new Error(`native.selectorTemplates.${k}: expected one placeholder`);
@@ -63,6 +65,12 @@ export function requiredChecks(contract){
   ...Object.entries(s.text??{}).map(([id,expected])=>({state:s.name,id,check:'text',expected})),
   ...(s.gone??[]).map(id=>({state:s.name,id,check:'gone'}))
  ]);
+ // The CI build has no identity provider, so every provider-only ID must be absent from the catalogue.
+ for(const k of contract.native.requiresAuth??[]){
+  const id=contract.native.selectors[k];
+  if(!id)throw new Error(`native.requiresAuth lists ${k}, which is not a native selector`);
+  checks.push({state:'catalogue',id,check:'absent'});
+ }
  for(const [k,id] of Object.entries(contract.native.selectors))
   if(/checkout/i.test(k)&&!checks.some(c=>c.check==='disabled'&&c.id===id))throw new Error(`native.selectors.${k}: checkout control has no disabled check in the walk plan`);
  return checks;
@@ -177,7 +185,7 @@ export async function walk(contract,core,call,folder,{timeout=15000,firstTimeout
    }
    report.assertions+=mine.length;
    for(const c of required.filter(c=>c.state===state.name)){
-    if(c.check==='gone'){
+    if(c.check==='gone'||c.check==='absent'){
      const ok=!nodeAttributes(first.xml,c.id)&&(await visible(c.id)).length===0;
      report.checks.push({...c,file:first.file,ok,actual:ok?'absent':'present'});
      continue;
@@ -245,7 +253,7 @@ export function verifyWalk(contract,core,report,folder,read=p=>readFileSync(p,'u
   const node=nodeAttributes(xml,c.id);
   if(c.check==='disabled'&&!(hit.actual===false&&node?.enabled==='false'))problems.push(`${label}: tree does not show enabled="false"`);
   if(c.check==='text'&&!(hit.actual===c.expected&&node?.text===c.expected))problems.push(`${label}: tree does not show text "${c.expected}"`);
-  if(c.check==='gone'&&node)problems.push(`${label}: still in ${hit.file}`);
+  if((c.check==='gone'||c.check==='absent')&&node)problems.push(`${label}: still in ${hit.file}`);
  }
  if(report.assertions!==expected.length+required.length)problems.push(`assertion count ${report.assertions} != ${expected.length+required.length}`);
  return problems.length?{ok:false,reason:problems.slice(0,10).join('; ')}:{ok:true,reason:`${expected.length} native contract IDs resolved by id on ${PLAN.length} screens, ${required.length} checks proven in the saved trees`};

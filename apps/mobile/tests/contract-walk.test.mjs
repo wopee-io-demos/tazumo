@@ -22,7 +22,7 @@ const clone=x=>JSON.parse(JSON.stringify(x));
 // hides the top (header, category pills, pizza). The pills are a HorizontalScrollView: shops and gifts need a
 // horizontal UiScrollable, which errors unless the pill list is on screen. The first render and each screen change
 // take a few polls, and a UiScrollable over a scrollable that is not on screen is an HTTP error, like UiAutomator2.
-function fakeApp({missing=[],enabledCheckout=false,ready=true,coldPolls=3,staleLine=false,screenshotFails=false,settingsIgnored=false,textLag=2}={}){
+function fakeApp({authIds=['sut-auth-unavailable'],missing=[],enabledCheckout=false,ready=true,coldPolls=3,staleLine=false,screenshotFails=false,settingsIgnored=false,textLag=2}={}){
  const s={screen:'catalogue',basket:false,qty:0,shownQty:0,lag:0,pos:'top',hpos:'start',pendingPolls:coldPolls},log=[];
  const top=['sut-search','sut-cart-open','sut-category-all','sut-category-food','sut-category-groceries','sut-category-shops','sut-category-gifts','sut-product-pizza','sut-add-pizza','sut-open-product-pizza'];
  const pills={start:['sut-category-all','sut-category-food','sut-category-groceries'],end:['sut-category-groceries','sut-category-shops','sut-category-gifts']};
@@ -31,7 +31,7 @@ function fakeApp({missing=[],enabledCheckout=false,ready=true,coldPolls=3,staleL
  const onScreen=()=>{
   let v;
   if(s.screen==='catalogue'){
-   v=s.pos==='top'?top.filter(x=>!x.startsWith('sut-category-')||pills[s.hpos].includes(x)):bottom();
+   v=s.pos==='top'?[...top.filter(x=>!x.startsWith('sut-category-')||pills[s.hpos].includes(x)),...authIds]:bottom();
    if(s.basket&&s.pos==='top')v=[...v,'sut-cart-summary'];
   }else if(s.screen==='detail')v=['sut-detail-screen','sut-detail-title','sut-detail-price','sut-detail-add','sut-detail-quantity','sut-nav-back','sut-nav-cart'];
   else{
@@ -101,7 +101,9 @@ const run=async(opts,c=contract)=>{const out=tmp(),{call,log}=fakeApp(opts);cons
 
 test('the walk plan gives every native contract ID a screen',()=>{
  const values=placeholderValues(contract,core),ids=expectedIds(contract,values);
- for(const key of Object.keys(contract.native.selectors))assert.ok(ids.some(e=>e.keys.includes(`selectors.${key}`)),key);
+ const providerOnly=contract.native.requiresAuth??[];
+ for(const key of Object.keys(contract.native.selectors))assert.equal(ids.some(e=>e.keys.includes(`selectors.${key}`)),!providerOnly.includes(key),key);
+ assert.deepEqual(requiredChecks(contract).filter(c=>c.check==='absent').map(c=>c.id),providerOnly.map(k=>contract.native.selectors[k]));
  for(const key of Object.keys(contract.native.selectorTemplates))assert.ok(ids.some(e=>e.keys.includes(`selectorTemplates.${key}`)),key);
  assert.equal(new Set(ids.map(e=>e.id)).size,ids.length);
  assert.ok(ids.some(e=>e.id==='sut-category-gifts')&&ids.some(e=>e.id==='sut-language-de')&&ids.some(e=>e.id==='sut-product-bread'));
@@ -292,4 +294,19 @@ test('the fake Appium answers errors as JSON without echoing exception text',asy
  assert.equal(res.status,500);
  assert.match(res.headers.get('content-type'),/^application\/json/);
  assert.doesNotMatch(await res.text(),/onerror/);
+});
+
+test('provider-only sign-in IDs are skipped but must be absent; any other new key still fails',async()=>{
+ const signedOut=await run({authIds:['sut-auth-sign-in','sut-auth-sign-up']});
+ assert.equal(signedOut.report.outcome,'failed');
+ assert.match(signedOut.report.error,/missing sut-auth-unavailable on catalogue/);
+ assert.match(signedOut.report.error,/absent sut-auth-sign-in on catalogue/);
+ assert.equal(signedOut.verdict.ok,false);
+ const c=clone(contract);
+ c.native.requiresAuth=[...c.native.requiresAuth,'search'];
+ assert.ok(!expectedIds(c,placeholderValues(c,core)).some(e=>e.id==='sut-search'));
+ assert.ok(requiredChecks(c).some(x=>x.check==='absent'&&x.id==='sut-search'));
+ const bogus=clone(contract);
+ bogus.native.requiresAuth=[...bogus.native.requiresAuth,'noSuchKey'];
+ assert.throws(()=>requiredChecks(bogus),/noSuchKey, which is not a native selector/);
 });
