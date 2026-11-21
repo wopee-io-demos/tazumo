@@ -105,9 +105,12 @@ export async function execute(testCase,call,folder,{timeout=15000,firstTimeout=t
 export function verdict(testCase,report,expectFail=false){
  const steps=testCase?.platforms?.android?.steps?.length??0;
  if(!report)return {ok:false,reason:'report.json missing or unreadable'};
+ if(!testCase?.id)return {ok:false,reason:'case has no id'};
  if(report.case!==testCase.id)return {ok:false,reason:`report is for case ${report.case}, expected ${testCase.id}`};
  if(steps===0)return {ok:false,reason:'case has no android steps'};
- const done=Array.isArray(report.steps)?report.steps.filter(s=>s.outcome==='completed').length:0;
+ const entries=Array.isArray(report.steps)?report.steps:[];
+ if(entries.some((s,i)=>s.index!==i+1))return {ok:false,reason:'report steps are out of order'};
+ const done=entries.filter(s=>s.outcome==='completed').length;
  if(expectFail)return report.outcome==='failed'&&report.currentStep===steps&&done===steps-1
   ?{ok:true,reason:'expectation failed on the last step as required'}
   :{ok:false,reason:`negative case did not fail on its last step (outcome ${report.outcome}, step ${report.currentStep}/${steps}, completed ${done})`};
@@ -116,7 +119,7 @@ export function verdict(testCase,report,expectFail=false){
   :{ok:false,reason:`outcome ${report.outcome}, completed ${done} of ${steps} steps`};
 }
 
-if(process.argv[1]&&fileURLToPath(import.meta.url)===realpathSync(process.argv[1])){
+if(process.argv[1]&&realpathSync(fileURLToPath(import.meta.url))===realpathSync(process.argv[1])){
  const args=process.argv.slice(2),[casePath,outDir]=args.filter(a=>!a.startsWith('--')),expectFail=args.includes('--expect-fail');
  if(!casePath||!outDir){console.error('usage: run-case.mjs <case.json> <outDir> [--expect-fail]');process.exit(2)}
  const testCase=JSON.parse(readFileSync(casePath,'utf8'));

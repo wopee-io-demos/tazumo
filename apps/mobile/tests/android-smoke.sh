@@ -25,6 +25,7 @@ for _ in $(seq 1 60); do
 done
 curl -fsS http://127.0.0.1:4723/status >/dev/null
 
+rm -f "$out/smoke/report.json" "$out/negative/report.json"
 node "$here/run-case.mjs" "$here/android-smoke.case.json" "$out/smoke"
 node "$here/verify-report.mjs" "$here/android-smoke.case.json" "$out/smoke"
 STEP_TIMEOUT_MS=5000 node "$here/run-case.mjs" "$here/android-smoke.negative.case.json" "$out/negative" --expect-fail

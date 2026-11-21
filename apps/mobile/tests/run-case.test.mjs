@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createServer} from 'node:http';
 import {spawn} from 'node:child_process';
-import {readFileSync,readdirSync,mkdtempSync,existsSync,mkdirSync,copyFileSync,symlinkSync,writeFileSync} from 'node:fs';
+import {readFileSync,readdirSync,mkdtempSync,existsSync,mkdirSync,copyFileSync,symlinkSync,writeFileSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -12,7 +12,9 @@ const here=fileURLToPath(new URL('.',import.meta.url));
 const load=f=>JSON.parse(readFileSync(join(here,f),'utf8'));
 const smoke=load('android-smoke.case.json'),negative=load('android-smoke.negative.case.json');
 const ELEMENT='element-6066-11e4-a52e-4f735466cecf';
-const tmp=()=>mkdtempSync(join(tmpdir(),'tazumo-case-'));
+const temps=[];
+const tmp=()=>{const d=mkdtempSync(join(tmpdir(),'tazumo-case-'));temps.push(d);return d};
+test.after(()=>{for(const d of temps)rmSync(d,{recursive:true,force:true})});
 
 // In-memory Appium: `screen` maps "by=value" to element count; `onClick` mutates it.
 function fakeDevice(screen,{onClick=()=>{},fail}={}){
@@ -137,7 +139,7 @@ const node=(script,args,env={})=>new Promise(r=>{
  child.on('close',code=>r({code,out}));
 });
 function copyTests(){
- const root=mkdtempSync(join(tmpdir(),'tazumo case '));
+ const root=mkdtempSync(join(tmpdir(),'tazumo case '));temps.push(root);
  const dir=join(root,'checkout with space','tests');
  mkdirSync(dir,{recursive:true});
  for(const f of ['run-case.mjs','verify-report.mjs','android-smoke.case.json','android-smoke.negative.case.json'])copyFileSync(join(here,f),join(dir,f));
@@ -178,4 +180,23 @@ test('verify-report fails closed on a missing, zero-step, partial or mismatched 
  assert.equal((await verify(write({case:smoke.id,outcome:'passed',steps:completed(n)}))).code,0);
  assert.equal((await verify(write({case:smoke.id,outcome:'failed',currentStep:n,steps:completed(n-1)}),'--expect-fail')).code,0);
  assert.equal((await verify(write({case:smoke.id,outcome:'failed',currentStep:1,steps:[]}),'--expect-fail')).code,1,'negative failing early');
+});
+
+test('the negative case passes --expect-fail end to end only when it fails on its last step',async()=>{
+ const {linked}=copyTests();
+ const run=async(visible)=>{
+  const server=await fakeServer(new Set(visible));
+  try{return (await node(join(linked,'run-case.mjs'),[join(linked,'android-smoke.negative.case.json'),tmp(),'--expect-fail'],{APPIUM_URL:`http://127.0.0.1:${server.address().port}`})).code}
+  finally{server.close()}
+ };
+ assert.equal(await run(['sut-open-product-pizza']),0);
+ assert.equal(await run([]),1,'failing on the first step is not the expected negative result');
+});
+
+test('verdict rejects a case without an id and out-of-order steps',async()=>{
+ const {verdict}=await import('./run-case.mjs');
+ assert.equal(verdict({platforms:smoke.platforms},{case:undefined,outcome:'passed',steps:[]}).ok,false);
+ const n=smoke.platforms.android.steps.length;
+ const steps=Array.from({length:n},(_,i)=>({index:n-i,action:'see',outcome:'completed'}));
+ assert.match(verdict(smoke,{case:smoke.id,outcome:'passed',steps}).reason,/out of order/);
 });
