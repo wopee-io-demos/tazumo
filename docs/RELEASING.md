@@ -19,7 +19,7 @@ The Tazumo SUT (web, mobile and API) has one product version, released as `vX.Y.
 
 Version bumps before 1.0: a feature or a breaking change bumps the minor version, a fix bumps the patch version. To force a version (for example `1.0.0`), put a `Release-As: 1.0.0` footer in the squash commit message when merging a PR (`gh pr merge <N> --squash --body 'Release-As: 1.0.0'`); `main` takes no direct pushes.
 
-The PR title becomes the squash commit title, so give it a Conventional Commit type. Titles are not linted yet; a title without a type is left out of the changelog and the version bump.
+The squash commit title is the PR title for multi-commit PRs and the commit subject for single-commit PRs (repository setting `COMMIT_OR_PR_TITLE`), so both need a Conventional Commit type. Nothing lints them yet ([#162](https://github.com/wopee-io-demos/tazumo/issues/162)); a title without a type is left out of the changelog and the version bump.
 
 A PR that changes `contracts/openapi.json` must raise `info.version` in the same PR (additive change: next minor). A PR that changes `contracts/sut.json` follows [SUT-CONTRACT](SUT-CONTRACT.md).
 
