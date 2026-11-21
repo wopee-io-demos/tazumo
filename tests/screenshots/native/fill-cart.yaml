@@ -1,42 +1,52 @@
 appId: io.wopee.demos.tazumo
 ---
 - scrollUntilVisible:
-    element: "Add Margherita pizza"
+    element:
+      id: "sut-add-pizza"
     direction: DOWN
     visibilityPercentage: 50
     centerElement: true
     timeout: 30000
-- tapOn: "Add Margherita pizza"
-- tapOn: "Add Margherita pizza"
+- tapOn:
+    id: "sut-add-pizza"
+- tapOn:
+    id: "sut-add-pizza"
 - scrollUntilVisible:
-    element: "Add Sourdough loaf"
+    element:
+      id: "sut-add-bread"
     direction: DOWN
     visibilityPercentage: 50
     centerElement: true
     timeout: 30000
-- tapOn: "Add Sourdough loaf"
+- tapOn:
+    id: "sut-add-bread"
 - scrollUntilVisible:
-    element: "Add Fresh flowers"
+    element:
+      id: "sut-add-flowers"
     direction: DOWN
     visibilityPercentage: 50
     centerElement: true
     timeout: 30000
-- tapOn: "Add Fresh flowers"
+- tapOn:
+    id: "sut-add-flowers"
 - scrollUntilVisible:
-    element: "Cart, \\d+"
+    element:
+      id: "sut-cart-open"
     direction: UP
     visibilityPercentage: 50
     timeout: 30000
 - extendedWaitUntil:
     visible: "Cart, 4"
     timeout: 10000
-- tapOn: "Cart, 4"
+- tapOn:
+    id: "sut-cart-open"
 - scrollUntilVisible:
-    element: "Subtotal €46.20"
+    element:
+      id: "sut-cart-summary"
     direction: DOWN
     visibilityPercentage: 50
     centerElement: true
     timeout: 30000
-- assertVisible: "Your basket"
+- assertVisible: "Subtotal €46.20"
 - assertVisible: "Margherita pizza × 2"
 - waitForAnimationToEnd

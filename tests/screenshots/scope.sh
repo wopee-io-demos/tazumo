@@ -4,7 +4,7 @@
 set -euo pipefail
 base="${1:-}"
 if [[ -z "$base" ]]; then echo web=true; echo native=true; exit 0; fi
-files="$(git diff --name-only "$base"...HEAD)"
+files="$(git diff --name-only "$base"...HEAD)" || { echo web=true; echo native=true; exit 0; }
 shared='^(\.github/workflows/screenshots\.yml|tests/screenshots/scope\.sh)$'
 web=false native=false
 grep -Eq "$shared|^apps/web/|^scripts/capture-web-screenshots\.sh$|^tests/screenshots/[^/]+\.ts$" <<<"$files" && web=true

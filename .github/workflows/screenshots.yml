@@ -20,8 +20,8 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: screenshots-${{ github.event.pull_request.number || github.sha }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: screenshots-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 env:
   MAESTRO_VERSION: 1.41.0
   MAESTRO_SHA256: 0b87a2eed8c1594fe572c5f29d6d64af389f4b7231ddde714179bbcb05f0fe0c
