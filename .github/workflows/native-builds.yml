@@ -137,6 +137,20 @@ jobs:
         with:
           node-version: '22'
       - run: pnpm install --no-frozen-lockfile
+      - name: Restore the persistent iOS build cache (self-hosted only)
+        id: ios-cache
+        if: runner.environment == 'self-hosted'
+        run: |
+          key="$(XCODE_VERSION="$(xcodebuild -version)" node apps/mobile/scripts/ios-cache-key.mjs)"
+          dir="$HOME/.tazumo-ci-cache/ios/$key"
+          echo "dir=$dir" >> "$GITHUB_OUTPUT"
+          if [ -d "$dir/ios/Pods" ] && [ -d "$dir/DerivedData/Build" ]; then
+            mv "$dir/ios" apps/mobile/ios
+            mv "$dir/DerivedData" "$RUNNER_TEMP/tazumo-ios"
+            echo "Restored the iOS build cache $key"
+          else
+            echo "No iOS build cache for $key; building clean"
+          fi
       - run: pnpm --filter @tazumo/mobile exec expo prebuild --platform ios --non-interactive --no-install
       - run: pod install
         working-directory: apps/mobile/ios
@@ -151,3 +165,22 @@ jobs:
           name: tazumo-ios-simulator-app
           path: tazumo-ios-simulator.zip
           retention-days: 7
+      - name: Save the persistent iOS build cache (self-hosted only)
+        if: always() && steps.ios-cache.outcome == 'success'
+        env:
+          CACHE_DIR: ${{ steps.ios-cache.outputs.dir }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          root="$(dirname "$CACHE_DIR")"
+          entries() { find "$root" -mindepth 1 -maxdepth 1 -type d -exec stat -f '%m %N' {} + 2>/dev/null | sort -rn | cut -d' ' -f2-; }
+          rm -rf "$CACHE_DIR"
+          if [ "$JOB_STATUS" = success ] && [ -d apps/mobile/ios/Pods ] && [ -d "$RUNNER_TEMP/tazumo-ios/Build" ]; then
+            mkdir -p "$CACHE_DIR"
+            mv apps/mobile/ios "$CACHE_DIR/ios"
+            mv "$RUNNER_TEMP/tazumo-ios" "$CACHE_DIR/DerivedData"
+          fi
+          entries | tail -n +4 | while read -r old; do rm -rf "$old"; done
+          while [ "$(entries | wc -l)" -gt 1 ] && [ "$(du -sk "$root" | cut -f1)" -gt 20971520 ]; do
+            rm -rf "$(entries | tail -1)"
+          done
+          du -sh "$root"/*/ 2>/dev/null || true
