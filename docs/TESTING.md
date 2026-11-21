@@ -50,3 +50,18 @@ Use roles and accessible names, or `data-testid` / `testID` values from the SUT 
 - `playwright-test-results`: raw screenshots, plus traces for failed attempts.
 
 This is browser evidence against fixture data. It is not native device evidence and not a deployed environment.
+
+## Pages preview
+
+[`pages.yml`](../.github/workflows/pages.yml) deploys the web build to https://wopee-io-demos.github.io/tazumo/ on every push to `main` that touches `apps/web`, `packages/`, the root manifests (`package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`), `tests/pages/` or the workflow, and on manual dispatch from `main`. Push and dispatch runs share one concurrency group that queues and never cancels a running deploy or smoke, so each smoke checks its own build. The preview is a project site under `/tazumo/`, so only this build sets `TAZUMO_WEB_BASE=/tazumo/`, which `apps/web/vite.config.ts` uses as Vite's `base`. Unset, the base is `/`: `pnpm dev:web`, `pnpm build`, `vite preview` and every other CI job are unchanged. Routes are hash routes ([ADR-0012](adr/0012-hash-client-routes.md)), so deep links such as `/tazumo/#/product/flowers` load `index.html` directly and need no 404 fallback.
+
+After the deploy, the `smoke` job waits until the live URL serves the entry script of this build, then runs `tests/pages/smoke.spec.ts` against it: the visible demo labelling (the `(demo)` title and `noindex` checks join when #97 / PR #126 is on `main`), search, add to cart, disabled checkout and a hash deep link. Screenshots are in the `pages-smoke` artifact. This is deployed evidence against synthetic fixture data. On pull requests that change the workflow, the Vite config or the smoke, only the build job runs.
+
+Reproduce the smoke against a local build:
+
+```sh
+TAZUMO_WEB_BASE=/tazumo/ pnpm build
+TAZUMO_WEB_BASE=/tazumo/ pnpm --filter @tazumo/web exec vite preview --host 127.0.0.1 --port 4316 --strictPort &
+PAGES_URL=http://127.0.0.1:4316/tazumo/ pnpm exec playwright test -c tests/pages/playwright.config.ts
+PAGES_URL=https://wopee-io-demos.github.io/tazumo/ pnpm exec playwright test -c tests/pages/playwright.config.ts
+```
