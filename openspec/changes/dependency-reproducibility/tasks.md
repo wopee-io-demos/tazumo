@@ -8,5 +8,6 @@
 - [x] ADR-0001 updated with the Expo SDK 53 → 58 evaluation and the lockfile policy.
 - [ ] Current-head CI green on the PR, with install times on the first (cold-cache) run and a second (warm-cache) run recorded.
 - [x] Follow-up issue for the Expo SDK upgrade filed: [#100](https://github.com/wopee-io-demos/tazumo/issues/100).
-- [ ] The orchestrator warns the open PRs that change `package.json` (#105, #148, #161, #163) and the Dependabot jose PRs (#109, #137, superseded under #149); they regenerate the lockfile after this merges.
+- [x] Merged main again at be970e2 (#105 added `packages/orders`). Lockfile regenerated (+9 lines, 12 workspace projects). Frozen install passes (1.8 s). `pnpm typecheck` and `pnpm test` pass: brand 15, core 17, commerce 29, address 27, merchant-ops 31, orders 37, product-options 48, payments 36, 0 failures.
+- [ ] The orchestrator warns the open PRs that change `package.json` (#148, #161, #163) and the Dependabot jose PRs (#109, #137, superseded under #149); they regenerate the lockfile after this merges.
 - [x] Independent review on 375716f: no blocking findings. Lockfile up to date for all 12 importers, `--lockfile-only` byte-identical, frozen filtered installs used by `pages.yml` pass, 734 packages with sha512 integrity and only npmjs sources, every install frozen, `cache: pnpm` only after `pnpm/action-setup`. Non-blocking fixes: SECURITY.md lockfile wording, this PR list, the PR body.
