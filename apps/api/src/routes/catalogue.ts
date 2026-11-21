@@ -1,12 +1,13 @@
 import type { FastifyInstance } from 'fastify';
 import type pg from 'pg';
+import { rateLimitTier } from '../rate-limit.ts';
 import { apiError } from '../errors.ts';
 import { routeSchema, toFastifyPath } from '../contract.ts';
 
 const marketCode = { pattern: '^[a-z0-9-]{1,64}$' };
 
 export async function catalogueRoutes(app: FastifyInstance, { pool }: { pool: pg.Pool }) {
-  app.get('/v1/markets', { schema: routeSchema('get', '/v1/markets') }, async () => {
+  app.get('/v1/markets', { schema: routeSchema('get', '/v1/markets'), config: { rateLimit: rateLimitTier.public } }, async () => {
     const { rows } = await pool.query(
       `SELECT code, country_code AS "countryCode", currency, locale FROM markets ORDER BY code`
     );
@@ -15,7 +16,7 @@ export async function catalogueRoutes(app: FastifyInstance, { pool }: { pool: pg
 
   app.get<{ Querystring: { marketCode: string } }>(
     '/v1/merchants',
-    { schema: routeSchema('get', '/v1/merchants', { marketCode }) },
+    { schema: routeSchema('get', '/v1/merchants', { marketCode }), config: { rateLimit: rateLimitTier.public } },
     async (request, reply) => {
       const market = await pool.query('SELECT 1 FROM markets WHERE code = $1', [request.query.marketCode]);
       if (market.rowCount === 0) return reply.code(400).send(apiError(request, 'unknown_market', 'Market is not supported'));
@@ -38,7 +39,7 @@ export async function catalogueRoutes(app: FastifyInstance, { pool }: { pool: pg
   const productsPath = '/v1/merchants/{merchantId}/products';
   app.get<{ Params: { merchantId: string } }>(
     toFastifyPath(productsPath),
-    { schema: routeSchema('get', productsPath) },
+    { schema: routeSchema('get', productsPath), config: { rateLimit: rateLimitTier.public } },
     async (request, reply) => {
       const merchant = await pool.query('SELECT 1 FROM merchants WHERE id = $1', [request.params.merchantId]);
       if (merchant.rowCount === 0) return reply.code(404).send(apiError(request, 'merchant_not_found', 'Merchant not found'));

@@ -58,9 +58,15 @@ export function buildApp({ pool, logger = false, auth, rateLimits, trustProxy = 
   const authenticate = createAuthenticate(pool, auth, pseudonymizer);
   const limits = createRateLimits(rateLimits);
   app.addHook('onRoute', (route) => {
-    if (requiresBearer(route.method, route.url)) {
-      route.onRequest = [limits.byIp, authenticate, limits.byPrincipal, ...[route.onRequest ?? []].flat()];
+    const tier = route.config?.rateLimit?.tier;
+    const bearer = requiresBearer(route.method, route.url);
+    if (!tier) throw new Error(`Route ${route.method} ${route.url} declares no rate-limit tier`);
+    const expected = bearer ? 'authenticated' : route.url === '/health' ? 'health' : 'public';
+    if (tier !== expected) {
+      throw new Error(`Route ${route.method} ${route.url}: tier ${tier} does not match the contract; expected ${expected}`);
     }
+    const hooks = { public: [limits.publicByIp], health: [limits.healthByIp], authenticated: [limits.byIp, authenticate, limits.byPrincipal] }[tier];
+    route.onRequest = [...hooks, ...[route.onRequest ?? []].flat()];
   });
 
   app.addHook('preHandler', async (request) => {
@@ -89,7 +95,7 @@ export function buildApp({ pool, logger = false, auth, rateLimits, trustProxy = 
     return reply.code(500).send(apiError(request, 'internal_error', 'Internal server error'));
   });
 
-  app.setNotFoundHandler((request, reply) => reply.code(404).send(apiError(request, 'not_found', 'Resource not found')));
+  app.setNotFoundHandler({ preHandler: limits.publicByIp }, (request, reply) => reply.code(404).send(apiError(request, 'not_found', 'Resource not found')));
 
   app.register(healthRoutes, { pool });
   app.register(catalogueRoutes, { pool });

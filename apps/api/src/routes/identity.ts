@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import type pg from 'pg';
+import { rateLimitTier } from '../rate-limit.ts';
 import { recordAudit } from '../audit.ts';
 import { can, isPrivileged, type Principal } from '../auth/policy.ts';
 import { routeSchema, toFastifyPath } from '../contract.ts';
@@ -20,7 +21,7 @@ export async function listMerchantStaff(pool: pg.Pool, merchantId: string, princ
 }
 
 export async function identityRoutes(app: FastifyInstance, { pool }: { pool: pg.Pool }) {
-  app.get('/v1/me', { schema: routeSchema('get', '/v1/me') }, async (request) => {
+  app.get('/v1/me', { schema: routeSchema('get', '/v1/me'), config: { rateLimit: rateLimitTier.authenticated } }, async (request) => {
     const principal = request.principal!;
     return { userId: principal.userId, roles: principal.grants };
   });
@@ -28,7 +29,7 @@ export async function identityRoutes(app: FastifyInstance, { pool }: { pool: pg.
   const staffPath = '/v1/merchants/{merchantId}/staff';
   app.get<{ Params: { merchantId: string } }>(
     toFastifyPath(staffPath),
-    { schema: routeSchema('get', staffPath) },
+    { schema: routeSchema('get', staffPath), config: { rateLimit: rateLimitTier.authenticated } },
     async (request, reply) => {
       const principal = request.principal!;
       const { merchantId } = request.params;

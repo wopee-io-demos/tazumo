@@ -3,12 +3,35 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import { apiError } from './errors.ts';
 
 export type LimitRule = { limit: number; windowMs: number };
-export type RateLimitOptions = { ip?: LimitRule; principal?: LimitRule; now?: () => number; maxKeys?: number };
+export type RateLimitOptions = {
+  ip?: LimitRule;
+  principal?: LimitRule;
+  public?: LimitRule;
+  health?: LimitRule;
+  now?: () => number;
+  maxKeys?: number;
+};
+
+export type RateLimitTier = 'public' | 'health' | 'authenticated';
+
+declare module 'fastify' {
+  interface FastifyContextConfig {
+    rateLimit?: { tier: RateLimitTier };
+  }
+}
+
+export const rateLimitTier = {
+  public: { tier: 'public' },
+  health: { tier: 'health' },
+  authenticated: { tier: 'authenticated' }
+} as const satisfies Record<RateLimitTier, { tier: RateLimitTier }>;
 
 export const defaultLimits = {
   ip: { limit: 300, windowMs: 60_000 },
-  principal: { limit: 120, windowMs: 60_000 }
-} satisfies Record<'ip' | 'principal', LimitRule>;
+  principal: { limit: 120, windowMs: 60_000 },
+  public: { limit: 300, windowMs: 60_000 },
+  health: { limit: 1_200, windowMs: 60_000 }
+} satisfies Record<'ip' | 'principal' | 'public' | 'health', LimitRule>;
 
 type Decision = { allowed: true } | { allowed: false; retryAfterSeconds: number };
 const overflowFactor = 10;
@@ -92,7 +115,11 @@ function hook(limiter: FixedWindowLimiter, key: (request: FastifyRequest) => str
 export function createRateLimits(options: RateLimitOptions = {}) {
   const ip = new FixedWindowLimiter(options.ip ?? defaultLimits.ip, options.now, options.maxKeys);
   const principal = new FixedWindowLimiter(options.principal ?? defaultLimits.principal, options.now, options.maxKeys);
+  const anonymous = new FixedWindowLimiter(options.public ?? defaultLimits.public, options.now, options.maxKeys);
+  const health = new FixedWindowLimiter(options.health ?? defaultLimits.health, options.now, options.maxKeys);
   return {
+    publicByIp: hook(anonymous, (request) => `ip:${clientKey(request.ip)}`),
+    healthByIp: hook(health, (request) => `ip:${clientKey(request.ip)}`),
     byIp: hook(ip, (request) => `ip:${clientKey(request.ip)}`),
     byPrincipal: hook(principal, (request) => `principal:${request.principal?.userId ?? 'none'}`)
   };
