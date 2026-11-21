@@ -16,7 +16,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: native-builds-${{ github.event.pull_request.number || github.ref }}
+  group: native-builds-${{ github.event.pull_request.number || github.ref }}${{ github.event_name == 'schedule' && '-nightly' || '' }}
   cancel-in-progress: true
 jobs:
   changes:
@@ -28,14 +28,13 @@ jobs:
       ios: ${{ steps.diff.outputs.ios }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
       - id: diff
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
-          git fetch --no-tags --depth=1 origin "$BASE_SHA"
-          changed="$(git diff --name-only "$BASE_SHA" HEAD)"
-          echo "$changed"
-          if echo "$changed" | grep -Eq '^(apps/mobile/|packages/(core|brand)/|\.github/workflows/native-builds\.yml$|package\.json$|pnpm-workspace\.yaml$|pnpm-lock\.yaml$)'; then
+          changed="$(git diff --name-only HEAD^1 HEAD)"
+          printf '%s\n' "$changed" | sed 's/^/  /'
+          if printf '%s\n' "$changed" | grep -Eq '^(apps/mobile/|packages/(core|brand)/|(apps|packages)/[^/]+/package\.json$|\.github/workflows/native-builds\.yml$|package\.json$|pnpm-workspace\.yaml$|pnpm-lock\.yaml$|\.npmrc$)'; then
             echo "ios=true" >> "$GITHUB_OUTPUT"
           else
             echo "ios=false" >> "$GITHUB_OUTPUT"
@@ -121,7 +120,7 @@ jobs:
   ios:
     name: iOS simulator build
     needs: changes
-    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.ios == 'true') }}
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.ios == 'true') }}
     runs-on: macos-15
     timeout-minutes: 90
     steps:
