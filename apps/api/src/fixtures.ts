@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { categories, products } from '@tazumo/core';
+import type { VatCategory } from '@tazumo/commerce';
 
 export const fixtureNamespace = '6f1c2b9e-4d1a-5c3e-9b7a-2d8e0f4a6c11';
 
@@ -22,11 +23,29 @@ export type ProductRow = {
   slug: string;
   merchantId: string;
   categoryCode: string;
+  vatCategory: VatCategory;
   name: string;
   description: string;
   priceMinor: number;
   currency: string;
 };
+
+export const fixtureVatCategory: Readonly<Record<string, VatCategory>> = {
+  pizza: 'food',
+  bowl: 'food',
+  burger: 'food',
+  bread: 'groceries',
+  apples: 'groceries',
+  flowers: 'flowers',
+  headphones: 'electronics',
+  book: 'gifts'
+};
+
+function vatCategoryFor(productId: string): VatCategory {
+  const category = fixtureVatCategory[productId];
+  if (!category) throw new Error(`Fixture product ${productId} has no VAT category`);
+  return category;
+}
 
 export const demoMarket: MarketRow = { code: 'demo-eu', countryCode: 'IE', currency: 'EUR', locale: 'en-IE' };
 
@@ -44,6 +63,7 @@ export function buildSeed() {
       slug: product.id,
       merchantId,
       categoryCode: slugify(product.category),
+      vatCategory: vatCategoryFor(product.id),
       name: product.name,
       description: product.description,
       priceMinor: product.priceCents,

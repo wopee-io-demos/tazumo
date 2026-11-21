@@ -1,0 +1,83 @@
+{
+  "id": "tazumo-flow-search-add-cart",
+  "intent": "Search the catalogue for Margherita, add the pizza, open the cart and see one Margherita pizza, subtotal €11.90 and checkout disabled",
+  "platforms": {
+    "ios": {
+      "app": "io.wopee.demos.tazumo",
+      "steps": [
+        {
+          "action": "see",
+          "by": "accessibility id",
+          "value": "What are you looking for?"
+        },
+        {
+          "action": "type",
+          "by": "accessibility id",
+          "value": "What are you looking for?",
+          "text": "Margherita"
+        },
+        {
+          "action": "tap",
+          "by": "accessibility id",
+          "value": "Return"
+        },
+        {
+          "action": "absent",
+          "by": "accessibility id",
+          "value": "Add Seasonal veggie bowl"
+        },
+        {
+          "action": "tap",
+          "by": "accessibility id",
+          "value": "Add Margherita pizza"
+        },
+        {
+          "action": "tap",
+          "by": "accessibility id",
+          "value": "Cart, 1"
+        },
+        {
+          "action": "see",
+          "by": "accessibility id",
+          "value": "Remove one Margherita pizza"
+        }
+      ]
+    },
+    "android": {
+      "app": "io.wopee.demos.tazumo",
+      "steps": [
+        {
+          "action": "see",
+          "by": "accessibility id",
+          "value": "What are you looking for?"
+        },
+        {
+          "action": "type",
+          "by": "accessibility id",
+          "value": "What are you looking for?",
+          "text": "Margherita"
+        },
+        {
+          "action": "absent",
+          "by": "accessibility id",
+          "value": "Add Seasonal veggie bowl"
+        },
+        {
+          "action": "tap",
+          "by": "accessibility id",
+          "value": "Add Margherita pizza"
+        },
+        {
+          "action": "tap",
+          "by": "accessibility id",
+          "value": "Cart, 1"
+        },
+        {
+          "action": "see",
+          "by": "accessibility id",
+          "value": "Remove one Margherita pizza"
+        }
+      ]
+    }
+  }
+}

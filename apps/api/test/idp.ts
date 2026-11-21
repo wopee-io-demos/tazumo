@@ -41,3 +41,4 @@ export async function mint(key: SigningKey, claims: JWTPayload = {}, typ = 'JWT'
 }
 
 export const b64url = (value: object) => Buffer.from(JSON.stringify(value)).toString('base64url');
+export const logSalt = 'test-log-salt-'.padEnd(40, 'x');

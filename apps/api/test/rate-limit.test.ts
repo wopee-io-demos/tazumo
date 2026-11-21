@@ -1,9 +1,11 @@
 import { after, before, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildApp } from '../src/app.ts';
-import { clientKey, FixedWindowLimiter } from '../src/rate-limit.ts';
+import { uuidV5 } from '../src/fixtures.ts';
+import { seed } from '../src/seed.ts';
+import { clientKey, FixedWindowLimiter, rateLimitTier } from '../src/rate-limit.ts';
 import { assertMatchesContract, createTestDb, type TestDb } from './helpers.ts';
-import { audience, issuer, mint, signingKey, startIdp, type SigningKey, type TestIdp } from './idp.ts';
+import { audience, issuer, logSalt, mint, signingKey, startIdp, type SigningKey, type TestIdp } from './idp.ts';
 
 test('fixed window limiter counts per key and resets on a simulated clock', () => {
   let now = 0;
@@ -70,7 +72,7 @@ describe('rate limits on authenticated routes', () => {
     idp = await startIdp([key]);
     app = buildApp({
       pool: db.pool,
-      auth: { issuer, audience, jwksUrl: idp.url },
+      auth: { issuer, audience, logSalt, jwksUrl: idp.url },
       rateLimits: { ip: { limit: 5, windowMs: 60_000 }, principal: { limit: 2, windowMs: 60_000 }, now: () => clock }
     });
     await app.ready();
@@ -103,7 +105,7 @@ describe('rate limits on authenticated routes', () => {
     const floodIdp = await startIdp([key]);
     const flooded = buildApp({
       pool: db.pool,
-      auth: { issuer, audience, jwksUrl: floodIdp.url },
+      auth: { issuer, audience, logSalt, jwksUrl: floodIdp.url },
       rateLimits: { ip: { limit: 5, windowMs: 60_000 }, now: () => clock }
     });
     try {
@@ -128,9 +130,108 @@ describe('rate limits on authenticated routes', () => {
     }
   });
 
-  test('anonymous discovery routes are not rate limited by these layers', async () => {
+  test('anonymous discovery traffic does not consume the authenticated budgets', async () => {
     for (let i = 0; i < 10; i++) {
       assert.equal((await app.inject({ method: 'GET', url: '/v1/markets', remoteAddress: '203.0.113.50' })).statusCode, 200);
+    }
+  });
+});
+
+describe('rate limits on public and health routes', () => {
+  let db: TestDb;
+  let clock = 5_000_000;
+  const merchant = uuidV5('merchant:Piazza Local');
+  const publicUrls = ['/v1/markets', '/v1/merchants?marketCode=demo-eu', `/v1/merchants/${merchant}/products`];
+
+  before(async () => {
+    db = await createTestDb();
+    await seed(db.pool);
+  });
+  after(async () => {
+    await db.drop();
+  });
+
+  const build = (limits: Parameters<typeof buildApp>[0]['rateLimits'] = {}) =>
+    buildApp({ pool: db.pool, rateLimits: { now: () => clock, ...limits } });
+
+  test('public routes return 429 with Retry-After past the per-IP limit and reset after the window', async () => {
+    const app = build({ public: { limit: 3, windowMs: 60_000 } });
+    try {
+      for (const url of publicUrls) {
+        const ip = `198.18.0.${publicUrls.indexOf(url) + 1}`;
+        for (let i = 0; i < 3; i++) assert.equal((await app.inject({ method: 'GET', url, remoteAddress: ip })).statusCode, 200);
+        const limited = await app.inject({ method: 'GET', url, remoteAddress: ip });
+        assert.equal(limited.statusCode, 429, url);
+        assert.equal(limited.headers['retry-after'], '60');
+        assertMatchesContract('get', url.split('?')[0].replace(merchant, '{merchantId}'), 429, limited.json());
+        assert.equal((await app.inject({ method: 'GET', url, remoteAddress: '198.18.1.1' })).statusCode, 200, 'other clients are unaffected');
+      }
+      clock += 60_000;
+      assert.equal((await app.inject({ method: 'GET', url: '/v1/markets', remoteAddress: '198.18.0.1' })).statusCode, 200);
+    } finally {
+      await app.close();
+    }
+  });
+
+  test('health probes have their own, higher budget', async () => {
+    const app = build({ public: { limit: 1, windowMs: 60_000 }, health: { limit: 5, windowMs: 60_000 } });
+    try {
+      const ip = '198.18.2.1';
+      assert.equal((await app.inject({ method: 'GET', url: '/v1/markets', remoteAddress: ip })).statusCode, 200);
+      assert.equal((await app.inject({ method: 'GET', url: '/v1/markets', remoteAddress: ip })).statusCode, 429);
+      for (let i = 0; i < 5; i++) assert.equal((await app.inject({ method: 'GET', url: '/health', remoteAddress: ip })).statusCode, 200);
+      const limited = await app.inject({ method: 'GET', url: '/health', remoteAddress: ip });
+      assert.equal(limited.statusCode, 429);
+      assert.ok(Number(limited.headers['retry-after']) >= 1);
+    } finally {
+      await app.close();
+    }
+  });
+
+  test('unmatched paths and methods share the public limit', async () => {
+    const app = build({ public: { limit: 2, windowMs: 60_000 } });
+    try {
+      const ip = '198.18.3.1';
+      assert.equal((await app.inject({ method: 'GET', url: '/nope', remoteAddress: ip })).statusCode, 404);
+      assert.equal((await app.inject({ method: 'POST', url: '/v1/markets', remoteAddress: ip })).statusCode, 404);
+      assert.equal((await app.inject({ method: 'GET', url: '/nope', remoteAddress: ip })).statusCode, 429);
+    } finally {
+      await app.close();
+    }
+  });
+
+  test('every registered route is rate limited', async () => {
+    const one = { limit: 1, windowMs: 60_000 };
+    const app = build({ public: one, health: one, ip: one, principal: one });
+    const routes: Array<{ method: string; url: string }> = [];
+    app.addHook('onRoute', (route) => {
+      for (const method of [route.method].flat()) routes.push({ method, url: route.url.replace(/:\w+/g, merchant) });
+    });
+    try {
+      await app.ready();
+      assert.equal(routes.length, 19, '11 contract operations, /health, and a HEAD route for every GET');
+      for (const [index, route] of routes.entries()) {
+        const remoteAddress = `198.19.${Math.floor(index / 250)}.${(index % 250) + 1}`;
+        const call = () => app.inject({ method: route.method as 'GET', url: route.url, remoteAddress });
+        await call();
+        const second = await call();
+        assert.equal(second.statusCode, 429, `${route.method} ${route.url} must be rate limited`);
+      }
+    } finally {
+      await app.close();
+    }
+  });
+
+  test('a route without a rate-limit tier, or with the wrong tier, fails at startup', async () => {
+    const app = build();
+    try {
+      assert.throws(() => app.get('/unlimited', async () => ({})), /declares no rate-limit tier/);
+      assert.throws(() => app.get('/v1/me', { config: { rateLimit: rateLimitTier.public } }, async () => ({})), /does not match the contract/);
+      assert.throws(() => app.get('/anon', { config: { rateLimit: rateLimitTier.authenticated } }, async () => ({})), /does not match the contract/);
+      assert.throws(() => app.get('/anon2', { config: { rateLimit: rateLimitTier.health } }, async () => ({})), /expected public/);
+      assert.throws(() => app.get('/health2', { config: { rateLimit: { tier: 'typo' as 'public' } } }, async () => ({})), /does not match/);
+    } finally {
+      await app.close().catch(() => {});
     }
   });
 });

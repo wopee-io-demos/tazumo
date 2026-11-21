@@ -1,0 +1,93 @@
+name: Back office
+on:
+  pull_request:
+    paths:
+      - 'apps/backoffice/**'
+      - '!apps/backoffice/**/*.md'
+      - 'tests/backoffice/**'
+      - 'apps/api/src/**'
+      - 'apps/api/migrations/**'
+      - 'apps/api/package.json'
+      - 'packages/brand/src/**'
+      - 'packages/core/src/**'
+      - 'packages/commerce/src/**'
+      - '!packages/**/*.test.ts'
+      - 'packages/brand/package.json'
+      - 'packages/core/package.json'
+      - 'packages/commerce/package.json'
+      - 'package.json'
+      - 'pnpm-workspace.yaml'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/backoffice.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'apps/backoffice/**'
+      - '!apps/backoffice/**/*.md'
+      - 'tests/backoffice/**'
+      - 'apps/api/src/**'
+      - 'apps/api/migrations/**'
+      - 'apps/api/package.json'
+      - 'packages/brand/src/**'
+      - 'packages/core/src/**'
+      - 'packages/commerce/src/**'
+      - '!packages/**/*.test.ts'
+      - 'packages/brand/package.json'
+      - 'packages/core/package.json'
+      - 'packages/commerce/package.json'
+      - 'package.json'
+      - 'pnpm-workspace.yaml'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/backoffice.yml'
+permissions:
+  contents: read
+concurrency:
+  group: backoffice-${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+jobs:
+  backoffice:
+    runs-on: ${{ (vars.RUNNER_MODE == 'hosted' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository)) && 'ubuntu-latest' || fromJSON('["self-hosted","linux","x64","demos"]') }}
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: tazumo
+          POSTGRES_PASSWORD: tazumo-ci-only
+          POSTGRES_DB: tazumo_backoffice
+        ports:
+          - 5432/tcp
+        options: >-
+          --health-cmd "pg_isready -U tazumo -d tazumo_backoffice"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Point DATABASE_URL at the postgres service
+        run: echo "DATABASE_URL=postgres://tazumo:tazumo-ci-only@127.0.0.1:${{ job.services.postgres.ports['5432'] }}/tazumo_backoffice" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.11.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @tazumo/backoffice typecheck
+      - name: Production build without test configuration, then bundle check
+        run: |
+          pnpm --filter @tazumo/backoffice build
+          node tests/backoffice/check-bundle.mjs
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: E2E against the real API and PostgreSQL
+        run: pnpm exec playwright test -c tests/backoffice/playwright.config.ts
+      - name: Bundle check on the E2E build
+        run: node tests/backoffice/check-bundle.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: backoffice-playwright
+          path: |
+            test-results/backoffice/
+            playwright-report/backoffice/
+          retention-days: 7

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { buildApp } from '../src/app.ts';
 import { contract, routeSchema, toFastifyPath } from '../src/contract.ts';
 import { uuidV5 } from '../src/fixtures.ts';
+import { rateLimitTier } from '../src/rate-limit.ts';
 import { seed } from '../src/seed.ts';
 import { assertMatchesContract, createTestDb, type TestDb } from './helpers.ts';
 
@@ -123,7 +124,7 @@ describe('catalogue API against PostgreSQL', () => {
 
   test('fields the contract does not declare are not serialized', async () => {
     const probe = buildApp({ pool: db.pool });
-    probe.get('/probe', { schema: { response: routeSchema('get', '/v1/markets').response } }, async () => [
+    probe.get('/probe', { schema: { response: routeSchema('get', '/v1/markets').response }, config: { rateLimit: rateLimitTier.public } }, async () => [
       { code: 'x', countryCode: 'IE', currency: 'EUR', locale: 'en-IE', internalNote: 'secret' }
     ]);
     const res = await probe.inject({ method: 'GET', url: '/probe' });
@@ -149,7 +150,7 @@ describe('catalogue API against PostgreSQL', () => {
     });
     await probe.ready();
     await probe.close();
-    assert.equal(routes.length, 7);
+    assert.equal(routes.length, 11);
     for (const route of routes) assert.ok(declared.includes(route), `${route} is not in contracts/openapi.json`);
   });
 });

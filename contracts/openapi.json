@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Tazumo Marketplace API",
-    "version": "0.4.0-draft",
-    "description": "Contract proposal. The read-only Discovery operations and the Identity and Admin role-grant operations have a reference implementation in apps/api (synthetic fixture data, not deployed). All prices are server-calculated. Checkout is disabled in the current clients."
+    "version": "0.7.0-draft",
+    "description": "Contract proposal. The read-only Discovery operations and the Identity, Admin role-grant, Privacy (erasure, export) and quote (synthetic fees, VAT rates to re-verify) operations have a reference implementation in apps/api (synthetic fixture data, not deployed). All prices are server-calculated. Checkout is disabled in the current clients."
   },
   "servers": [
     {
@@ -23,6 +23,9 @@
     },
     {
       "name": "Admin"
+    },
+    {
+      "name": "Privacy"
     }
   ],
   "paths": {
@@ -42,6 +45,25 @@
                   "items": {
                     "$ref": "#/components/schemas/Market"
                   }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded (per client IP; anonymous routes default to 300 requests per 60 s)",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the current window resets",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
                 }
               }
             }
@@ -82,6 +104,25 @@
           },
           "400": {
             "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded (per client IP; anonymous routes default to 300 requests per 60 s)",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the current window resets",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -144,6 +185,25 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limit exceeded (per client IP; anonymous routes default to 300 requests per 60 s)",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the current window resets",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
           }
         }
       }
@@ -185,6 +245,16 @@
               }
             }
           },
+          "404": {
+            "description": "Unknown market, merchant or product",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
           "409": {
             "description": "Error",
             "content": {
@@ -197,6 +267,25 @@
           },
           "422": {
             "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded (per client IP; anonymous routes default to 300 requests per 60 s)",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the current window resets",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -815,6 +904,16 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Target user has been erased",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
           }
         }
       },
@@ -908,6 +1007,297 @@
           },
           "404": {
             "description": "Unknown user or merchant",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded (per client IP before authentication, per principal after)",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the current window resets",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication not configured or identity provider keys unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Target user has been erased",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/erasure": {
+      "post": {
+        "tags": [
+          "Privacy"
+        ],
+        "summary": "Erase the authenticated user (GDPR Art. 17)",
+        "description": "Pseudonymises the user record (the subject is replaced by a keyed hash), deletes all role grants and writes an audit event without personal data, in one transaction. Tokens issued before the erasure are rejected afterwards; deleting the account at the identity provider is a separate operator step.",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User erased",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErasureResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Bearer challenge (RFC 6750)",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Erasure blocked by dependent records (details.blockers lists them)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded (per client IP before authentication, per principal after)",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the current window resets",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication not configured or identity provider keys unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/users/{userId}/erasure": {
+      "post": {
+        "tags": [
+          "Privacy",
+          "Admin"
+        ],
+        "summary": "Erase a user on their behalf (admin or support)",
+        "description": "Idempotent: erasing an erased user returns the original erasedAt without a new audit event.",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User erased (now or earlier)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErasureResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Bearer challenge (RFC 6750)",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is neither admin nor support",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Erasure blocked by dependent records (details.blockers lists them)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded (per client IP before authentication, per principal after)",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the current window resets",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication not configured or identity provider keys unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/export": {
+      "get": {
+        "tags": [
+          "Privacy"
+        ],
+        "summary": "Export the personal data Tazumo holds about the authenticated user (GDPR Art. 15/20)",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Personal data export",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonalDataExport"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Bearer challenge (RFC 6750)",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -1197,10 +1587,20 @@
             "minItems": 1,
             "items": {
               "$ref": "#/components/schemas/OrderItem"
-            }
+            },
+            "maxItems": 100
           },
           "deliveryAddress": {
             "$ref": "#/components/schemas/DeliveryAddress"
+          },
+          "paymentMethod": {
+            "type": "string",
+            "enum": [
+              "card",
+              "cash"
+            ],
+            "default": "card",
+            "description": "Only cash applies the market's cash rounding (whole crowns for CZK)"
           }
         },
         "additionalProperties": false
@@ -1246,8 +1646,173 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          "payable": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "rounding": {
+            "$ref": "#/components/schemas/SignedMoney"
+          },
+          "smallOrderSurcharge": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "paymentMethod": {
+            "type": "string",
+            "enum": [
+              "card",
+              "cash"
+            ]
+          },
+          "pricesIncludeVat": {
+            "type": "boolean"
+          },
+          "commerceMarket": {
+            "type": "string",
+            "description": "Commerce rule set applied (ISO country code)"
+          },
+          "vat": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "rateId",
+                "basisPoints",
+                "label",
+                "net",
+                "vat",
+                "gross",
+                "explanation"
+              ],
+              "properties": {
+                "rateId": {
+                  "type": "string"
+                },
+                "basisPoints": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "label": {
+                  "type": "string"
+                },
+                "net": {
+                  "$ref": "#/components/schemas/Money"
+                },
+                "vat": {
+                  "$ref": "#/components/schemas/Money"
+                },
+                "gross": {
+                  "$ref": "#/components/schemas/Money"
+                },
+                "explanation": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "components": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "kind",
+                "amount",
+                "addsToPayable",
+                "synthetic",
+                "explanation"
+              ],
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "line",
+                    "subtotal",
+                    "delivery_fee",
+                    "small_order_surcharge",
+                    "vat",
+                    "total",
+                    "rounding",
+                    "payable"
+                  ]
+                },
+                "amount": {
+                  "$ref": "#/components/schemas/SignedMoney"
+                },
+                "addsToPayable": {
+                  "type": "boolean"
+                },
+                "synthetic": {
+                  "type": "boolean"
+                },
+                "explanation": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "deliveryDistance": {
+            "type": "object",
+            "required": [
+              "meters",
+              "synthetic",
+              "explanation"
+            ],
+            "properties": {
+              "meters": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "synthetic": {
+                "type": "boolean",
+                "const": true
+              },
+              "explanation": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "dataStatus": {
+            "type": "object",
+            "required": [
+              "vatRates",
+              "vatRetrievedOn",
+              "feesSynthetic",
+              "notice",
+              "distanceSynthetic",
+              "redeemable"
+            ],
+            "properties": {
+              "vatRates": {
+                "type": "string",
+                "enum": [
+                  "reverify"
+                ]
+              },
+              "vatRetrievedOn": {
+                "type": "string",
+                "format": "date"
+              },
+              "feesSynthetic": {
+                "type": "boolean",
+                "const": true
+              },
+              "notice": {
+                "type": "string"
+              },
+              "distanceSynthetic": {
+                "type": "boolean"
+              },
+              "redeemable": {
+                "type": "boolean",
+                "description": "false until quotes are persisted for order creation"
+              }
+            },
+            "additionalProperties": false
           }
-        }
+        },
+        "description": "Server-authoritative price breakdown. total is the exact total; payable and rounding differ from it only for cash payments. Fees are synthetic and VAT rates are research data to re-verify."
       },
       "CreateOrderRequest": {
         "type": "object",
@@ -1411,6 +1976,133 @@
           }
         },
         "additionalProperties": false
+      },
+      "ErasureResult": {
+        "type": "object",
+        "required": [
+          "userId",
+          "erasedAt"
+        ],
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "erasedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PersonalDataExport": {
+        "type": "object",
+        "required": [
+          "userId",
+          "issuer",
+          "subject",
+          "createdAt",
+          "roles",
+          "auditEvents"
+        ],
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "issuer": {
+            "type": "string"
+          },
+          "subject": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RoleGrant"
+            }
+          },
+          "auditEvents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "occurredAt",
+                "action",
+                "resourceType",
+                "resourceId",
+                "initiatedBy",
+                "details"
+              ],
+              "properties": {
+                "occurredAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "action": {
+                  "type": "string"
+                },
+                "resourceType": {
+                  "type": "string"
+                },
+                "resourceId": {
+                  "type": "string"
+                },
+                "initiatedBy": {
+                  "type": "string",
+                  "enum": [
+                    "self",
+                    "staff"
+                  ]
+                },
+                "details": {
+                  "type": "object",
+                  "description": "Whitelisted event details (role, merchantId, initiator); never personal data of other people",
+                  "properties": {
+                    "role": {
+                      "type": "string"
+                    },
+                    "merchantId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "format": "uuid"
+                    },
+                    "initiator": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "SignedMoney": {
+        "type": "object",
+        "required": [
+          "currency",
+          "minorUnits"
+        ],
+        "properties": {
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "minorUnits": {
+            "type": "integer"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Money that may be negative, such as a rounding adjustment"
       }
     }
   }

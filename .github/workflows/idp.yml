@@ -1,0 +1,92 @@
+name: Identity provider
+on:
+  pull_request:
+    paths:
+      - 'infra/idp/**'
+      - 'tests/idp/**'
+      - 'tests/web-auth/**'
+      - 'contracts/sut.json'
+      - 'apps/**'
+      - 'contracts/openapi.json'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - '.github/workflows/idp.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'infra/idp/**'
+      - 'tests/idp/**'
+      - 'tests/web-auth/**'
+      - 'contracts/sut.json'
+      - 'apps/**'
+      - 'contracts/openapi.json'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - '.github/workflows/idp.yml'
+permissions:
+  contents: read
+concurrency:
+  group: idp-${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+jobs:
+  keycloak:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      IDP_PROJECT: tazumo-ci-idp
+    services:
+      postgres:
+        image: postgres:17.12-alpine@sha256:526f86d93c6ea08fd3f1fe5605650cacc781b2c6013169a0ad8f42c7d3d84f32
+        env:
+          POSTGRES_USER: tazumo
+          POSTGRES_PASSWORD: tazumo-ci-only
+          POSTGRES_DB: tazumo_idp
+        ports:
+          - 5432/tcp
+        options: >-
+          --health-cmd "pg_isready -U tazumo -d tazumo_idp"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Point DATABASE_URL at the postgres service
+        run: echo "DATABASE_URL=postgres://tazumo:tazumo-ci-only@127.0.0.1:${{ job.services.postgres.ports['5432'] }}/tazumo_idp" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.11.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: pnpm install --frozen-lockfile
+      - name: Realm lint and password-field checks
+        run: |
+          node --experimental-strip-types tests/idp/realm-lint.mts
+          node --experimental-strip-types --test tests/idp/*.test.mts
+      - name: Start Keycloak, Mailpit and PostgreSQL, seed test users
+        run: bash infra/idp/up.sh
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Real Keycloak against the real API
+        run: pnpm exec playwright test -c tests/idp/playwright.config.ts
+      - name: Web sign-in against the real Keycloak and API
+        run: pnpm exec playwright test -c tests/web-auth/playwright.config.ts
+      - name: Keycloak log
+        if: failure()
+        run: docker compose -f infra/idp/compose.yml logs --no-color keycloak | tail -200
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: idp-playwright
+          path: |
+            test-results/idp/
+            playwright-report/idp/
+            test-results/web-auth/
+            playwright-report/web-auth/
+          retention-days: 7
+      - name: Stop the identity provider
+        if: always()
+        run: docker compose -f infra/idp/compose.yml down -v

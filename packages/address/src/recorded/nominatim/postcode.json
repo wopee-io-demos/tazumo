@@ -1,0 +1,40 @@
+{
+  "recordedFrom": "Local Nominatim 5.3.3 (mediagis/nominatim:5.3.3@sha256:168c30e2, infra/geocoding/compose.yaml), Geofabrik Bremen extract 2026-11-20, recorded 2026-11-21. OSM data (c) OpenStreetMap contributors, ODbL 1.0.",
+  "note": "Postcode-only query: the adapter never sends one, this records the shape of a postcode-level answer.",
+  "query": {
+    "postalcode": "28195",
+    "countrycodes": "de"
+  },
+  "status": 200,
+  "body": [
+    {
+      "place_id": 290904,
+      "licence": "Data © OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright",
+      "lat": "53.0790125",
+      "lon": "8.8062008",
+      "category": "place",
+      "type": "postcode",
+      "place_rank": 21,
+      "importance": 0.12000999999999995,
+      "addresstype": "postcode",
+      "name": "28195",
+      "display_name": "28195, Mitte, Bremen-Mitte, Bremen, Deutschland",
+      "address": {
+        "postcode": "28195",
+        "suburb": "Mitte",
+        "city_district": "Bremen-Mitte",
+        "city": "Bremen",
+        "state": "Bremen",
+        "ISO3166-2-lvl4": "DE-HB",
+        "country": "Deutschland",
+        "country_code": "de"
+      },
+      "boundingbox": [
+        "53.0340661",
+        "53.1239586",
+        "8.7315610",
+        "8.8808410"
+      ]
+    }
+  ]
+}

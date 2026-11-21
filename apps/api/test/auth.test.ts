@@ -9,7 +9,7 @@ import { loadConfig } from '../src/config.ts';
 import { uuidV5 } from '../src/fixtures.ts';
 import { seed } from '../src/seed.ts';
 import { assertMatchesContract, createTestDb, type TestDb } from './helpers.ts';
-import { audience, b64url, issuer, mint, signingKey, startIdp, type SigningKey, type TestIdp } from './idp.ts';
+import { audience, b64url, issuer, logSalt, mint, signingKey, startIdp, type SigningKey, type TestIdp } from './idp.ts';
 
 const merchantA = uuidV5('merchant:Piazza Local');
 const merchantB = uuidV5('merchant:Morning Market');
@@ -33,7 +33,7 @@ describe('authentication and authorization', () => {
     rs384 = await signingKey('rs384-no-alg', 'RS384', { publishAlg: false });
     idp = await startIdp([rsa, ec, rs384]);
     const stream = new Writable({ write: (chunk, _e, done) => (logLines.push(chunk.toString()), done()) });
-    app = buildApp({ pool: db.pool, logger: { level: 'info', stream }, auth: { issuer, audience, jwksUrl: idp.url, jwksCooldownMs: 0 } });
+    app = buildApp({ pool: db.pool, logger: { level: 'info', stream }, auth: { issuer, audience, logSalt, jwksUrl: idp.url, jwksCooldownMs: 0 } });
     await app.ready();
   });
   after(async () => {
@@ -82,7 +82,7 @@ describe('authentication and authorization', () => {
       )
     );
     const routes: string[] = [];
-    const probe = buildApp({ pool: db.pool, auth: { issuer, audience, jwksUrl: idp.url } });
+    const probe = buildApp({ pool: db.pool, auth: { issuer, audience, logSalt, jwksUrl: idp.url } });
     probe.addHook('onRoute', (route) => {
       for (const method of [route.method].flat()) if (protectedOps.has(`${method === 'HEAD' ? 'GET' : method} ${route.url}`)) routes.push(`${method} ${route.url}`);
     });
@@ -243,7 +243,7 @@ describe('JWKS rotation and availability', () => {
     const oldKey = await signingKey('2026-a');
     const newKey = await signingKey('2026-b');
     const idp = await startIdp([oldKey]);
-    const app = buildApp({ pool: db.pool, auth: { issuer, audience, jwksUrl: idp.url, jwksCooldownMs: 0 } });
+    const app = buildApp({ pool: db.pool, auth: { issuer, audience, logSalt, jwksUrl: idp.url, jwksCooldownMs: 0 } });
     try {
       assert.equal((await app.inject({ method: 'GET', url: '/v1/me', headers: bearer(await mint(oldKey)) })).statusCode, 200);
       idp.keys = [newKey];
@@ -258,7 +258,7 @@ describe('JWKS rotation and availability', () => {
   test('unknown kids do not trigger a JWKS refetch inside the cooldown', async () => {
     const key = await signingKey('cooldown');
     const idp = await startIdp([key]);
-    const app = buildApp({ pool: db.pool, auth: { issuer, audience, jwksUrl: idp.url, jwksCooldownMs: 60_000 } });
+    const app = buildApp({ pool: db.pool, auth: { issuer, audience, logSalt, jwksUrl: idp.url, jwksCooldownMs: 60_000 } });
     try {
       assert.equal((await app.inject({ method: 'GET', url: '/v1/me', headers: bearer(await mint(key)) })).statusCode, 200);
       const fetches = idp.fetches;
@@ -277,14 +277,14 @@ describe('JWKS rotation and availability', () => {
     const key = await signingKey('down');
     const idp = await startIdp([key]);
     idp.status = 500;
-    const app = buildApp({ pool: db.pool, auth: { issuer, audience, jwksUrl: idp.url } });
+    const app = buildApp({ pool: db.pool, auth: { issuer, audience, logSalt, jwksUrl: idp.url } });
     try {
       const res = await app.inject({ method: 'GET', url: '/v1/me', headers: bearer(await mint(key)) });
       assert.equal(res.statusCode, 503);
       assert.equal(res.json().code, 'auth_unavailable');
       assertMatchesContract('get', '/v1/me', 503, res.json());
       await idp.close();
-      const refused = buildApp({ pool: db.pool, auth: { issuer, audience, jwksUrl: idp.url } });
+      const refused = buildApp({ pool: db.pool, auth: { issuer, audience, logSalt, jwksUrl: idp.url } });
       const res2 = await refused.inject({ method: 'GET', url: '/v1/me', headers: bearer(await mint(key)) });
       await refused.close();
       assert.equal(res2.statusCode, 503);
@@ -297,7 +297,7 @@ describe('JWKS rotation and availability', () => {
     const key = await signingKey('outage');
     const junk = await signingKey('junk-during-outage');
     const idp = await startIdp([key]);
-    const auth = { issuer, audience, jwksUrl: idp.url, jwksCacheMaxAgeMs: 50, jwksStaleMaxMs: 2_000, jwksRetryAfterFailureMs: 10_000 };
+    const auth = { issuer, audience, logSalt, jwksUrl: idp.url, jwksCacheMaxAgeMs: 50, jwksStaleMaxMs: 2_000, jwksRetryAfterFailureMs: 10_000 };
     const app = buildApp({ pool: db.pool, auth });
     const call = async (k: SigningKey) => (await app.inject({ method: 'GET', url: '/v1/me', headers: bearer(await mint(k)) })).statusCode;
     try {
@@ -320,7 +320,7 @@ describe('JWKS rotation and availability', () => {
     const oldKey = await signingKey('rotate-old');
     const newKey = await signingKey('rotate-new');
     const idp = await startIdp([oldKey]);
-    const auth = { issuer, audience, jwksUrl: idp.url, jwksCooldownMs: 0, jwksCacheMaxAgeMs: 50, jwksRetryAfterFailureMs: 10_000 };
+    const auth = { issuer, audience, logSalt, jwksUrl: idp.url, jwksCooldownMs: 0, jwksCacheMaxAgeMs: 50, jwksRetryAfterFailureMs: 10_000 };
     const app = buildApp({ pool: db.pool, auth });
     const call = async (k: SigningKey) => (await app.inject({ method: 'GET', url: '/v1/me', headers: bearer(await mint(k)) })).statusCode;
     try {
@@ -340,7 +340,7 @@ describe('JWKS rotation and availability', () => {
   test('a configured token type rejects other token types', async () => {
     const key = await signingKey('typed');
     const idp = await startIdp([key]);
-    const app = buildApp({ pool: db.pool, auth: { issuer, audience, jwksUrl: idp.url, tokenType: 'at+jwt' } });
+    const app = buildApp({ pool: db.pool, auth: { issuer, audience, logSalt, jwksUrl: idp.url, tokenType: 'at+jwt' } });
     try {
       const idToken = await app.inject({ method: 'GET', url: '/v1/me', headers: bearer(await mint(key, { nonce: 'n' }, 'JWT')) });
       assert.equal(idToken.statusCode, 401);

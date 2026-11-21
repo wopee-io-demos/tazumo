@@ -1,0 +1,52 @@
+appId: io.wopee.demos.tazumo
+---
+- scrollUntilVisible:
+    element:
+      id: "sut-add-pizza"
+    direction: DOWN
+    visibilityPercentage: 50
+    centerElement: true
+    timeout: 30000
+- tapOn:
+    id: "sut-add-pizza"
+- tapOn:
+    id: "sut-add-pizza"
+- scrollUntilVisible:
+    element:
+      id: "sut-add-bread"
+    direction: DOWN
+    visibilityPercentage: 50
+    centerElement: true
+    timeout: 30000
+- tapOn:
+    id: "sut-add-bread"
+- scrollUntilVisible:
+    element:
+      id: "sut-add-flowers"
+    direction: DOWN
+    visibilityPercentage: 50
+    centerElement: true
+    timeout: 30000
+- tapOn:
+    id: "sut-add-flowers"
+- scrollUntilVisible:
+    element:
+      id: "sut-cart-open"
+    direction: UP
+    visibilityPercentage: 50
+    timeout: 30000
+- extendedWaitUntil:
+    visible: "Cart, 4"
+    timeout: 10000
+- tapOn:
+    id: "sut-cart-open"
+- scrollUntilVisible:
+    element:
+      id: "sut-cart-summary"
+    direction: DOWN
+    visibilityPercentage: 50
+    centerElement: true
+    timeout: 30000
+- assertVisible: "Subtotal €46.20"
+- assertVisible: "Margherita pizza × 2"
+- waitForAnimationToEnd

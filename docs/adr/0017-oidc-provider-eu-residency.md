@@ -1,8 +1,8 @@
 # ADR-0017: OIDC provider for EU data residency
 
-Status: **Proposed.** The decision belongs to the repository owner.
-Date: 2026-11-20
-Tracking: issue #56, ADR-0016 (token verification is provider-neutral)
+Status: **Accepted.** Decided by the repository owner on 2026-11-21: self-hosted Keycloak in the EU, as recommended (recorded on #56 and #87).
+Date: 2026-11-20 (proposed), 2026-11-21 (accepted)
+Tracking: issue #56, issue #87 (spike), ADR-0016 (token verification is provider-neutral)
 
 ## Context
 
@@ -38,11 +38,25 @@ Pricing and contract terms change often. The figures below are indicative and mu
 
 Every option uses the same erasure pattern on Tazumo's side:
 
-1. Delete the account at the provider.
-2. Replace `users.subject` with an irreversible tombstone (for example `erased:<random>`), and remove non-customer grants.
+1. Delete the account at the provider. Until a provider is chosen and wired in, this is an operator step.
+2. In one transaction (implemented in #56 slice 3, `POST /v1/me/erasure` and `POST /v1/admin/users/{userId}/erasure`):
+   - replace `users.subject` with `erased:<HMAC-SHA-256(k_erasure, issuer, subject)>`, where `k_erasure` is derived from `AUTH_LOG_SALT` with HKDF under a separate label from the log-tag key, and the input is length-prefixed;
+   - set `users.erased_at`;
+   - delete all role grants;
+   - write an audit event `user:erase` whose details hold only the initiator (`self`, `admin` or `support`).
+   - Repeating the call changes nothing.
+   - Erasure is refused (409) while dependent records exist. Today that is an `admin` grant; orders will add their own blockers.
 3. Keep `users.id`, so that `audit_events.actor_user_id` (ON DELETE RESTRICT, ADR-0016) stays valid but no longer resolves to a person.
+4. Tokens after erasure:
+   - Access tokens whose `iat` is at or before `erased_at` plus the 60 s clock tolerance are rejected with 401. The keyed hash lets the API recognise the erased subject without storing it.
+   - The cost: a fresh login within about a minute of the erasure is also rejected.
+   - A token issued later (only possible if the provider still or again has the account) creates a new, unlinked user with only the `customer` role.
+   - Erasing that new user again re-tombstones the older record with a random value; the newer erasure takes over recognition.
+   - **Recognition window:** recognition is needed only while pre-erasure tokens can still be valid: the 24 h lifetime cap plus twice the clock tolerance, fixed at 24 h 2 min regardless of the configured lifetime. After that, `forget_erased_subjects` replaces the keyed hash with a random tombstone, removing the long-term re-identification handle. It runs on every erasure, and operators schedule `db:forget-erased` daily as the owner.
+   - Rotating `AUTH_LOG_SALT` ends recognition early. Rotate it only once the last erasure is older than the recognition window.
+   - **Not yet enforced:** erasure is irreversible, yet any valid access token can trigger it. Once a provider is wired in, require recent authentication (`auth_time` with `max_age`) for self-service erasure.
 
-The row is then pseudonymous, not anonymous. It is still personal data under GDPR (Art. 4(5), Recital 26), because `users.id` links audit rows, request IDs and, later, orders. Keeping it with the audit trail relies on the Art. 17(3) exemptions (legal obligation, or establishing and defending legal claims), and that basis must be documented.
+The keyed hash is not reversible without the salt, but the row is pseudonymous, not anonymous. It is still personal data under GDPR (Art. 4(5), Recital 26), because `users.id` links audit rows, request IDs and, later, orders. Keeping it with the audit trail relies on the Art. 17(3) exemptions (legal obligation, or establishing and defending legal claims), and that basis must be documented.
 
 Logs carry an HMAC of issuer and subject (ADR-0016). That tag can be linked back to a person until both the provider account and Tazumo's own backups holding the subject have expired. Request IDs in log lines also link to `audit_events`, and through it to the pseudonymous `users.id`. Rotating `AUTH_LOG_SALT` on a schedule, and expiring logs by retention, limits re-identification while backups still hold the account.
 
@@ -72,7 +86,7 @@ What differs per provider:
 
 **Auth0 EU and Entra External ID are technically strong but rank lower here.** Their US parents carry legal exposure. They remain viable if legal review accepts the Data Privacy Framework and SCC route.
 
-## Consequences if accepted
+## Consequences
 
 1. Run a spike:
    - Keycloak in a container locally and in `api.yml`;
@@ -83,6 +97,18 @@ What differs per provider:
    - hosting, PostgreSQL, backups and retention;
    - upgrade cadence and an on-call owner;
    - setting `AUTH_ISSUER`, `AUTH_AUDIENCE`, `AUTH_JWKS_URL` and `AUTH_TOKEN_TYPE` from the realm.
-3. Implement the erasure flow above as an admin operation, with its own audit event.
+3. Call the provider's account-deletion API from the erasure operation, replacing the operator step.
 
-Nothing in this ADR wires a provider. Until it is accepted, `AUTH_*` stays unset in every environment, so protected routes return 503.
+No deployed environment is wired to a provider yet. Outside development and CI, `AUTH_*` stays unset, so protected routes return 503.
+
+## Spike findings (#87)
+
+Consequence 1 is done: `infra/idp` (Keycloak 26.8.2, Mailpit, PostgreSQL 17, pinned by digest) and `.github/workflows/idp.yml`, which runs the real `apps/api` server against it.
+
+- **Access token `typ`:** `at+jwt`. Keycloak sets the RFC 9068 header per client with the attribute `access.token.header.type.rfc9068`, so `AUTH_TOKEN_TYPE=at+jwt` is enforced in CI. ID tokens keep `typ: JWT` and their `aud` is the client ID, and the API rejects them.
+- **Audience:** Keycloak 26.8 does not derive the audience from the RFC 8707 `resource` parameter: it refuses a non-URI value such as `tazumo-api` with `invalid_target` and ignores an absolute URI. An `oidc-audience-mapper` on each app client adds `tazumo-api` to access tokens only. A token from a client without the mapper gets 401 from the API.
+- **Lifetime:** realm access token lifespan 300 s. A real token is refused with 401 once `exp` plus the API's 60 s tolerance has passed.
+- **Issuer:** `KC_HOSTNAME` pins the issuer (`http://127.0.0.1:48180/realms/tazumo` locally and in CI), whichever URL the browser used.
+- **Registration:** with e-mail verification on, Keycloak 26.8 asks for the password only after the verification link is opened, so no password exists for an unproven address.
+- **Passwords stay at the provider:** public clients have the password grant disabled (Keycloak answers `unauthorized_client`), PKCE `S256` is required (a request without a challenge is refused), and a test fails if an app or API route accepts a password field.
+- **Still open:** the production deployment (consequence 2), provider-side account deletion from the erasure operation and recent re-authentication for self-service erasure (consequence 3, #56), and client wiring (#88).
