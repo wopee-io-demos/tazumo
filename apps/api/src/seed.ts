@@ -45,6 +45,23 @@ export async function seed(pool: pg.Pool) {
         [p.id, p.slug, p.merchantId, p.categoryCode, p.vatCategory, p.name, p.description, p.priceMinor, p.currency]
       );
     }
+    await client.query('DELETE FROM product_option_groups WHERE product_id = ANY($1::uuid[])', [data.products.map((p) => p.id)]);
+    for (const { productId, groups } of data.productOptions) {
+      for (const [groupOrder, g] of groups.entries()) {
+        await client.query(
+          `INSERT INTO product_option_groups (product_id, id, label_key, selection, min_choices, max_choices, required, sort_order)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          [productId, g.id, g.labelKey, g.selection, g.min, g.max, g.required, groupOrder]
+        );
+        for (const [optionOrder, o] of g.options.entries()) {
+          await client.query(
+            `INSERT INTO product_options (product_id, group_id, id, label_key, price_delta_minor, availability, is_default, sort_order)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+            [productId, g.id, o.id, o.labelKey, o.priceDeltaMinor, { status: o.available ? 'in_stock' : 'out_of_stock' }, o.isDefault === true, optionOrder]
+          );
+        }
+      }
+    }
     await client.query('COMMIT');
   } catch (error) {
     await client.query('ROLLBACK');

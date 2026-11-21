@@ -44,6 +44,12 @@ importers:
       '@tazumo/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@tazumo/merchant-ops':
+        specifier: workspace:*
+        version: link:../../packages/merchant-ops
+      '@tazumo/product-options':
+        specifier: workspace:*
+        version: link:../../packages/product-options
       fastify:
         specifier: 5.12.8
         version: 5.12.8
