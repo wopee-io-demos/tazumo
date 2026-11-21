@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import {
   allowedCommands,
+  emailPattern,
   onboardingStates,
   roles,
   transitionOnboarding,
@@ -198,6 +199,20 @@ test('profile lengths count raw characters like the merchants CHECK, and non-str
   assert.deepEqual(validateStoreProfile({ ...profile, name: ` ${'n'.repeat(199)} ` }), [{ path: 'name', code: 'too_long' }]);
   assert.deepEqual(validateStoreProfile({ ...profile, slug: 7 as unknown as string }), [{ path: 'slug', code: 'invalid_format' }]);
   assert.equal(validateStoreProfile({} as StoreProfile).length, 11);
+});
+
+test('e-mail validation is linear on the CodeQL polynomial-ReDoS input and rejects it', () => {
+  const alert = '!@!.' + '!.'.repeat(50_000);
+  for (const input of [alert, `${alert} `, `${alert}@`]) {
+    const started = performance.now();
+    assert.equal(emailPattern.test(input), false);
+    assert.ok(performance.now() - started < 100, 'regex must not backtrack');
+  }
+  const started = performance.now();
+  assert.deepEqual(validateStoreProfile({ ...profile, contact: { ...profile.contact, email: alert } }), [{ path: 'contact.email', code: 'too_long' }]);
+  assert.ok(performance.now() - started < 100);
+  for (const valid of ['shop@example.test', 'first.last@sub.example.co']) assert.equal(emailPattern.test(valid), true, valid);
+  for (const invalid of ['x@y', 'a@b.', 'a@.b', 'a@b..c', 'a b@c.d', 'a@b@c.d']) assert.equal(emailPattern.test(invalid), false, invalid);
 });
 
 test('role names match apps/api policy and the user_roles CHECK constraint', () => {

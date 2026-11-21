@@ -11,7 +11,7 @@ export type FieldError = { path: string; code: 'required' | 'too_long' | 'invali
 
 const slugPattern = /^[a-z0-9-]{1,64}$/;
 const countryPattern = /^[A-Z]{2}$/;
-const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+export const emailPattern = /^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/;
 const phonePattern = /^\+[1-9]\d{6,14}$/;
 const postalPattern = /^[A-Za-z0-9 -]{2,12}$/;
 const registrationPattern = /^[A-Za-z0-9 ./-]{1,32}$/;
