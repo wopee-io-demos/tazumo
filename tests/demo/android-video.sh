@@ -14,6 +14,10 @@ export MOBILECLI_DEVICE="$(mobilecli devices | node -e 'const d=JSON.parse(requi
 test -n "$MOBILECLI_DEVICE"
 echo "mobilecli device: $MOBILECLI_DEVICE"
 adb shell settings put system screen_off_timeout 600000
+# A cold software-rendered emulator can raise "Pixel Launcher isn't responding" over the app; let it settle and suppress such dialogs.
+adb shell settings put global hide_error_dialogs 1
+sleep 20
+adb shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS >/dev/null || true
 adb shell monkey -p "$app" -c android.intent.category.LAUNCHER 1 >/dev/null
 sleep 8
 adb shell screenrecord --time-limit 180 --bit-rate 8000000 /sdcard/tazumo-flow.mp4 &
