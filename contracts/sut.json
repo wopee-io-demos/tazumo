@@ -126,6 +126,9 @@
         ],
         "effect": "sets and stores the UI language"
       }
+    },
+    "placeholders": {
+      "lineId": "A cart line: the productId for the product's default configuration (and for a product without options), otherwise productId-{chosen option IDs in menu order}, or productId-none when nothing is chosen. Every cart template that takes {productId} accepts a lineId."
     }
   },
   "native": {
@@ -328,12 +331,12 @@
       "id": "product-options",
       "steps": [
         "open #/product/pizza",
-        "choose sut-option-large and two extras",
-        "assert sut-detail-price shows the unit price with the deltas",
+        "choose sut-option-large, sut-option-olives and sut-option-mushrooms",
+        "assert sut-detail-price contains 17.20",
         "add, then add the default pizza from the catalogue",
         "open cart",
-        "assert two pizza lines (sut-cart-line-pizza and sut-cart-line-pizza-large-{extras}) and an exact subtotal",
-        "choose a third extra and assert sut-options-error and a disabled add"
+        "assert sut-cart-line-pizza and sut-cart-line-pizza-large-olives-mushrooms and subtotal 29.10",
+        "choose a fourth extra and assert sut-options-error and a disabled add"
       ],
       "platforms": [
         "web"

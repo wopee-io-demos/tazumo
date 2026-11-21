@@ -6,14 +6,18 @@ type Props={lang:Language;definition:ProductOptions;selection:Selection;errors:O
 
 export function OptionPicker({lang,definition,selection,errors,onChange}:Props){
   const set=(groupId:string,ids:string[])=>onChange({...selection,[groupId]:ids});
+  const groupOf=(error:OptionsError)=>definition.groups.find(g=>g.id===error.path[1]);
   const message=(error:OptionsError)=>{
-    const group=definition.groups.find(g=>g.id===error.path[1]);
-    return error.code==='too_many_options'&&group?`${optionLabel(lang,group.labelKey)}: ${t(lang,'chooseUpTo').replace('{max}',String(group.max))}`:t(lang,'optionsInvalid');
+    const group=groupOf(error);
+    if(!group)return t(lang,'optionsInvalid');
+    const text=error.code==='too_many_options'?t(lang,'chooseUpTo').replace('{max}',String(group.max)):t(lang,'optionsInvalid');
+    return `${optionLabel(lang,group.labelKey)}: ${text}`;
   };
+  const failing=new Set(errors.map(e=>groupOf(e)?.id));
   return <div className="optionPicker">
     {definition.groups.map(group=>{
       const chosen=selection[group.id]??[],single=group.selection==='single';
-      return <fieldset key={group.id} className="optionGroup" data-testid={`sut-option-group-${group.id}`}>
+      return <fieldset key={group.id} className="optionGroup" data-testid={`sut-option-group-${group.id}`} aria-describedby={failing.has(group.id)?'options-error':undefined}>
         <legend>{optionLabel(lang,group.labelKey)}{!single&&<span className="optionHint"> · {t(lang,'chooseUpTo').replace('{max}',String(group.max))}</span>}</legend>
         {single&&!group.required&&<label><input type="radio" name={`option-${group.id}`} data-testid={`sut-option-none-${group.id}`} checked={chosen.length===0} onChange={()=>set(group.id,[])}/> {t(lang,'optionNone')}</label>}
         {group.options.map(option=><label key={option.id} className={option.available?undefined:'optionUnavailable'}>
@@ -25,6 +29,6 @@ export function OptionPicker({lang,definition,selection,errors,onChange}:Props){
         </label>)}
       </fieldset>;
     })}
-    {errors.length>0&&<p role="alert" className="optionsError" data-testid="sut-options-error">{[...new Set(errors.map(message))].join(' ')}</p>}
+    {errors.length>0&&<p role="alert" id="options-error" className="optionsError" data-testid="sut-options-error">{[...new Set(errors.map(message))].join(' ')}</p>}
   </div>;
 }

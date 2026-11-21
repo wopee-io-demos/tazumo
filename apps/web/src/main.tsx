@@ -1,7 +1,7 @@
 import React,{useMemo,useRef,useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {brandName,palettes,preferredPalette,type PaletteName} from '@tazumo/brand';
-import {products,categories,filterProducts,merchantForProduct,changeQuantity,cartCount,formatLocalizedPrice,t,categoryLabel,type Category,type Cart} from '@tazumo/core';
+import {products,categories,filterProducts,merchantForProduct,changeQuantity,formatLocalizedPrice,t,categoryLabel,type Category,type Cart} from '@tazumo/core';
 import './style.css';
 import './discovery/discovery.css';
 import {CartDrawer} from './discovery/CartDrawer';
@@ -10,6 +10,7 @@ import {MerchantDetail} from './discovery/MerchantDetail';
 import {ProductDetail} from './discovery/ProductDetail';
 import {productHref,useHashRoute} from './discovery/route';
 import {useFavourites} from './discovery/favourites';
+import {pricedCart} from './discovery/options';
 import {useDocumentTitle} from './discovery/documentTitle';
 import './i18n/i18n.css';
 import {LanguageSwitcher} from './i18n/LanguageSwitcher';
@@ -22,7 +23,7 @@ function App(){
  const cartOpener=useRef<HTMLButtonElement>(null);
  const {favourites,toggle:toggleFavourite}=useFavourites(),[favouritesOnly,setFavouritesOnly]=useState(false);
  const visible=useMemo(()=>filterProducts(products,query,category).filter(p=>!favouritesOnly||favourites.includes(merchantForProduct(p)?.id??'')),[query,category,favourites,favouritesOnly]);
- const itemCount=cartCount(cart);
+ const itemCount=pricedCart(cart).reduce((sum,line)=>sum+line.quantity,0);
  const route=useHashRoute();
  useDocumentTitle(route,lang);
  return <div className="app" style={{'--primary':theme.primary,'--accent':theme.accent,'--tint':theme.background,'--ink':theme.ink} as React.CSSProperties}>

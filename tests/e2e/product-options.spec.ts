@@ -41,6 +41,8 @@ test('too many extras show a validation message and disable add; unavailable opt
   await expect(page.getByTestId('sut-options-error')).toHaveCount(0);
   await option(page,'extra-mozzarella').check();
   await expect(page.getByTestId('sut-options-error')).toHaveText('Extras: Choose up to 3.');
+  await expect(page.getByTestId('sut-option-group-extras')).toHaveAttribute('aria-describedby','options-error');
+  await expect(page.getByTestId('sut-detail-price')).toHaveText('€14.30');
   await expect(page.getByTestId('sut-add-pizza')).toBeDisabled();
   await option(page,'olives').uncheck();
   await expect(page.getByTestId('sut-options-error')).toHaveCount(0);
@@ -52,6 +54,11 @@ test('a negative delta and an optional single choice in Czech',async({page})=>{
   await expect(page.getByTestId('sut-option-group-sauce')).toContainText('Omáčka');
   await page.getByTestId('sut-option-none-sauce').check();
   await page.getByTestId('sut-add-burger').click();
+  await page.getByTestId('sut-cart-open').click();
+  await expect(page.getByTestId('sut-cart-line-burger-none')).toBeVisible();
+  await expect(page.getByTestId('sut-cart-line-total-burger-none')).toContainText(/13,90\s€/);
+  await expect(page.getByTestId('sut-cart-line-options-burger-none')).toHaveCount(0);
+  await page.getByTestId('sut-cart-close').click();
   await page.goto('/?lang=cs#/product/pizza');
   await page.getByRole('radio',{name:/Malá −2,00\s€/}).check();
   await expect(page.getByTestId('sut-detail-price')).toHaveText(/9,90\s€/);

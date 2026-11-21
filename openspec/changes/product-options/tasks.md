@@ -18,8 +18,8 @@
 
 ## Slice 3a: web picker and cart lines
 
-- [x] `@tazumo/product-options`: `cartKey`, `parseCartKey`, `lineTestKey`, `priceCartLines` and `syntheticOptionLabel` (en, cs, de). Package tests 56/56, coverage 100/100/100, including uniqueness of the line test keys across every valid fixture configuration.
+- [x] `@tazumo/product-options`: `cartKey`, `parseCartKey`, `lineTestKey`, `priceCartLines` and `syntheticOptionLabel` (en, cs, de). Package tests 57/57, coverage 100/100/100, including uniqueness of the line test keys across every valid fixture configuration.
 - [x] Web product page option picker (fieldsets, radios and checkboxes, deltas in labels, disabled unavailable options, live unit price, validation message with Add disabled) and per-configuration cart lines.
 - [x] SUT contract 0.6.0 (additive): `optionsError`, `optionGroup`, `option`, `optionNone`, `cartLineOptions`, placeholders `{groupId}`, `{optionId}`, `{lineId}`, journey `product-options`; `pnpm check:sut --base origin/main` reports a minor change.
-- [x] Playwright, local Chromium on a private port: `product-options.spec.ts` 4/4 (journey, validation and unavailable option, Czech negative delta and optional none, axe scan), plus `sut-contract`, `web-discovery`, `a11y`, `regression`, `marketplace`, `web-i18n` and `favourites` specs passing.
+- [x] Playwright, local Chromium on a private port: `product-options.spec.ts` 4/4 (journey, validation with the last valid price kept and the error linked to its fieldset, unavailable option, Czech negative delta and `burger-none` cart line, axe scan), plus `sut-contract`, `web-discovery`, `a11y`, `regression`, `marketplace`, `web-i18n` and `favourites` specs passing.
 - [ ] Current-head CI green on the slice 3a PR.

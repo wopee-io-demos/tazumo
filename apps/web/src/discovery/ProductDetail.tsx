@@ -21,7 +21,8 @@ export function ProductDetail({lang,id,cart,onCartChange}:Props){
   const priced=item&&priceSelection(item.options??{productId:item.id,currency:item.basePrice.currency,groups:[]},item.basePrice,selection,1);
   const key=item&&priced?.ok?cartKey(item,priced.selection):undefined;
   const quantity=key?cart[key]??0:0;
-  const actions=useRef<HTMLDivElement>(null),previous=useRef({key,quantity});
+  const actions=useRef<HTMLDivElement>(null),previous=useRef({key,quantity}),lastPrice=useRef(product?.priceCents??0);
+  if(priced?.ok)lastPrice.current=priced.unitPrice.minorUnits;
   useEffect(()=>{
     const before=previous.current;previous.current={key,quantity};
     if(before.key===key&&(before.quantity===0)!==(quantity===0))actions.current?.querySelector<HTMLButtonElement>(quantity>0?'[data-testid^="sut-detail-increase"]':'button')?.focus();
@@ -39,7 +40,7 @@ export function ProductDetail({lang,id,cart,onCartChange}:Props){
         {merchant&&<p>{t(lang,'soldBy')} <a href={merchantHref(merchant.id)} data-testid="sut-detail-merchant-link">{merchant.name}</a></p>}
         <p>{product.description}</p>
         {item.options&&<OptionPicker lang={lang} definition={item.options} selection={selection} errors={priced.ok?[]:priced.errors} onChange={setSelection}/>}
-        <p className="detailPrice" data-testid="sut-detail-price" aria-live="polite">{formatLocalizedPrice(priced.ok?priced.unitPrice.minorUnits:product.priceCents,lang)}</p>
+        <p className="detailPrice" data-testid="sut-detail-price" aria-live="polite">{formatLocalizedPrice(lastPrice.current,lang)}</p>
         <div ref={actions} className="detailActions">{quantity===0
           ?<button type="button" className="primaryAction" data-testid={`sut-add-${product.id}`} aria-label={`${t(lang,'add')} ${product.name}`} disabled={!key} onClick={()=>change(1)}>{t(lang,'add')}</button>
           :<div className="inBasketRow"><span>{t(lang,'inBasket')}</span><QuantityStepper lang={lang} name={product.name} idKey={product.id} quantity={quantity} testIdPrefix="sut-detail" onChange={change} onRemove={()=>onCartChange(c=>removeFromCart(c,key!))}/></div>}</div>

@@ -94,7 +94,9 @@ Web product options (#82, slice 3a): the product page of `pizza`, `burger` and `
 
 ### 0.6.0 (additive)
 - Web product options (#82): `optionsError`, `selectorTemplates.optionGroup`, `option`, `optionNone`, `cartLineOptions`, placeholders `{groupId}`, `{optionId}` and `{lineId}`, and journey `product-options`.
+- `web.placeholders.lineId` defines the cart line placeholder; every `{productId}` cart template accepts a `lineId`.
 - No ID from 0.5.0 was renamed or removed. The default configuration of every product keeps its existing cart IDs.
+- Visible changes for text and visual assertions: the `pizza`, `burger` and `bowl` product pages gain option fieldsets, and their cart lines show the chosen options, including the defaults ("Medium", "House sauce", "Grains").
 
 ### 0.5.0 (additive)
 - Native sign-in (#88): `native.selectors` `authUnavailable`, `authSignIn`, `authSignUp`, `authNotice`, `authPending`, `authSigningOut`, `authUser`, `authSignOut`. A new `native.requiresAuth` lists every one except `authUnavailable`.

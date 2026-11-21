@@ -55,7 +55,8 @@ export function lineTestKey(product: CartProduct, selection: ResolvedSelection):
 
 /**
  * Prices every cart entry with a positive quantity, in cart order. Malformed or non-canonical keys, unknown products
- * and selections that no longer validate (for example an option that became unavailable) are left out.
+ * and selections that no longer validate (for example an option that became unavailable) are left out. The quantity
+ * is not capped here; the server enforces its line limit when it quotes.
  */
 export function priceCartLines(cart: Readonly<Record<string, number>>, find: (productId: string) => CartProduct | undefined): PricedCartLine[] {
   const lines: PricedCartLine[] = [];
@@ -64,9 +65,19 @@ export function priceCartLines(cart: Readonly<Record<string, number>>, find: (pr
     const parsed = parseCartKey(key);
     const product = parsed && find(parsed.productId);
     if (!parsed || !product) continue;
-    const priced = priceSelection(definitionOf(product), product.basePrice, parsed.selection, quantity);
-    if (!priced.ok || cartKey(product, priced.selection) !== key) continue;
-    lines.push({ ...priced, key, productId: product.id, testKey: lineTestKey(product, priced.selection), lineKey: lineKey(product.id, priced.selection) });
+    const priced = priceSelection(definitionOf(product), product.basePrice, parsed.selection, 1);
+    if (!priced.ok || cartKey(product, priced.selection) !== key || !Number.isSafeInteger(quantity)) continue;
+    const total = priced.unitPrice.minorUnits * quantity;
+    if (!Number.isSafeInteger(total)) continue;
+    lines.push({
+      ...priced,
+      quantity,
+      lineTotal: { ...priced.unitPrice, minorUnits: total },
+      key,
+      productId: product.id,
+      testKey: lineTestKey(product, priced.selection),
+      lineKey: lineKey(product.id, priced.selection)
+    });
   }
   return lines;
 }

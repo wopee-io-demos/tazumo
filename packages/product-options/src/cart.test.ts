@@ -53,6 +53,11 @@ test('priceCartLines prices two configurations of one product as separate lines,
   assert.equal(lines[0].lineKey, lineKey('pizza', { size: ['medium'], extras: [] }));
 });
 
+test('priceCartLines does not cap quantities but drops non-integer or unsafe totals', () => {
+  assert.deepEqual(priceCartLines({ bread: 1000 }, find).map((l) => [l.quantity, l.lineTotal.minorUnits]), [[1000, 450_000]]);
+  assert.deepEqual(priceCartLines({ bread: 1.5, pizza: Number.MAX_SAFE_INTEGER }, find), []);
+});
+
 test('priceCartLines leaves out empty, malformed, unknown, non-canonical and invalid entries', () => {
   const cart = {
     pizza: 0,
