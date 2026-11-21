@@ -1,0 +1,47 @@
+{
+  "recordedFrom": "Local Nominatim 5.3.3 (mediagis/nominatim:5.3.3@sha256:168c30e2, infra/geocoding/compose.yaml), Geofabrik Bremen extract 2026-11-20, recorded 2026-11-21. OSM data (c) OpenStreetMap contributors, ODbL 1.0.",
+  "query": {
+    "street": "Am Markt 21",
+    "city": "Bremen",
+    "postalcode": "28195",
+    "countrycodes": "de"
+  },
+  "status": 200,
+  "body": [
+    {
+      "place_id": 210965,
+      "licence": "Data © OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright",
+      "osm_type": "relation",
+      "osm_id": 2190791,
+      "lat": "53.0760668",
+      "lon": "8.8077376",
+      "category": "place",
+      "type": "house",
+      "place_rank": 30,
+      "importance": 9.99999999995449e-06,
+      "addresstype": "place",
+      "name": "",
+      "display_name": "21, Am Markt, Ansgari-Viertel, Altstadt, Mitte, Bremen-Mitte, Bremen, 28195, Deutschland",
+      "address": {
+        "house_number": "21",
+        "road": "Am Markt",
+        "neighbourhood": "Ansgari-Viertel",
+        "quarter": "Altstadt",
+        "suburb": "Mitte",
+        "city_district": "Bremen-Mitte",
+        "city": "Bremen",
+        "state": "Bremen",
+        "ISO3166-2-lvl4": "DE-HB",
+        "postcode": "28195",
+        "country": "Deutschland",
+        "country_code": "de"
+      },
+      "boundingbox": [
+        "53.0757907",
+        "53.0763371",
+        "8.8073053",
+        "8.8086653"
+      ]
+    }
+  ]
+}

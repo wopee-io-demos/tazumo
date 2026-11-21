@@ -3,7 +3,7 @@
 ## 2026-11-20 high-severity advisories
 Initial PR security run 44772710082 identified four high advisories from PostCSS (GHSA-6g55-p6wh-862q, GHSA-r28c-9q8g-f849) and image-size (GHSA-5p2g-fcmc-qvqq, GHSA-w3rx-r6r6-pgpr). Two transitive override constraints were added in root package.json: postcss ^8.5.18 and image-size ^2.0.3.
 
-This is a proposed dependency remediation. CI audit, JS bundles and native builds MUST pass after dependency overrides before any merge. Track a future Expo SDK upgrade and lockfile in #14. Avoid ignoring high/critical advisories to obtain a green check.
+This is a proposed dependency remediation. CI audit, JS bundles and native builds MUST pass after dependency overrides before any merge. `pnpm-lock.yaml` is committed and CI installs it frozen (#14); the Expo SDK upgrade is tracked in #100. Avoid ignoring high/critical advisories to obtain a green check.
 
 ## Automated scanning (ADR-0020)
 
@@ -21,7 +21,7 @@ This is a proposed dependency remediation. CI audit, JS bundles and native build
   - Major version updates are not proposed automatically, for npm or github-actions. Each major is a deliberate PR with a changelog review and green CI (ADR-0020, 2026-11-21 update).
   - Expo, React and React Native majors and minors are left to the Expo SDK upgrade (#14).
   - github-actions is checked weekly as one group, at most 3 PRs. SHA pins are updated with their version comments.
-  - Without a committed lockfile (#14), Dependabot updates manifests only. Transitive advisories are handled by `pnpm audit` and `pnpm.overrides`.
+  - With the committed `pnpm-lock.yaml` (#14), Dependabot updates the lockfile together with the manifests and can raise transitive security fixes. `pnpm audit` and `pnpm.overrides` remain the backstop.
 
 ### Secret-scan allowlist
 
