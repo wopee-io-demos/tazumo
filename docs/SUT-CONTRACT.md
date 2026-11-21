@@ -1,6 +1,6 @@
 # Tazumo, canonical system under test (SUT)
 
-Version: `0.4.0`. Source of truth: [contract](../contracts/sut.json). Tracking: [#32](https://github.com/wopee-io-demos/tazumo/issues/32). Pin the contract `version` and the Tazumo commit you tested against.
+Version: `0.5.0`. Source of truth: [contract](../contracts/sut.json). Tracking: [#32](https://github.com/wopee-io-demos/tazumo/issues/32). Pin the contract `version` and the Tazumo commit you tested against.
 
 Use Tazumo web, Android and iOS as the common application for Wopee demos. Its catalogue is synthetic, checkout is **disabled**, and order tracking is **not operational**. No dummy order should ever be reported as a real purchase.
 
@@ -34,6 +34,7 @@ From the Tazumo monorepo run `pnpm install && pnpm dev:sut`. This intentionally 
 | `web.selectors`, `native.selectors` | Named, concrete IDs. Web values are CSS selectors on `data-testid`; native values are raw `testID`s for the `native.locatorStrategies`. |
 | `web.selectorTemplates`, `native.selectorTemplates` | ID families with a placeholder: `{productId}` and `{merchantId}` from `fixtures` / `@tazumo/core`, `{category}` (`all`, `food`, `groceries`, `shops`, `gifts`) and `{language}` (`en`, `cs`, `de`). |
 | `web.routes` | Hash routes: `#/`, `#/merchant/{merchantId}`, `#/product/{productId}` (ADR-0012). |
+| `web.storage`, `web.urlParameters` | Browser state that survives reloads (`localStorage` keys, their format and defaults) and URL parameters the web app reads (`?lang=`). |
 | `fixtures` | Synthetic products and merchants with stable IDs, names and prices. |
 | `journeys` | Scenario outlines with the `platforms` they apply to. |
 
@@ -56,6 +57,8 @@ Assert on contains-text for amounts, not on the whole element text.
 Web `language` (`sut-language`) is the header language select on every route (#81). A `?lang=` URL parameter sets the language and stores it in `localStorage` (`tazumo.language`), so start each independent test in a fresh browser context.
 
 Web sign-in (#88, [ADR-0027](adr/0027-client-auth.md)): `authUnavailable` is the only sign-in selector in a build without a provider (the public preview). `web.requiresAuth` lists the selectors that appear only in a build with `VITE_OIDC_ISSUER` and `VITE_OIDC_CLIENT_ID`: sign in, create account, the notice after a refused or failed sign-in, and the signed-in account menu with the user and sign-out. Credentials are never typed into Tazumo; a demo that signs in drives the identity provider's hosted page, which is outside this contract. `tests/web-auth/` asserts each `requiresAuth` selector against the real Keycloak realm. `native.requiresAuth` follows the same rule for the native app (built with `EXPO_PUBLIC_OIDC_*`). Native sign-in IDs are checked statically, and `authUnavailable` is checked by the Android emulator smoke.
+
+Web favourites (#95): `selectorTemplates.favourite` (`sut-favourite-{merchantId}`) is a toggle button with `aria-pressed` on merchant cards and on the merchant page. `favouritesFilter` (`sut-favourites-filter`) is a toggle that narrows products and merchants to favourites. Favourites persist on the device in `localStorage` (`tazumo.favourites`, a JSON array of merchant IDs) and sync across tabs. `web.storage` and `web.urlParameters` list the persisted keys and the `?lang=` parameter. A fresh browser context resets both.
 
 ## Versioning
 
@@ -85,9 +88,14 @@ IDs that are in the code but not registered are printed as a note. `tests/contra
 
 ## Changelog
 
-### 0.4.0 (additive)
+### 0.5.0 (additive)
 - Native sign-in (#88): `native.selectors` `authUnavailable`, `authSignIn`, `authSignUp`, `authNotice`, `authPending`, `authSigningOut`, `authUser`, `authSignOut`. A new `native.requiresAuth` lists every one except `authUnavailable`.
 - Web: the transient `authPending` (signing in) and `authSigningOut` states, both in `web.requiresAuth`.
+- No ID from 0.4.0 was renamed or removed.
+
+### 0.4.0 (additive)
+- Web favourites (#95, #130): `favouritesFilter`, `favouritePiazza`, `selectorTemplates.favourite`, journey `favourites-filter`.
+- `web.storage` (`tazumo.language`, `tazumo.favourites`) and `web.urlParameters` (`lang`, #81).
 - No ID from 0.3.0 was renamed or removed.
 
 ### 0.3.0 (additive)

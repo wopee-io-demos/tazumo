@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "version": "0.4.0",
+  "version": "0.5.0",
   "app": "Tazumo",
   "status": "synthetic-only",
   "repo": "https://github.com/wopee-io-demos/tazumo",
@@ -55,6 +55,8 @@
       "authAccountMenu": "[data-testid=\"sut-auth-account-menu\"]",
       "authUser": "[data-testid=\"sut-auth-user\"]",
       "authSignOut": "[data-testid=\"sut-auth-sign-out\"]",
+      "favouritesFilter": "[data-testid=\"sut-favourites-filter\"]",
+      "favouritePiazza": "[data-testid=\"sut-favourite-piazza-local\"]",
       "authPending": "[data-testid=\"sut-auth-pending\"]",
       "authSigningOut": "[data-testid=\"sut-auth-signing-out\"]"
     },
@@ -86,12 +88,39 @@
       "cartDecrease": "[data-testid=\"sut-cart-decrease-{productId}\"]",
       "cartRemove": "[data-testid=\"sut-cart-remove-{productId}\"]",
       "cartQuantity": "[data-testid=\"sut-cart-quantity-{productId}\"]",
-      "cartLineTotal": "[data-testid=\"sut-cart-line-total-{productId}\"]"
+      "cartLineTotal": "[data-testid=\"sut-cart-line-total-{productId}\"]",
+      "favourite": "[data-testid=\"sut-favourite-{merchantId}\"]"
     },
     "routes": {
       "home": "#/",
       "merchant": "#/merchant/{merchantId}",
       "product": "#/product/{productId}"
+    },
+    "storage": {
+      "language": {
+        "key": "tazumo.language",
+        "values": [
+          "en",
+          "cs",
+          "de"
+        ],
+        "default": "en"
+      },
+      "favourites": {
+        "key": "tazumo.favourites",
+        "format": "JSON array of merchantId strings",
+        "default": []
+      }
+    },
+    "urlParameters": {
+      "lang": {
+        "values": [
+          "en",
+          "cs",
+          "de"
+        ],
+        "effect": "sets and stores the UI language"
+      }
     }
   },
   "native": {
@@ -274,6 +303,20 @@
         "decrease quantity",
         "remove Margherita pizza",
         "assert empty cart and checkout disabled"
+      ]
+    },
+    {
+      "id": "favourites-filter",
+      "platforms": [
+        "web"
+      ],
+      "steps": [
+        "favourite Piazza Local from its merchant card",
+        "assert the favourite toggle is pressed",
+        "turn on the Favourites filter",
+        "assert only Piazza Local and its products are listed",
+        "reload and assert the favourite is kept",
+        "un-favourite Piazza Local and assert the favourites empty state"
       ]
     }
   ],

@@ -1,10 +1,11 @@
 import {categoryLabel,findMerchant,formatLocalizedPrice,productsForMerchant,t,type Language} from '@tazumo/core';
 import {Breadcrumbs,NotFound,useRouteFocus} from './common';
+import {FavouriteButton} from './favourites';
 import {homeHref,productHref} from './route';
 
-type Props={lang:Language;id:string;cart:Record<string,number>;onAdd:(productId:string)=>void};
+type Props={lang:Language;id:string;cart:Record<string,number>;onAdd:(productId:string)=>void;favourites:string[];onToggleFavourite:(id:string)=>void};
 
-export function MerchantDetail({lang,id,cart,onAdd}:Props){
+export function MerchantDetail({lang,id,cart,onAdd,favourites,onToggleFavourite}:Props){
   const merchant=findMerchant(id);
   const heading=useRouteFocus(id);
   if(!merchant)return <NotFound lang={lang} routeKey={id} message={t(lang,'merchantNotFound')} testId="sut-merchant-not-found"/>;
@@ -13,6 +14,7 @@ export function MerchantDetail({lang,id,cart,onAdd}:Props){
     <header className="detailHero">
       <span className="detailEmoji" aria-hidden="true">{merchant.emoji}</span>
       <div><p className="kicker">{categoryLabel(lang,merchant.category)}</p><h1 ref={heading} tabIndex={-1}>{merchant.name}</h1><p>{merchant.description}</p><small>{t(lang,'demo')}</small></div>
+      <FavouriteButton lang={lang} merchant={merchant} on={favourites.includes(merchant.id)} onToggle={onToggleFavourite}/>
     </header>
     <h2>{t(lang,'menu')}</h2>
     <ul className="detailProducts">{productsForMerchant(merchant).map(p=><li key={p.id} data-testid={`sut-merchant-product-${p.id}`}>

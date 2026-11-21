@@ -43,9 +43,25 @@ Contract tests build the seed from `@tazumo/core` with `buildSeed()` from `apps/
 
 Use roles and accessible names, or `data-testid` / `testID` values from the SUT contract. Do not use CSS classes, DOM positions or text offsets. Shared helpers are in `tests/e2e/support/locators.ts`.
 
+## CI scope per pull request
+
+The required checks (`check`, `evidence`, `dependency-audit`, `CodeQL PR analysis`, `Secret scan`) run on every pull request, because branch protection waits for them. Their workflows are never path-filtered. Each job starts with `node scripts/ci-changes.mjs`, which reads `git diff HEAD^1 HEAD` on the PR merge commit and gates the expensive steps:
+
+| Changed files | `check` | `evidence` | `dependency-audit` | `CodeQL PR analysis` |
+| --- | --- | --- | --- | --- |
+| Docs only (`*.md`, `docs/**`, `openspec/**`) | policy and OpenAPI checks only | skipped steps, reports success | skipped | skipped |
+| `apps/web/**`, `packages/**`, `tests/e2e/**`, `contracts/**`, `playwright.config.ts` | install, typecheck, unit and contract tests, web build | Playwright e2e and report | only if a `package.json` changed | analysis |
+| `apps/mobile/**`, `packages/core/**`, `packages/brand/**` | the above plus `pnpm bundle:mobile` | e2e only for package changes | as above | analysis |
+| Other code (for example `apps/api/**`) | install, typecheck, unit and contract tests | skipped | as above | analysis when JS/TS, HTML, JSON or YAML outside `.github/workflows` changed |
+| Root `package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`, `.npmrc`, root `tsconfig*.json`, `ci.yml`, `test-evidence.yml`, `security.yml`, `codeql.yml`, the classifier | everything | everything | audit | analysis |
+
+Playwright runs once per pull request, in `evidence`; `check` no longer runs it. The runner guard runs in `evidence` when a workflow changes. Pushes to `main`, schedules, manual runs and pull requests into any branch other than `main` always run everything. `Secret scan` always scans the PR's commits.
+
+The path-filtered workflows (`api.yml`, `backoffice.yml`, `screenshots.yml`, `demo-videos.yml`, `idp.yml`, `payments.yml`) start only for the files they use; `screenshots.yml` selects its web and native captures with `tests/screenshots/scope.sh` (#157). `native-builds.yml` has its own scope (see its section). Superseded runs of the same pull request are cancelled; runs on `main` are never cancelled, except in `native-builds.yml` and the deploy queue in `pages.yml`.
+
 ## Native CI scope
 
-- **JavaScript and shared packages:** the required `check` job runs `pnpm bundle:mobile` on every PR. It builds the iOS and Android JS bundles with Expo, so changes to `apps/mobile/src`, `@tazumo/core` and `@tazumo/brand` are compiled for both platforms there.
+- **JavaScript and shared packages:** the required `check` job runs `pnpm bundle:mobile` on every PR that changes `apps/mobile/**`, `@tazumo/core`, `@tazumo/brand` or the install files. It builds the iOS and Android JS bundles with Expo, so changes to `apps/mobile/src`, `@tazumo/core` and `@tazumo/brand` are compiled for both platforms there.
 - **Native layer:** on pull requests, `native-builds.yml` runs the Gradle (`Android debug APK`) and Xcode (`iOS simulator build`) builds only for native-layer changes. The `changes` job decides, from this list:
   - `apps/mobile/app.json`, `package.json` and `eas.json`;
   - `apps/mobile/assets/**` and `apps/mobile/plugins/**`;
@@ -59,7 +75,7 @@ Use roles and accessible names, or `data-testid` / `testID` values from the SUT 
 
 ## CI evidence
 
-[`test-evidence.yml`](../.github/workflows/test-evidence.yml) runs the contract tests and all Playwright specs on every pull request and push to `main`, and uploads two artifacts on every run, pass or fail:
+[`test-evidence.yml`](../.github/workflows/test-evidence.yml) runs all Playwright specs on every push to `main` and on pull requests that change the web app, packages, e2e tests or contracts. Those runs upload two artifacts, pass or fail:
 
 - `playwright-report`: the HTML report. Each accessibility test carries its axe JSON and a full-page screenshot as attachments; every test has a final screenshot.
 - `playwright-test-results`: raw screenshots, plus traces for failed attempts.

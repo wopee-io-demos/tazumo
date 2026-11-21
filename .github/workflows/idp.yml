@@ -26,8 +26,8 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: idp-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: idp-${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   keycloak:
     runs-on: ubuntu-latest
