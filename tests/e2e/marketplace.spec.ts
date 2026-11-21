@@ -59,3 +59,15 @@ test('native dialog restores keyboard focus after Escape',async({page})=>{
  await expect(page.getByRole('dialog')).not.toBeVisible();
  await expect(opener).toBeFocused();
 });
+
+test('canonical SUT selectors support independent demo tools',async({page})=>{
+ await page.goto('/');
+ await expect(page.getByTestId('sut-product-pizza')).toContainText('Margherita pizza');
+ await page.getByTestId('sut-search').fill('Piazza');
+ await expect(page.getByTestId('sut-product-pizza')).toBeVisible();
+ await page.getByTestId('sut-add-pizza').click();
+ await page.getByTestId('sut-cart-open').click();
+ await expect(page.getByTestId('sut-cart-dialog')).toContainText('Margherita pizza');
+ await expect(page.getByTestId('sut-cart-dialog')).toContainText('11.90');
+ await expect(page.getByTestId('sut-cart-dialog').getByRole('button',{name:'Checkout coming later'})).toBeDisabled();
+});
