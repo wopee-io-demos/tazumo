@@ -7,7 +7,11 @@ on:
     paths:
       - '.github/workflows/geocoding-integration.yml'
       - 'infra/geocoding/**'
+      - 'packages/address/src/address.ts'
+      - 'packages/address/src/delivery.ts'
+      - 'packages/address/src/geocoder.ts'
       - 'packages/address/src/nominatim.ts'
+      - 'packages/address/src/redact.ts'
       - 'packages/address/src/recorded/**'
       - 'packages/address/integration/**'
 permissions:
@@ -17,7 +21,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   nominatim:
-    name: Nominatim (Bremen extract)
+    name: Nominatim (Vienna extract)
     # Needs Docker, so it stays on GitHub-hosted runners.
     runs-on: ubuntu-24.04
     timeout-minutes: 40
@@ -42,8 +46,12 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: geo-data/extracts
-          key: geofabrik-bremen-${{ steps.week.outputs.iso }}
-      - run: REGIONS=europe/germany/bremen KEEP_EXISTING=1 bash infra/geocoding/prepare-extract.sh
+          key: osmfr-wien-${{ steps.week.outputs.iso }}
+      # download.geofabrik.de refuses connections from GitHub-hosted runners, so CI uses the OSM France mirror.
+      - run: bash infra/geocoding/prepare-extract.sh
+        env:
+          EXTRACT_URLS: https://download.openstreetmap.fr/extracts/europe/austria/wien.osm.pbf
+          KEEP_EXISTING: '1'
       - run: docker compose -f infra/geocoding/compose.yaml up -d
       - name: Wait for the import
         run: |
@@ -61,7 +69,9 @@ jobs:
         run: |
           docker compose -f infra/geocoding/compose.yaml logs > nominatim.log 2>&1
           grep -q 'Nominatim is ready to accept requests' nominatim.log
-          if grep -nE 'Am(%20|\+| )Markt|Erfundene' nominatim.log; then exit 1; fi
-          docker compose -f infra/geocoding/compose.yaml exec -T nominatim sh -c '! grep -rlE "Am Markt|Erfundene" /var/log'
+          if grep -nE 'Friedrich-Schmidt|Fiktivgasse' nominatim.log; then exit 1; fi
+          set +e
+          docker compose -f infra/geocoding/compose.yaml exec -T nominatim grep -rqE 'Friedrich-Schmidt|Fiktivgasse' /var/log
+          [ $? -eq 1 ]
       - if: always()
         run: docker compose -f infra/geocoding/compose.yaml down -v

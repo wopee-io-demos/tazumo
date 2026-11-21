@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Downloads the Geofabrik extracts for the Tazumo markets, verifies their MD5 sums and merges them
 # into $NOMINATIM_DATA_DIR/markets.osm.pbf for compose.yaml. Run it once per import, not on a schedule loop.
-# KEEP_EXISTING=1 reuses extracts already on disk without contacting Geofabrik (used by CI with a weekly cache).
+# KEEP_EXISTING=1 reuses extracts already on disk without contacting the server (used by CI with a weekly cache).
+# EXTRACT_URLS replaces the Geofabrik list with explicit .osm.pbf URLs that publish a .md5 next to them (CI uses a
+# download.openstreetmap.fr extract because GitHub-hosted runners cannot reach download.geofabrik.de).
 set -euo pipefail
 
 REGIONS=${REGIONS:-"europe/slovakia europe/czech-republic europe/germany europe/austria"}
@@ -15,11 +17,24 @@ md5of() { if command -v md5sum >/dev/null; then md5sum "$1" | cut -d' ' -f1; els
 
 mkdir -p "$DATA_DIR/extracts"
 DATA_DIR=$(cd "$DATA_DIR" && pwd)
+urls=()
+if [ -n "${EXTRACT_URLS:-}" ]; then
+  for url in $EXTRACT_URLS; do
+    [[ $url =~ ^https://[A-Za-z0-9.-]+/[A-Za-z0-9/_.-]+\.osm\.pbf$ && $url != *..* ]] || { echo "Invalid extract URL: $url" >&2; exit 1; }
+    urls+=("$url")
+  done
+else
+  for region in $REGIONS; do
+    [[ $region =~ ^[a-z0-9-]+(/[a-z0-9-]+)*$ ]] || { echo "Invalid region: $region" >&2; exit 1; }
+    urls+=("$GEOFABRIK/$region/${region##*/}-latest.osm.pbf")
+  done
+fi
+
 files=()
-for region in $REGIONS; do
-  [[ $region =~ ^[a-z0-9-]+(/[a-z0-9-]+)*$ ]] || { echo "Invalid region: $region" >&2; exit 1; }
-  name=${region##*/}
-  url="$GEOFABRIK/$region/$name-latest.osm.pbf"
+for url in "${urls[@]}"; do
+  name=${url##*/}
+  name=${name%.osm.pbf}
+  name=${name%-latest}
   target="$DATA_DIR/extracts/$name.osm.pbf"
   files+=("/data/extracts/$name.osm.pbf")
   if [ "${KEEP_EXISTING:-0}" = 1 ] && [ -s "$target" ]; then

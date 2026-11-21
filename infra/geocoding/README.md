@@ -22,11 +22,18 @@ docker compose logs -f nominatim  # wait for "Nominatim is ready to accept reque
 curl -fsS http://127.0.0.1:8080/status
 ```
 
-`REGIONS` overrides the extract list (Geofabrik paths such as `europe/germany/bremen`). `KEEP_EXISTING=1` reuses extracts already on disk without contacting Geofabrik. For a smoke test, use one small in-market region:
+Options:
+- `REGIONS` overrides the extract list with Geofabrik paths such as `europe/germany/bremen`.
+- `EXTRACT_URLS` replaces Geofabrik with explicit `.osm.pbf` URLs that publish a `.md5` next to them.
+- `KEEP_EXISTING=1` reuses extracts already on disk without contacting the server.
+
+For a smoke test, use one small in-market region, the same one CI uses:
 
 ```bash
-REGIONS="europe/germany/bremen" ./prepare-extract.sh
+EXTRACT_URLS=https://download.openstreetmap.fr/extracts/europe/austria/wien.osm.pbf ./prepare-extract.sh
 ```
+
+`osmium-tool` is pinned to the Debian trixie version (`1.18.0-1`). When Debian replaces it with a point release, the merge fails loudly at install. Then update `OSMIUM_VERSION` in the script.
 
 ## Sizing
 
@@ -40,7 +47,7 @@ REGIONS="europe/germany/bremen" ./prepare-extract.sh
 | Import time | about 12–18 h for all four on a Ryzen 5 3600 with NVMe | Community: Germany alone took 10 h on that CPU with 32 GB RAM. **Unverified** for the four-country extract |
 | Germany share | about 70% of data and time | File sizes |
 
-Verified locally on 2026-11-21 (Docker Desktop, 4 CPUs, 8 GB): `prepare-extract.sh` merged Bremen and Liechtenstein (24 MB), and the import with this compose file took 5.6 minutes. `pg_database_size` was 303 MB with `FREEZE` (679 MB without). PostgreSQL ran with `log_min_error_statement = panic`, and neither the container log nor `/var/log` contained any searched street. Small extracts are dominated by fixed overhead, so this does not scale linearly to the four-country import. The startup line `Control server error: [Errno 13] Permission denied: '/root/.gunicorn'` is harmless: the API serves normally.
+Verified locally on 2026-11-21 (Docker Desktop, 4 CPUs, 8 GB): `prepare-extract.sh` merged Bremen and Liechtenstein (24 MB), and the import with this compose file took 5.6 minutes. `pg_database_size` was 303 MB with `FREEZE` (679 MB without). The Vienna extract (51 MB, the CI smoke region) took 9.4 minutes and gave 467 MB. PostgreSQL ran with `log_min_error_statement = panic`, and neither the container log nor `/var/log` contained any searched street. Small extracts are dominated by fixed overhead, so this does not scale linearly to the four-country import. The startup line `Control server error: [Errno 13] Permission denied: '/root/.gunicorn'` is harmless: the API serves normally.
 
 ## Updates
 
@@ -62,7 +69,7 @@ Address data changes slowly, so a month is enough for delivery eligibility. Nomi
 
 ## Integration check
 
-`packages/address/integration/nominatim.test.ts` runs `NominatimGeocoder` against a live instance when `NOMINATIM_URL` is set. Against a Bremen import:
+`packages/address/integration/nominatim.test.ts` runs `NominatimGeocoder` against a live instance with the Vienna extract when `NOMINATIM_URL` is set. The CI job `.github/workflows/geocoding-integration.yml` imports that extract on a GitHub-hosted runner, runs these tests, and fails if a searched street appears in the container log or in `/var/log`. `download.geofabrik.de` refuses connections from GitHub-hosted runners, so CI downloads from the OSM France mirror once a week (cached). Run it by hand with:
 
 ```bash
 NOMINATIM_URL=http://127.0.0.1:8080 node --experimental-strip-types --test packages/address/integration/*.test.ts
