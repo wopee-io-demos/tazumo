@@ -44,7 +44,7 @@ Web and native differ in places; do not share one locator table across platforms
 | Purpose | Web | Native |
 | --- | --- | --- |
 | Product page / screen root | `detailProduct` (`sut-detail-product`) | `detailScreen` (`sut-detail-screen`); title text `detailTitle` |
-| Quantity on the detail page | `selectorTemplates.detailQuantity` (`sut-detail-quantity-{productId}`), number only, after the first add | `selectors.detailQuantity` (`sut-detail-quantity`), text "In cart: N" |
+| Quantity on the detail page | `selectorTemplates.detailQuantity` (`sut-detail-quantity-{productId}`), number only, after the first add | `selectors.detailQuantity` (`sut-detail-quantity`), text "In your cart: N" |
 | Add on the detail page | `sut-add-{productId}` | `detailAdd` (`sut-detail-add`) |
 | Subtotal | `cartSubtotal` contains the amount only | `cartSubtotal` contains "Subtotal" and the amount |
 | Empty cart | `cartEmpty` in the cart drawer | `cartEmpty` on the cart screen |
@@ -77,7 +77,7 @@ Reordering arrays of IDs or values (for example `platforms`) is not a change. Th
 - fixtures differ from `@tazumo/core`, or IDs are duplicated;
 - a checkout control is not disabled.
 
-IDs that are in the code but not registered are printed as a note. `tests/contract/sut-contract.test.mts` covers the checker with mutations: it removes each registered ID's attribute, comments an element out, moves an ID to another attribute or the wrong platform's prop, and re-enables checkout, plus semantic-version cases. `tests/e2e/sut-contract.spec.ts` runs the `merchant-detail-cart` journey in Chromium using only contract selectors and routes, and asserts that every web selector and template is visible in at least one app state. Native IDs are verified statically only; there is no Appium run against them in this repository.
+IDs that are in the code but not registered are printed as a note. `tests/contract/sut-contract.test.mts` covers the checker with mutations: it removes each registered ID's attribute, comments an element out, moves an ID to another attribute or the wrong platform's prop, and re-enables checkout, plus semantic-version cases. `tests/e2e/sut-contract.spec.ts` runs the `merchant-detail-cart` journey in Chromium using only contract selectors and routes, and asserts that every web selector and template is visible in at least one app state. On Android, `apps/mobile/tests/contract-walk.mjs` walks the app on an emulator (catalogue, mini-cart, product detail, cart screen and the `native-detail-cart` journey). It asserts that every native ID, with templates filled from the fixtures, resolves by `id` with UiAutomator2 `disableIdLocatorAutocompletion: true`, and that every checkout control is disabled. It saves the UiAutomator XML tree of each screen, and `verify-contract-walk.mjs` checks the report against the contract and those trees. Run it with `bash apps/mobile/tests/android-contract-walk.sh contracts/sut.json <outDir>` on a booted emulator with the app installed. A new native contract key fails the walk until it is added to the walk plan. iOS is not walked yet.
 
 ## Changelog
 
