@@ -1,7 +1,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: Automated dependency updates
-Dependabot SHALL propose grouped weekly npm and github-actions updates with open-PR limits. Patch and minor updates SHALL be grouped per ecosystem across all configured directories. Major version updates SHALL NOT be proposed automatically. Expo-pinned packages SHALL receive patch updates only.
+Dependabot SHALL propose grouped weekly npm and github-actions updates with open-PR limits. Patch and minor updates SHALL arrive as one pull request per group per run, across the configured directories. Major version updates SHALL NOT be proposed automatically. Expo-pinned packages SHALL receive patch updates only.
 
 #### Scenario: Weekly update run
 - **WHEN** the weekly Dependabot run finds updates
@@ -13,4 +13,4 @@ Dependabot SHALL propose grouped weekly npm and github-actions updates with open
 
 #### Scenario: Patch and minor releases in several workspaces
 - **WHEN** patch or minor releases exist for packages in several workspace directories
-- **THEN** they arrive in one pull request per group, not one per directory
+- **THEN** each group's updates arrive in one pull request, not one per directory
