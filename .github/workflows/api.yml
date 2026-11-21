@@ -26,7 +26,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   api:
-    runs-on: ${{ vars.RUNNER_MODE == 'hosted' && 'ubuntu-latest' || fromJSON('["self-hosted","linux","x64","demos"]') }}
+    runs-on: ${{ (vars.RUNNER_MODE == 'hosted' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository)) && 'ubuntu-latest' || fromJSON('["self-hosted","linux","x64","demos"]') }}
     timeout-minutes: 20
     services:
       postgres:
@@ -75,8 +75,9 @@ jobs:
           merchant_id=$(node -e 'const m=JSON.parse(process.argv[1]).find(x=>x.slug==="piazza-local");if(!m)process.exit(1);console.log(m.id)' "$merchants")
           curl -sf "$base/v1/merchants/$merchant_id/products" | grep -q '"slug":"pizza"'
           test "$(curl -s -o /dev/null -w '%{http_code}' "$base/v1/merchants")" = 400
+          test "$(curl -s -o /dev/null -w '%{http_code}' "$base/v1/me")" = 503
           kill "$srv"
-          pnpm db:rollback
+          node --experimental-strip-types src/migrate.ts down all
       - name: Server log
         if: always()
         run: cat apps/api/server.log 2>/dev/null || true

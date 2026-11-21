@@ -22,5 +22,7 @@ export function cartTotal(cart:Cart,list:Product[]=products):number {return list
 export function changeQuantity(cart:Cart,id:string,delta:number):Cart {const next={...cart};const qty=Math.max(0,(next[id]??0)+delta);if(qty===0)delete next[id];else next[id]=qty;return next}
 export function formatPrice(cents:number,locale='en-IE',currency='EUR'):string{return new Intl.NumberFormat(locale,{style:'currency',currency}).format(cents/100)}
 
-export {languages,t,categoryLabel,formatLocalizedPrice} from './localization.ts';
+export {languages,languageNames,t,categoryLabel,formatLocalizedPrice} from './localization.ts';
 export type {Language,MessageKey} from './localization.ts';
+export {merchants,findMerchant,findProduct,merchantForProduct,productsForMerchant,filterMerchants,setQuantity,removeFromCart,cartLines} from './discovery.ts';
+export type {Merchant,CartLine} from './discovery.ts';

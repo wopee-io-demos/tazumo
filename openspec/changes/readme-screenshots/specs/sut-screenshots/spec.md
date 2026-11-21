@@ -33,3 +33,14 @@ Each committed PNG SHALL be optimised and stay under about 300 KB.
 #### Scenario: Optimise and enforce the size limit
 - **WHEN** the capture script runs
 - **THEN** it quantises every PNG with `pngquant`, records the optimiser version in `provenance.json`, and fails without touching the gallery if `pngquant` is missing or any PNG exceeds 300 KB
+
+### Requirement: Native captures come from simulator and emulator builds in CI
+The `SUT screenshots` workflow SHALL build the Expo app for the iOS simulator and the Android emulator on hosted runners, install and launch `io.wopee.demos.tazumo`, drive it to the catalogue and to a cart with items, capture with `xcrun simctl io screenshot` and `adb exec-out screencap`, and upload the PNGs with a `provenance.json` that names the workflow run, SUT commit, device, OS and build.
+
+#### Scenario: Publish native captures
+- **WHEN** a maintainer copies native PNGs into `docs/screenshots/ios/` or `docs/screenshots/android/`
+- **THEN** they are byte-identical to the artifact of the workflow run cited in the README
+
+#### Scenario: App does not reach the expected state
+- **WHEN** the catalogue text, the cart button or the subtotal €46.20 is not found
+- **THEN** the job fails and uploads no screenshot artifact for that platform

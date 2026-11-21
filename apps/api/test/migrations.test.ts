@@ -14,12 +14,12 @@ const tables = async (db: Awaited<ReturnType<typeof createTestDb>>) =>
 test('migrations create the catalogue schema, are idempotent and reversible', async () => {
   const db = await createTestDb();
   try {
-    assert.deepEqual(await tables(db), ['catalogue_categories', 'markets', 'merchants', 'products']);
+    assert.deepEqual(await tables(db), ['audit_events', 'catalogue_categories', 'markets', 'merchants', 'products', 'user_roles', 'users']);
     assert.equal((await migrate({ databaseUrl: databaseUrl(), direction: 'up', schema: db.schema })).length, 0);
-    await migrate({ databaseUrl: databaseUrl(), direction: 'down', schema: db.schema });
+    await migrate({ databaseUrl: databaseUrl(), direction: 'down', count: Infinity, schema: db.schema });
     assert.deepEqual(await tables(db), []);
     await migrate({ databaseUrl: databaseUrl(), direction: 'up', schema: db.schema });
-    assert.equal((await tables(db)).length, 4);
+    assert.equal((await tables(db)).length, 7);
   } finally {
     await db.drop();
   }
@@ -48,6 +48,23 @@ test('database rejects invalid money and identifiers', async () => {
       /foreign key/
     );
   } finally {
+    await db.drop();
+  }
+});
+
+test('migration 0003 refuses an existing tazumo_api role with unsafe attributes or memberships', async () => {
+  const db = await createTestDb();
+  const fresh = await createTestDb({ migrated: false });
+  try {
+    await db.pool.query('ALTER ROLE tazumo_api LOGIN');
+    await assert.rejects(migrate({ databaseUrl: databaseUrl(), direction: 'up', schema: fresh.schema }), /unsafe attributes/);
+    await db.pool.query('ALTER ROLE tazumo_api NOLOGIN');
+    await db.pool.query('GRANT pg_read_all_data TO tazumo_api');
+    await assert.rejects(migrate({ databaseUrl: databaseUrl(), direction: 'up', schema: fresh.schema }), /unsafe attributes/);
+  } finally {
+    await db.pool.query('ALTER ROLE tazumo_api NOLOGIN');
+    await db.pool.query('REVOKE pg_read_all_data FROM tazumo_api');
+    await fresh.drop();
     await db.drop();
   }
 });

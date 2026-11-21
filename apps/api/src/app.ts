@@ -1,14 +1,35 @@
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import Fastify, { type FastifyError, type FastifyRequest, type FastifyServerOptions } from 'fastify';
 import type pg from 'pg';
-import { componentSchemas } from './contract.ts';
+import { createAuthenticate, type AuthOptions } from './auth/plugin.ts';
+import { createPseudonymizer } from './auth/pseudonym.ts';
+import { componentSchemas, requiresBearer } from './contract.ts';
+import { createRateLimits, type RateLimitOptions } from './rate-limit.ts';
 import { apiError } from './errors.ts';
 import { catalogueRoutes } from './routes/catalogue.ts';
 import { healthRoutes } from './routes/health.ts';
+import { identityRoutes } from './routes/identity.ts';
+import { adminRoutes } from './routes/admin.ts';
+import { privacyRoutes } from './routes/privacy.ts';
 
-export type AppOptions = { pool: pg.Pool; logger?: FastifyServerOptions['logger'] };
+export type AppOptions = {
+  pool: pg.Pool;
+  logger?: FastifyServerOptions['logger'];
+  auth?: AuthOptions;
+  rateLimits?: RateLimitOptions;
+  trustProxy?: FastifyServerOptions['trustProxy'];
+};
 
-export function buildApp({ pool, logger = false }: AppOptions) {
+const canonicalUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function lowerCaseUuids(values: unknown) {
+  if (!values || typeof values !== 'object') return;
+  const record = values as Record<string, unknown>;
+  for (const [key, value] of Object.entries(record)) {
+    if (typeof value === 'string' && canonicalUuid.test(value)) record[key] = value.toLowerCase();
+  }
+}
+
+export function buildApp({ pool, logger = false, auth, rateLimits, trustProxy = false }: AppOptions) {
   const loggerOptions = logger === true ? {} : logger;
   const app = Fastify({
     logger:
@@ -22,6 +43,7 @@ export function buildApp({ pool, logger = false }: AppOptions) {
             }
           }
         : false,
+    trustProxy,
     genReqId: () => randomUUID(),
     requestIdHeader: false,
     bodyLimit: 16 * 1024,
@@ -29,6 +51,22 @@ export function buildApp({ pool, logger = false }: AppOptions) {
   });
 
   for (const schema of componentSchemas()) app.addSchema(schema);
+  app.decorateRequest('principal', null);
+
+  if (auth && !auth.logSalt) throw new Error('auth.logSalt is required when authentication is configured');
+  const pseudonymizer = createPseudonymizer(auth?.logSalt ?? randomBytes(32).toString('hex'));
+  const authenticate = createAuthenticate(pool, auth, pseudonymizer);
+  const limits = createRateLimits(rateLimits);
+  app.addHook('onRoute', (route) => {
+    if (requiresBearer(route.method, route.url)) {
+      route.onRequest = [limits.byIp, authenticate, limits.byPrincipal, ...[route.onRequest ?? []].flat()];
+    }
+  });
+
+  app.addHook('preHandler', async (request) => {
+    lowerCaseUuids(request.params);
+    lowerCaseUuids(request.query);
+  });
 
   app.addHook('onSend', async (request, reply) => {
     reply.header('x-request-id', request.id);
@@ -55,5 +93,8 @@ export function buildApp({ pool, logger = false }: AppOptions) {
 
   app.register(healthRoutes, { pool });
   app.register(catalogueRoutes, { pool });
+  app.register(identityRoutes, { pool });
+  app.register(adminRoutes, { pool });
+  app.register(privacyRoutes, { pool, pseudonymizer });
   return app;
 }

@@ -9,7 +9,7 @@ permissions:
   contents: read
 jobs:
   dependency-audit:
-    runs-on: ${{ vars.RUNNER_MODE == 'hosted' && 'ubuntu-latest' || fromJSON('["self-hosted","linux","x64","demos"]') }}
+    runs-on: ${{ (vars.RUNNER_MODE == 'hosted' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository)) && 'ubuntu-latest' || fromJSON('["self-hosted","linux","x64","demos"]') }}
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
