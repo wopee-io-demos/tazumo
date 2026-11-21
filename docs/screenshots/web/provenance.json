@@ -1,6 +1,6 @@
 {
-  "sutCommit": "3354ab63930c56ff8fb138e55c1682c54029a04c",
-  "captureCommit": "357a51ac078277d975041be54af0266e3dd1565f",
+  "sutCommit": "be970e26633469e94876c5740051fcb1ed082179",
+  "captureCommit": "18637308d850f92b67a9cfcad18cd3014661ef28",
   "worktreeDirty": false,
   "fixtureData": "packages/core/src/index.ts products (synthetic, illustrative)",
   "captureCommand": "bash scripts/capture-web-screenshots.sh",
@@ -15,5 +15,5 @@
   "environment": "app language EN, locale en-IE, timezone Europe/Prague, light scheme, reduced motion, animations and caret disabled, Google Fonts loaded from the network",
   "clock": "2026-11-20T09:41:00+01:00",
   "optimiser": "pngquant 3.0.3",
-  "capturedAt": "2026-11-20T20:10:17Z"
+  "capturedAt": "2026-11-21T12:11:41Z"
 }

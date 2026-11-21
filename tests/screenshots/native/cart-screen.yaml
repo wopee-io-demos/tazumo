@@ -1,0 +1,20 @@
+appId: io.wopee.demos.tazumo
+---
+- scrollUntilVisible:
+    element:
+      id: "sut-cart-screen-open"
+    direction: DOWN
+    visibilityPercentage: 50
+    timeout: 30000
+- tapOn:
+    id: "sut-cart-screen-open"
+- extendedWaitUntil:
+    visible:
+      id: "sut-cart-screen"
+    timeout: 10000
+- assertVisible:
+    id: "sut-cart-subtotal"
+    text: "Subtotal €46.20"
+- assertVisible:
+    id: "sut-cart-checkout-disabled"
+- waitForAnimationToEnd
