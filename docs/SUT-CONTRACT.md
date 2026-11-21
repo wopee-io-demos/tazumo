@@ -1,6 +1,6 @@
 # Tazumo, canonical system under test (SUT)
 
-Version: `0.2.0`. Source of truth: [contract](../contracts/sut.json). Tracking: [#32](https://github.com/wopee-io-demos/tazumo/issues/32). Pin the contract `version` and the Tazumo commit you tested against.
+Version: `0.3.0`. Source of truth: [contract](../contracts/sut.json). Tracking: [#32](https://github.com/wopee-io-demos/tazumo/issues/32). Pin the contract `version` and the Tazumo commit you tested against.
 
 Use Tazumo web, Android and iOS as the common application for Wopee demos. Its catalogue is synthetic, checkout is **disabled**, and order tracking is **not operational**. No dummy order should ever be reported as a real purchase.
 
@@ -55,6 +55,8 @@ Assert on contains-text for amounts, not on the whole element text.
 
 Web `language` (`sut-language`) is the header language select on every route (#81). A `?lang=` URL parameter sets the language and stores it in `localStorage` (`tazumo.language`), so start each independent test in a fresh browser context.
 
+Web sign-in (#88, [ADR-0027](adr/0027-client-auth.md)): `authUnavailable` is the only sign-in selector in a build without a provider (the public preview). `web.requiresAuth` lists the selectors that appear only in a build with `VITE_OIDC_ISSUER` and `VITE_OIDC_CLIENT_ID`: sign in, create account, the notice after a refused or failed sign-in, and the signed-in account menu with the user and sign-out. Credentials are never typed into Tazumo; a demo that signs in drives the identity provider's hosted page, which is outside this contract. `tests/web-auth/` asserts each `requiresAuth` selector against the real Keycloak realm.
+
 ## Versioning
 
 The contract version is checked by `pnpm check:sut --base <ref>`. CI compares a pull request with its base branch and a push to `main` with the previous `main` commit. The new version must be exactly the next one for the kind of change:
@@ -63,6 +65,8 @@ The contract version is checked by `pnpm check:sut --base <ref>`. CI compares a 
 - **Minor**: something is added (IDs, templates, routes, fixtures, journeys, fields).
 - **Patch**: only prose changes (journey step wording, `isolation`, `repo`).
 - **None**: an unchanged contract keeps its version.
+
+`web.requiresAuth` is graded by effect: listing a selector that already existed is major (it disappears from builds without a provider), removing an entry is minor, and listing a new selector together with its addition is minor.
 
 Reordering arrays of IDs or values (for example `platforms`) is not a change. The push check runs after a merge and cannot block it; concurrent pull requests that each bump to the same version are caught only if branches must be up to date with `main` before merging. A force-push to `main` can make the previous commit unfetchable, which fails the push check.
 
@@ -80,6 +84,11 @@ Reordering arrays of IDs or values (for example `platforms`) is not a change. Th
 IDs that are in the code but not registered are printed as a note. `tests/contract/sut-contract.test.mts` covers the checker with mutations: it removes each registered ID's attribute, comments an element out, moves an ID to another attribute or the wrong platform's prop, and re-enables checkout, plus semantic-version cases. `tests/e2e/sut-contract.spec.ts` runs the `merchant-detail-cart` journey in Chromium using only contract selectors and routes, and asserts that every web selector and template is visible in at least one app state. Native IDs are verified statically only; there is no Appium run against them in this repository.
 
 ## Changelog
+
+### 0.3.0 (additive)
+- Web sign-in (#88): `authUnavailable`, `authSignIn`, `authSignUp`, `authNotice`, `authAccount`, `authAccountMenu`, `authUser`, `authSignOut`, and `web.requiresAuth` for the selectors that need an identity provider in the build.
+- The header of every build now shows the sign-in control (in the public preview: "Sign-in isn't available in this build.") between the cart and the language switcher.
+- No ID from 0.2.0 was renamed or removed.
 
 ### 0.2.0 (additive)
 - Web discovery (#50, #63): merchant list and cards, merchant page, product page, cart line editing, not-found states, categories, `routes`, and `selectorTemplates`.
