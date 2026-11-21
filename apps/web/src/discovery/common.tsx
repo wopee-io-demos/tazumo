@@ -1,5 +1,5 @@
 import {useEffect,useRef} from 'react';
-import {t,type Language,type Product} from '@tazumo/core';
+import {t,type Language} from '@tazumo/core';
 import {homeHref} from './route';
 
 export function useRouteFocus(key:string){
@@ -23,12 +23,12 @@ export function NotFound({lang,routeKey,message,testId}:{lang:Language;routeKey:
   </section>;
 }
 
-type StepperProps={lang:Language;product:Product;quantity:number;testIdPrefix:string;onChange:(delta:number)=>void;onRemove:()=>void};
-export function QuantityStepper({lang,product,quantity,testIdPrefix,onChange,onRemove}:StepperProps){
-  return <div className="stepper" role="group" aria-label={`${t(lang,'quantity')}: ${product.name}`}>
-    <button type="button" data-testid={`${testIdPrefix}-decrease-${product.id}`} aria-label={`${t(lang,'removeOne')} ${product.name}`} onClick={()=>onChange(-1)}>−</button>
-    <span data-testid={`${testIdPrefix}-quantity-${product.id}`}>{quantity}</span>
-    <button type="button" data-testid={`${testIdPrefix}-increase-${product.id}`} aria-label={`${t(lang,'addOne')} ${product.name}`} onClick={()=>onChange(1)}>+</button>
-    <button type="button" className="removeLine" data-testid={`${testIdPrefix}-remove-${product.id}`} aria-label={`${t(lang,'remove')} ${product.name}`} onClick={onRemove}>{t(lang,'remove')}</button>
+type StepperProps={lang:Language;name:string;idKey:string;quantity:number;testIdPrefix:string;onChange:(delta:number)=>void;onRemove:()=>void};
+export function QuantityStepper({lang,name,idKey,quantity,testIdPrefix,onChange,onRemove}:StepperProps){
+  return <div className="stepper" role="group" aria-label={`${t(lang,'quantity')}: ${name}`}>
+    <button type="button" data-testid={`${testIdPrefix}-decrease-${idKey}`} aria-label={`${t(lang,'removeOne')} ${name}`} onClick={()=>onChange(-1)}>−</button>
+    <span data-testid={`${testIdPrefix}-quantity-${idKey}`}>{quantity}</span>
+    <button type="button" data-testid={`${testIdPrefix}-increase-${idKey}`} aria-label={`${t(lang,'addOne')} ${name}`} onClick={()=>onChange(1)}>+</button>
+    <button type="button" className="removeLine" data-testid={`${testIdPrefix}-remove-${idKey}`} aria-label={`${t(lang,'remove')} ${name}`} onClick={onRemove}>{t(lang,'remove')}</button>
   </div>;
 }

@@ -1,6 +1,7 @@
 /** Prototype catalogue only. Never represent fixture prices or delivery estimates as live. */
 export type Category = 'Food' | 'Groceries' | 'Shops' | 'Gifts';
 export type Product = { id: string; merchant: string; name: string; category: Category; description: string; priceCents: number; emoji: string };
+/** Cart line key to quantity. A product ID is the product's default configuration; any other configuration is keyed by `cartKey` from `@tazumo/product-options` (its `lineKey`). */
 export type Cart = Record<string, number>;
 export const categories: Category[] = ['Food','Groceries','Shops','Gifts'];
 export const products: Product[] = [

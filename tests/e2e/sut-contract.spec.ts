@@ -58,7 +58,7 @@ test('every catalogue fixture is addressable through the product and add templat
 });
 
 test('every web selector and template is visible in at least one app state',async({page})=>{
-  const values={productId:'pizza',merchantId:'piazza-local',category:'groceries'};
+  const values={productId:'pizza',merchantId:'piazza-local',category:'groceries',groupId:'sauce',optionId:'bacon',lineId:'pizza'};
   const needsProvider=new Set<string>(contract.web.requiresAuth);
   const all=[...Object.entries(selectors).filter(([k])=>!needsProvider.has(k)).map(([k,s])=>[`selectors.${k}`,s]),...Object.entries(selectorTemplates).map(([k,s])=>[`selectorTemplates.${k}`,fill(s,values)])];
   const seen=new Set<string>();
@@ -82,6 +82,11 @@ test('every web selector and template is visible in at least one app state',asyn
   await record();
   await sel(page,'cartOpen').click();
   await expect(sel(page,'cartLinePizza')).toBeVisible();
+  await record();
+  await sel(page,'cartClose').click();
+  await page.goto('/'+fill(routes.product,{productId:'burger'}));
+  for(const optionId of ['cheddar','bacon','jalapenos'])await tpl(page,'option',{optionId}).check();
+  await expect(sel(page,'optionsError')).toBeVisible();
   await record();
   await page.goto('/'+fill(routes.merchant,{merchantId:'no-such-merchant'}));
   await expect(sel(page,'merchantNotFound')).toBeVisible();
