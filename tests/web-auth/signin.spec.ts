@@ -264,12 +264,17 @@ test('the transient signing-in and signing-out states are announced', async ({ b
 
   await page.route((url) => url.href.startsWith(`${issuer}/protocol/openid-connect/logout?`), slow);
   await page.getByTestId('sut-auth-account').click();
-  // The click waits for the navigation it starts, which the route holds, so assert while it is still pending.
-  const signingOut = page.getByTestId('sut-auth-sign-out').click();
-  await expect(page.getByTestId('sut-auth-signing-out')).toHaveAttribute('role', 'status');
-  await recordSelectors(page);
-  await signingOut;
+  // Locators wait for the logout navigation to finish, so a page-side observer records the transient state in this tab's sessionStorage.
+  await page.evaluate(() => {
+    new MutationObserver(() => {
+      const status = document.querySelector('[data-testid="sut-auth-signing-out"]');
+      if (status?.getAttribute('role') === 'status' && status.checkVisibility()) sessionStorage.setItem('test.signing-out', status.textContent ?? '');
+    }).observe(document.body, { subtree: true, childList: true });
+  });
+  await page.getByTestId('sut-auth-sign-out').click();
   await expect(page.getByTestId('sut-auth-sign-in')).toBeVisible();
+  expect(await page.evaluate(() => sessionStorage.getItem('test.signing-out'))).toBe('Signing you out…');
+  seenSelectors.add('authSigningOut');
   await page.unrouteAll({ behavior: 'wait' });
 });
 

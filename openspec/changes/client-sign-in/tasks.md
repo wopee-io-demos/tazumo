@@ -28,5 +28,5 @@
   - no double TalkBack announcement;
   - exact `iss` comparison;
   - tests for a refused scheduled refresh, rotation, a missing `exp`, the late write, a double sign-out, the smoke copy matching `@tazumo/core`, and native `requiresAuth` contract cases.
-  The CI-only transient-state test now asserts `signing-out` while the click's held navigation is pending. Mobile tests 44/44, contract 31/31.
+  The CI-only transient-state test records `signing-out` with an in-page MutationObserver, because Playwright locators wait for the held logout navigation. Mobile tests 44/44, contract 31/31.
 - [x] Follow-up filed: #165 (an app-level native sign-in E2E on an emulator against Keycloak; too heavy for this slice).
