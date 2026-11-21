@@ -85,15 +85,15 @@ The iOS gallery still shows the app before #45. iOS captures no longer run on pu
 
 The PNGs and `provenance.json` in each platform folder are the exact files from that platform's artifact (`tazumo-screenshots-ios` or `tazumo-screenshots-android`) of the run named in the table; iOS and Android can come from different runs. They were optimised in CI with pngquant. `SHA256SUMS` was computed from the downloaded artifact, so the match stays checkable after the artifacts expire; newer runs also write the checksums into `provenance.json`.
 
-To regenerate, use the [SUT screenshots workflow](.github/workflows/screenshots.yml). Android runs on pull requests that touch `apps/mobile/**` or `tests/screenshots/native/**`. iOS runs only on pushes to `main`, nightly and on `workflow_dispatch`, so take iOS from one of those runs. For each platform whose artifact the run has:
+To regenerate, use the [SUT screenshots workflow](.github/workflows/screenshots.yml). Android runs on pushes to `main` that match the workflow's path filter, nightly, on `workflow_dispatch`, and on pull requests that touch `apps/mobile/**`, `tests/screenshots/native/**`, `.github/workflows/screenshots.yml` or `tests/screenshots/scope.sh`. iOS never runs on pull requests: it runs on pushes to `main` that match the path filter, nightly and on `workflow_dispatch`, so take iOS from one of those runs. For each platform whose artifact the run has (the steps are chained so a failed download leaves the gallery untouched):
 
 ```sh
 p=android   # or ios
 run=<run-id>
-tmp="$(mktemp -d)"
-gh run download "$run" -n "tazumo-screenshots-$p" -D "$tmp"
-rm -f docs/screenshots/$p/*.png docs/screenshots/$p/provenance.json docs/screenshots/$p/SHA256SUMS
-cp "$tmp"/* docs/screenshots/$p/
+tmp="$(mktemp -d)" &&
+gh run download "$run" -n "tazumo-screenshots-$p" -D "$tmp" &&
+rm -f docs/screenshots/$p/*.png docs/screenshots/$p/provenance.json docs/screenshots/$p/SHA256SUMS &&
+cp "$tmp"/* docs/screenshots/$p/ &&
 (cd docs/screenshots/$p && shasum -a 256 *.png > SHA256SUMS)
 ```
 
