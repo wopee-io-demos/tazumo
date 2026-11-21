@@ -29,7 +29,7 @@ jobs:
         with:
           version: 10.11.0
       - if: steps.changes.outputs.deps == 'true'
-        run: pnpm install --no-frozen-lockfile
+        run: pnpm install --frozen-lockfile
       - if: steps.changes.outputs.deps == 'true'
         run: pnpm audit --audit-level high
       - if: steps.changes.outputs.deps != 'true'

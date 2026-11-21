@@ -28,7 +28,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: pnpm install --no-frozen-lockfile
+      - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm build
       - run: pnpm exec playwright test -c tests/demo/playwright.config.ts
@@ -65,7 +65,7 @@ jobs:
           distribution: temurin
           java-version: '17'
       - run: node --test tests/demo/run-case.test.mjs
-      - run: pnpm install --no-frozen-lockfile
+      - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @tazumo/mobile exec expo prebuild --platform android --non-interactive --no-install
       - name: Assemble release-variant APK (debug keystore, x86_64, embedded JS bundle)
         working-directory: apps/mobile/android

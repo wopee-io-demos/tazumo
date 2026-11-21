@@ -11,6 +11,7 @@ ADRs are short decision documents with context, options, consequences and status
 - [0011: Semantic design tokens with tested contrast](0011-design-system-tokens.md)
 - [0016: Bearer JWT verification, database-held roles](0016-api-authentication.md)
 - [0017: OIDC provider for EU data residency (accepted)](0017-oidc-provider-eu-residency.md)
+- [0021: Order lifecycle as a validated event log (proposed)](0021-order-lifecycle-event-log.md)
 - [0023: Geocoding provider for delivery addresses (accepted)](0023-geocoding.md)
 - [0025: Public web preview on GitHub Pages](0025-web-preview-github-pages.md)
 - [0026: Stripe in test mode as the payment provider](0026-payment-provider.md)

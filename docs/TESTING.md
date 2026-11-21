@@ -70,7 +70,7 @@ The path-filtered workflows (`api.yml`, `backoffice.yml`, `screenshots.yml`, `de
   - the workflow itself.
 - **Runtime:** `Android emulator smoke` also runs for `apps/mobile/src/**`, `apps/mobile/tests/**`, `apps/mobile/index.ts` and `packages/core/**`.
 - **Out of scope:** other packages and apps do not start the workflow at all.
-- **Main:** every push to `main`, the nightly schedule and manual dispatch run all native jobs, so `main` is always verified natively.
+- **Main:** every push to `main`, the nightly schedule and manual dispatch run all native jobs, so `main` is always verified natively. Only pull request runs cancel superseded runs; each `main`, nightly or manual run has its own concurrency group, so a later push never cancels an earlier `main` run.
 - **iOS runner (#144):** the iOS job runs on the self-hosted `mac-ios` runner (`mac-ios-1`) when the repo variable `IOS_RUNNER=self-hosted` is set, or when `RUNNER_MODE` is unset or `self-hosted`. Otherwise it runs on hosted `macos-15`. Pull requests from forks always use `macos-15`, which `scripts/check-runner-guard.mjs` enforces. The trade-off: one self-hosted Mac serialises iOS builds, but it avoids the hosted macOS queue.
 
 ## CI evidence
