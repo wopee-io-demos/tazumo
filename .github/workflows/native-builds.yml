@@ -5,6 +5,7 @@ on:
       - '.github/workflows/native-builds.yml'
       - 'apps/mobile/**'
       - 'packages/core/**'
+      - 'contracts/sut.json'
       - 'pnpm-workspace.yaml'
       - 'pnpm-lock.yaml'
       - '.npmrc'
@@ -38,7 +39,7 @@ jobs:
           changed="$(git diff --name-only HEAD^1 HEAD)"
           printf '%s\n' "$changed" | sed 's/^/  /'
           native='^(apps/mobile/(app\.json|app\.config\.[^/]+|package\.json|eas\.json|(babel|metro)\.config\.[^/]+)$|apps/mobile/(assets|plugins)/|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|\.npmrc$|\.github/workflows/native-builds\.yml$)'
-          smoke='^(apps/mobile/(src|tests)/|apps/mobile/index\.ts$|packages/core/)'
+          smoke='^(apps/mobile/(src|tests)/|apps/mobile/index\.ts$|packages/core/|contracts/sut\.json$)'
           if printf '%s\n' "$changed" | grep -Eq "$native"; then n=true; else n=false; fi
           if [ "$n" = true ] || printf '%s\n' "$changed" | grep -Eq "$smoke"; then m=true; else m=false; fi
           echo "native=$n" >> "$GITHUB_OUTPUT"
@@ -109,7 +110,7 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
-      - name: Smoke path on the emulator (browse, product, add, cart)
+      - name: Smoke path and SUT contract walk on the emulator
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
           api-level: 34
@@ -118,13 +119,16 @@ jobs:
           profile: pixel_6
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
-          script: bash apps/mobile/tests/android-smoke.sh apps/mobile/android/app/build/outputs/apk/release/app-release.apk ${{ runner.temp }}/android-smoke
+          script: |
+            bash apps/mobile/tests/android-smoke.sh apps/mobile/android/app/build/outputs/apk/release/app-release.apk ${{ runner.temp }}/android-smoke
+            bash apps/mobile/tests/android-contract-walk.sh contracts/sut.json ${{ runner.temp }}/contract-walk
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: tazumo-android-smoke
           path: |
             ${{ runner.temp }}/android-smoke/
+            ${{ runner.temp }}/contract-walk/
             apps/mobile/android/app/build/outputs/apk/release/app-release.apk
           retention-days: 7
   ios:
