@@ -104,7 +104,7 @@ jobs:
           read -r runtime devtype < <(xcrun simctl list runtimes available -j | node -e "
             const r=JSON.parse(require('fs').readFileSync(0)).runtimes.filter(x=>x.platform==='iOS');
             r.sort((a,b)=>b.version.localeCompare(a.version,undefined,{numeric:true}));
-            const rt=r[0];if(!rt)process.exit(1);
+            const rt=r.find(x=>x.version.startsWith('26.'))||r[0];if(!rt)process.exit(1);
             const types=(rt.supportedDeviceTypes||[]).filter(t=>t.productFamily==='iPhone');
             const t=types.find(t=>t.name==='iPhone 16 Pro')||types[types.length-1];
             console.log(rt.identifier,t?t.identifier:'com.apple.CoreSimulator.SimDeviceType.iPhone-16-Pro')")
