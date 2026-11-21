@@ -45,3 +45,4 @@ Requires browser for web captures, Android SDK/emulator for APK, and macOS/Xcode
 Create/claim a GitHub Issue first, write linked OpenSpec changes, work on a new short-lived branch, open a draft PR early, run separated reviews (delegated where available), merge when CI and policy genuinely permit, and update the issue with the merge SHA. For interrupted work, use the handoff template in [ISSUE-WORKFLOW](ISSUE-WORKFLOW.md) with a concrete next step.
 
 This page is intentionally mostly stable. **GitHub Issues/PRs are the live status source**; update their bodies/comments for every new step rather than keeping duplicated static progress tables.
+
