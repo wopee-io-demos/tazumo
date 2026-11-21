@@ -7,10 +7,12 @@
     "dev:mobile": "pnpm --filter @tazumo/mobile start",
     "build": "pnpm --filter @tazumo/web build",
     "typecheck": "pnpm -r typecheck",
-    "test": "pnpm --filter @tazumo/core test && pnpm --filter @tazumo/commerce test && pnpm test:contract",
+    "test": "pnpm --filter @tazumo/core test && pnpm --filter @tazumo/commerce test && pnpm --filter @tazumo/address test && pnpm test:contract",
     "test:contract": "node --experimental-strip-types --test tests/contract/*.test.mts",
+    "check:sut": "node --experimental-strip-types scripts/check-sut-contract.mjs",
     "test:e2e": "playwright test",
-    "bundle:mobile": "pnpm --filter @tazumo/mobile exec expo export --platform ios && pnpm --filter @tazumo/mobile exec expo export --platform android"
+    "bundle:mobile": "pnpm --filter @tazumo/mobile exec expo export --platform ios && pnpm --filter @tazumo/mobile exec expo export --platform android",
+    "dev:sut": "pnpm --filter @tazumo/web dev --host 127.0.0.1 --port 4173 --strictPort"
   },
   "devDependencies": {
     "@actions/expressions": "0.3.61",
@@ -18,6 +20,7 @@
     "@playwright/test": "^1.56.0",
     "ajv": "8.20.0",
     "ajv-formats": "3.0.1",
+    "typescript": "^5.8.3",
     "yaml": "2.9.1"
   },
   "pnpm": {

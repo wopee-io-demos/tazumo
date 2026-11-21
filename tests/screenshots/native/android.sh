@@ -20,17 +20,18 @@ statusbar(){
 }
 adb shell cmd uimode night no
 adb install -r "$apk"
-adb shell monkey -p io.wopee.demos.tazumo -c android.intent.category.LAUNCHER 1 >/dev/null
-maestro test "$here/wait-catalogue.yaml"
 shoot(){ statusbar; adb exec-out screencap -p > "$out/$1.png"; }
-shoot catalogue
-maestro test "$here/product-detail.yaml"
-shoot product
-maestro test "$here/back-to-catalogue.yaml"
-maestro test "$here/fill-cart.yaml"
-shoot cart
-maestro test "$here/cart-screen.yaml"
-shoot cart-screen
+flow(){ maestro test "$here/$1.yaml"; }
+capture(){
+  adb shell am force-stop io.wopee.demos.tazumo
+  adb shell monkey -p io.wopee.demos.tazumo -c android.intent.category.LAUNCHER 1 >/dev/null
+  flow wait-catalogue && shoot catalogue &&
+  flow product-detail && shoot product &&
+  flow back-to-catalogue &&
+  flow fill-cart && shoot cart &&
+  flow cart-screen && shoot cart-screen
+}
+capture || { echo "Capture attempt 1 failed; relaunching the app for one retry" >&2; rm -f "$out"/*.png; capture; }
 bash "$here/optimise.sh" "$out"
 device="$(adb shell getprop ro.product.model | tr -d '\r') emulator"
 os="Android $(adb shell getprop ro.build.version.release | tr -d '\r') (API $(adb shell getprop ro.build.version.sdk | tr -d '\r'))"
