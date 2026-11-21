@@ -4,10 +4,10 @@ on:
     paths:
       - '.github/workflows/native-builds.yml'
       - 'apps/mobile/**'
-      - 'packages/**'
-      - 'package.json'
+      - 'packages/core/**'
       - 'pnpm-workspace.yaml'
       - 'pnpm-lock.yaml'
+      - '.npmrc'
   push:
     branches: [main]
   schedule:
@@ -20,12 +20,13 @@ concurrency:
   cancel-in-progress: true
 jobs:
   changes:
-    name: iOS-relevant changes
+    name: Native-relevant changes
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
-      ios: ${{ steps.diff.outputs.ios }}
+      native: ${{ steps.diff.outputs.native }}
+      smoke: ${{ steps.diff.outputs.smoke }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -34,14 +35,17 @@ jobs:
         run: |
           changed="$(git diff --name-only HEAD^1 HEAD)"
           printf '%s\n' "$changed" | sed 's/^/  /'
-          if printf '%s\n' "$changed" | grep -Eq '^(apps/mobile/|packages/(core|brand)/|(apps|packages)/[^/]+/package\.json$|\.github/workflows/native-builds\.yml$|package\.json$|pnpm-workspace\.yaml$|pnpm-lock\.yaml$|\.npmrc$)'; then
-            echo "ios=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "ios=false" >> "$GITHUB_OUTPUT"
-          fi
+          native='^(apps/mobile/(app\.json|package\.json|eas\.json|(babel|metro)\.config\.[^/]+)$|apps/mobile/(assets|plugins)/|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|\.npmrc$|\.github/workflows/native-builds\.yml$)'
+          smoke='^(apps/mobile/(src|tests)/|apps/mobile/index\.ts$|packages/core/)'
+          if printf '%s\n' "$changed" | grep -Eq "$native"; then n=true; else n=false; fi
+          if [ "$n" = true ] || printf '%s\n' "$changed" | grep -Eq "$smoke"; then m=true; else m=false; fi
+          echo "native=$n" >> "$GITHUB_OUTPUT"
+          echo "smoke=$m" >> "$GITHUB_OUTPUT"
+          echo "native=$n smoke=$m"
   android:
     name: Android debug APK
-    if: github.event_name != 'schedule'
+    needs: changes
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.native == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 75
     steps:
@@ -69,7 +73,8 @@ jobs:
           retention-days: 7
   android-smoke:
     name: Android emulator smoke
-    if: github.event_name != 'schedule'
+    needs: changes
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.smoke == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
@@ -120,7 +125,7 @@ jobs:
   ios:
     name: iOS simulator build
     needs: changes
-    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.ios == 'true') }}
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.native == 'true') }}
     runs-on: macos-15
     timeout-minutes: 90
     steps:
