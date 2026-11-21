@@ -69,16 +69,20 @@ export function requiredChecks(contract){
 }
 
 /** The attributes of the UiAutomator node with this resource-id, or null. */
+const decode=v=>v.replace(/&(#x[0-9a-f]+|#\d+|amp|lt|gt|quot|apos);/gi,(_,e)=>e[0]==='#'?String.fromCodePoint(Number(e[1].toLowerCase()==='x'?'0'+e.slice(1):e.slice(1))):({amp:'&',lt:'<',gt:'>',quot:'"',apos:"'"})[e.toLowerCase()]);
 export function nodeAttributes(xml,id){
- const tag=new RegExp(`<[^<>]*\\bresource-id="${id.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}"[^<>]*>`).exec(xml)?.[0];
- return tag?Object.fromEntries([...tag.matchAll(/([\w:-]+)="([^"]*)"/g)].map(m=>[m[1],m[2]])):null;
+ for(const tag of xml.match(/<[\w.:-]+(?:\s+[\w:.-]+="[^"]*")*\s*\/?>/g)??[]){
+  const attrs=Object.fromEntries([...tag.matchAll(/([\w:.-]+)="([^"]*)"/g)].map(m=>[m[1],decode(m[2])]));
+  if(attrs['resource-id']===id)return attrs;
+ }
+ return null;
 }
 
 const vertical=target=>`new UiScrollable(new UiSelector().scrollable(true).className("android.widget.ScrollView")).scrollIntoView(${target})`;
 const horizontal=target=>`new UiScrollable(new UiSelector().scrollable(true).className("android.widget.HorizontalScrollView")).setAsHorizontalList().scrollIntoView(${target})`;
 const byId=id=>`new UiSelector().resourceId("${id}")`;
 
-export async function walk(contract,core,call,folder,{timeout=15000,firstTimeout=timeout,extra={}}={}){
+export async function walk(contract,core,call,folder,{timeout=15000,firstTimeout=timeout,poll=350,extra={}}={}){
  const report={contractVersion:contract.version,platform:'android',settings:null,expected:0,states:[],ids:[],checks:[],missing:[],assertions:0,outcome:'infrastructure-failed'};
  mkdirSync(folder,{recursive:true});
  let session,device,shot=0,expected=[],required=[];
@@ -107,7 +111,7 @@ export async function walk(contract,core,call,folder,{timeout=15000,firstTimeout
    if(hits.length)return {hits,scrolled:false};
    if(await scrollTo(id,inHorizontal)){const again=await visible(id);if(again.length)return {hits:again,scrolled:true}}
    if(Date.now()>=end)return {hits:[],scrolled:false};
-   await new Promise(r=>setTimeout(r,350));
+   await new Promise(r=>setTimeout(r,poll));
   }
  };
  try{
@@ -160,7 +164,7 @@ export async function walk(contract,core,call,folder,{timeout=15000,firstTimeout
      ({hits}=await find(c.id,0));
      actual=!hits.length?null:c.check==='disabled'?await device('GET',hits[0]+'/enabled'):await device('GET',hits[0]+'/text');
      if((c.check==='disabled'?actual===false:actual===c.expected)||Date.now()>=end)break;
-     await new Promise(r=>setTimeout(r,350));
+     await new Promise(r=>setTimeout(r,poll));
     }
     const proof=await capture(`${state.name}-${c.check}-${c.id}`);
     record.files.push(proof.file);
@@ -195,7 +199,7 @@ export function verifyWalk(contract,core,report,folder,read=p=>readFileSync(p,'u
  if(report.outcome!=='passed')return {ok:false,reason:`outcome ${report.outcome}${report.error?`: ${report.error}`:''}`};
  if(report.evidenceErrors?.length||report.cleanupError)return {ok:false,reason:'evidence or cleanup errors'};
  const xmlOf=file=>{try{return read(join(folder,file))}catch{return null}};
- const fromState=(file,state)=>typeof file==='string'&&new RegExp(`^\\d{2}-${state}(-|\\.xml$)`).test(file);
+ const fromState=(file,state)=>typeof file==='string'&&new RegExp(`^\\d+-${state}(-|\\.xml$)`).test(file);
  const problems=[];
  const ids=Array.isArray(report.ids)?report.ids:[];
  for(const e of expected){
@@ -235,6 +239,7 @@ if(process.argv[1]&&realpathSync(fileURLToPath(import.meta.url))===realpathSync(
  const report=await walk(contract,core,client(process.env.APPIUM_URL??'http://127.0.0.1:4723'),outDir,{
   timeout:Number(process.env.STEP_TIMEOUT_MS??15000),
   firstTimeout:Number(process.env.FIRST_STEP_TIMEOUT_MS??90000),
+  poll:Number(process.env.POLL_MS??350),
   // forceAppLaunch restarts the app, so the in-memory cart starts empty even after the smoke run.
   extra:{'appium:appActivity':'.MainActivity','appium:forceAppLaunch':true,'appium:autoGrantPermissions':true,'appium:newCommandTimeout':300,'appium:uiautomator2ServerLaunchTimeout':120000,'appium:uiautomator2ServerInstallTimeout':120000,'appium:adbExecTimeout':120000}
  });

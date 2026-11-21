@@ -6,7 +6,7 @@ import {spawn} from 'node:child_process';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {PLAN,expectedIds,loadCore,placeholderValues,verifyWalk,walk} from './contract-walk.mjs';
+import {PLAN,expectedIds,loadCore,nodeAttributes,placeholderValues,requiredChecks,verifyWalk,walk} from './contract-walk.mjs';
 
 const here=fileURLToPath(new URL('.',import.meta.url));
 const contract=JSON.parse(readFileSync(join(here,'../../../contracts/sut.json'),'utf8'));
@@ -22,8 +22,8 @@ const clone=x=>JSON.parse(JSON.stringify(x));
 // hides the top (header, category pills, pizza). The pills are a HorizontalScrollView: shops and gifts need a
 // horizontal UiScrollable, which errors unless the pill list is on screen. The first render and each screen change
 // take a few polls, and a UiScrollable over a scrollable that is not on screen is an HTTP error, like UiAutomator2.
-function fakeApp({missing=[],enabledCheckout=false,ready=true,coldPolls=3,staleLine=false,screenshotFails=false,settingsIgnored=false}={}){
- const s={screen:'catalogue',basket:false,qty:0,pos:'top',hpos:'start',pendingPolls:coldPolls},log=[];
+function fakeApp({missing=[],enabledCheckout=false,ready=true,coldPolls=3,staleLine=false,screenshotFails=false,settingsIgnored=false,textLag=2}={}){
+ const s={screen:'catalogue',basket:false,qty:0,shownQty:0,lag:0,pos:'top',hpos:'start',pendingPolls:coldPolls},log=[];
  const top=['sut-search','sut-cart-open','sut-category-all','sut-category-food','sut-category-groceries','sut-category-shops','sut-category-gifts','sut-product-pizza','sut-add-pizza','sut-open-product-pizza'];
  const pills={start:['sut-category-all','sut-category-food','sut-category-groceries'],end:['sut-category-groceries','sut-category-shops','sut-category-gifts']};
  const bottom=()=>[...(s.basket?['sut-cart-summary','sut-checkout-disabled','sut-cart-screen-open']:[]),'sut-product-bread','sut-add-bread','sut-open-product-bread','sut-language-en','sut-language-cs','sut-language-de'];
@@ -41,7 +41,7 @@ function fakeApp({missing=[],enabledCheckout=false,ready=true,coldPolls=3,staleL
   return v.filter(x=>!missing.includes(x));
  };
  const rendered=()=>s.pendingPolls>0?[]:onScreen();
- const text=id=>id==='sut-detail-quantity'?`In your cart: ${s.qty}`:id==='sut-cart-quantity-pizza'?String(s.qty):'';
+ const text=id=>id==='sut-detail-quantity'?`In your cart: ${s.shownQty}`:id==='sut-cart-quantity-pizza'?String(s.shownQty):'';
  const enabled=id=>id.includes('checkout-disabled')?enabledCheckout:true;
  const tap=id=>{
   const before=s.screen;
@@ -52,6 +52,7 @@ function fakeApp({missing=[],enabledCheckout=false,ready=true,coldPolls=3,staleL
   else if(id==='sut-open-product-pizza')s.screen='detail';
   else if(id==='sut-nav-cart')s.screen='cart';
   if(s.screen!==before)s.pendingPolls=2;
+  s.lag=textLag;
  };
  const scroll=value=>{
   const target=/resourceId\("([^"]+)"\)/.exec(value)?.[1],toPills=/scrollIntoView\(new UiSelector\(\)\.className\("android.widget.HorizontalScrollView"\)\)/.test(value);
@@ -85,8 +86,9 @@ function fakeApp({missing=[],enabledCheckout=false,ready=true,coldPolls=3,staleL
   if(path.endsWith('/displayed'))return rendered().includes(id);
   if(path.endsWith('/click')){tap(id);return null}
   if(path.endsWith('/enabled'))return enabled(id);
-  if(path.endsWith('/text'))return text(id);
+  if(path.endsWith('/text')){if(s.lag>0)s.lag--;else s.shownQty=s.qty;return text(id)}
   if(path.endsWith('/source')){
+   if(s.lag===0)s.shownQty=s.qty;
    const nodes=[...rendered(),...(staleLine&&s.screen==='cart'&&s.qty===0?['sut-cart-line-pizza']:[])];
    return `<hierarchy>${nodes.map(x=>`<android.view.View index="0" text="${text(x)}" resource-id="${x}" enabled="${enabled(x)}" displayed="true"/>`).join('')}</hierarchy>`;
   }
@@ -95,7 +97,7 @@ function fakeApp({missing=[],enabledCheckout=false,ready=true,coldPolls=3,staleL
  };
  return {call,log,state:s,content};
 }
-const run=async(opts,c=contract)=>{const out=tmp(),{call,log}=fakeApp(opts);const report=await walk(c,core,call,out,{timeout:200,firstTimeout:5000});return {out,log,report,verdict:verifyWalk(c,core,report,out)}};
+const run=async(opts,c=contract)=>{const out=tmp(),{call,log}=fakeApp(opts);const report=await walk(c,core,call,out,{timeout:400,firstTimeout:2000,poll:20});return {out,log,report,verdict:verifyWalk(c,core,report,out)}};
 
 test('the walk plan gives every native contract ID of v0.2.0 a screen',()=>{
  const values=placeholderValues(contract,core),ids=expectedIds(contract,values);
@@ -188,7 +190,7 @@ const contractPath=join(here,'../../../contracts/sut.json');
 test('the walker and verifier CLIs exit 0 only for a complete walk',async()=>{
  for(const [opts,code] of [[{},0],[{missing:['sut-detail-price']},1]]){
   const server=await serve(fakeApp(opts)),out=tmp();
-  const env={APPIUM_URL:`http://127.0.0.1:${server.address().port}`,STEP_TIMEOUT_MS:'30',FIRST_STEP_TIMEOUT_MS:'30'};
+  const env={APPIUM_URL:`http://127.0.0.1:${server.address().port}`,STEP_TIMEOUT_MS:'400',FIRST_STEP_TIMEOUT_MS:'2000',POLL_MS:'20'};
   const walked=await cli('contract-walk.mjs',[contractPath,out],env);
   server.close();
   assert.equal(walked.code,code,walked.output);
@@ -231,4 +233,42 @@ test('a slow cold start is waited for before the first tree is captured',async()
  const {report,out}=await run({coldPolls:6});
  assert.equal(report.outcome,'passed',report.error);
  assert.match(readFileSync(join(out,report.states[0].files[0]),'utf8'),/resource-id="sut-search"/);
+});
+
+test('the verifier rejects each kind of unproven or misattributed evidence',async()=>{
+ const {out,report}=await run({});
+ const edit=(file,from,to)=>{const p=join(out,file),x=readFileSync(p,'utf8');assert.ok(x.includes(from),from);writeFileSync(p,x.replace(from,to));return ()=>writeFileSync(p,x)};
+ const text=report.checks.find(c=>c.check==='text'&&c.state==='cart-increase');
+ let undo=edit(text.file,'text="3" resource-id="sut-cart-quantity-pizza"','text="4" resource-id="sut-cart-quantity-pizza"');
+ assert.match(verifyWalk(contract,core,report,out).reason,/text sut-cart-quantity-pizza on cart-increase: tree does not show text "3"/);
+ undo();
+ const gone=report.checks.find(c=>c.check==='gone');
+ undo=edit(gone.file,'</hierarchy>','<node resource-id="sut-cart-line-pizza"/></hierarchy>');
+ assert.match(verifyWalk(contract,core,report,out).reason,/gone sut-cart-line-pizza on cart-empty: still in/);
+ undo();
+ const moved={...report,checks:report.checks.map(c=>c===text?{...c,file:report.checks.find(x=>x.state==='cart-decrease').file}:c)};
+ assert.match(verifyWalk(contract,core,moved,out).reason,/evidence .* is not from cart-increase/);
+ assert.match(verifyWalk(contract,core,{...report,evidenceErrors:['screenshot failed']},out).reason,/evidence or cleanup errors/);
+ assert.match(verifyWalk(contract,core,{...report,assertions:report.assertions-1},out).reason,/assertion count/);
+ assert.ok(verifyWalk(contract,core,report,out).ok);
+});
+
+test('a contract checkout control without a disabled check in the plan fails',()=>{
+ const c=clone(contract);
+ c.native.selectors.detailCheckoutDisabled='sut-detail-title';
+ assert.throws(()=>requiredChecks(c),/detailCheckoutDisabled: checkout control has no disabled check/);
+});
+
+test('tree attributes are decoded and matched by exact resource-id',()=>{
+ const xml='<hierarchy><node text="Tom &amp; Jerry &#8364;1 &gt; 0" resource-id="sut-a-b" enabled="false"/><node resource-id="sut-a" text="x"/></hierarchy>';
+ assert.deepEqual([nodeAttributes(xml,'sut-a-b').text,nodeAttributes(xml,'sut-a').text,nodeAttributes(xml,'sut-a-b').enabled],['Tom & Jerry \u20ac1 > 0','x','false']);
+ assert.equal(nodeAttributes(xml,'sut-b'),null);
+});
+
+test('text that updates a few polls after a tap is waited for',async()=>{
+ const {report}=await run({textLag:4});
+ assert.equal(report.outcome,'passed',report.error);
+ const {report:slow}=await run({textLag:1000});
+ assert.equal(slow.outcome,'failed');
+ assert.match(slow.error,/text sut-detail-quantity on product-detail/);
 });
