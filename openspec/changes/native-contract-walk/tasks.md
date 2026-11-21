@@ -2,7 +2,7 @@
 
 Issue #32 (slice), branch `test/32-android-contract-walker`.
 
-- [x] Walk plan covering every native key of contract v0.2.0 (36 unique IDs over 8 screens; the last six follow the `native-detail-cart` journey steps).
+- [x] Walk plan covering every native key of the contract (v0.2.0 to v0.4.0; v0.3.0 and v0.4.0 added web keys only) (36 unique IDs over 8 screens; the last six follow the `native-detail-cart` journey steps).
 - [x] Walker, independent verifier and emulator script.
 - [x] Fake-WebDriver tests (16) over a model of the app: a scrolling viewport, the nested horizontal pill list, cold-start and transition delays, and text that updates a few polls after a tap. They cover:
   - a complete walk, and missing IDs (including an off-screen pill)

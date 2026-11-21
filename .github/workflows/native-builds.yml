@@ -5,6 +5,7 @@ on:
       - '.github/workflows/native-builds.yml'
       - 'apps/mobile/**'
       - 'packages/core/**'
+      - 'contracts/sut.json'
       - 'pnpm-workspace.yaml'
       - 'pnpm-lock.yaml'
       - '.npmrc'
@@ -36,7 +37,7 @@ jobs:
           changed="$(git diff --name-only HEAD^1 HEAD)"
           printf '%s\n' "$changed" | sed 's/^/  /'
           native='^(apps/mobile/(app\.json|package\.json|eas\.json|(babel|metro)\.config\.[^/]+)$|apps/mobile/(assets|plugins)/|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|\.npmrc$|\.github/workflows/native-builds\.yml$)'
-          smoke='^(apps/mobile/(src|tests)/|apps/mobile/index\.ts$|packages/core/)'
+          smoke='^(apps/mobile/(src|tests)/|apps/mobile/index\.ts$|packages/core/|contracts/sut\.json$)'
           if printf '%s\n' "$changed" | grep -Eq "$native"; then n=true; else n=false; fi
           if [ "$n" = true ] || printf '%s\n' "$changed" | grep -Eq "$smoke"; then m=true; else m=false; fi
           echo "native=$n" >> "$GITHUB_OUTPUT"

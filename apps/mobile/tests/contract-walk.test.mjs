@@ -99,7 +99,7 @@ function fakeApp({missing=[],enabledCheckout=false,ready=true,coldPolls=3,staleL
 }
 const run=async(opts,c=contract)=>{const out=tmp(),{call,log}=fakeApp(opts);const report=await walk(c,core,call,out,{timeout:400,firstTimeout:2000,poll:20});return {out,log,report,verdict:verifyWalk(c,core,report,out)}};
 
-test('the walk plan gives every native contract ID of v0.2.0 a screen',()=>{
+test('the walk plan gives every native contract ID a screen',()=>{
  const values=placeholderValues(contract,core),ids=expectedIds(contract,values);
  for(const key of Object.keys(contract.native.selectors))assert.ok(ids.some(e=>e.keys.includes(`selectors.${key}`)),key);
  for(const key of Object.keys(contract.native.selectorTemplates))assert.ok(ids.some(e=>e.keys.includes(`selectorTemplates.${key}`)),key);
@@ -161,7 +161,7 @@ test('the verifier fails closed on a missing, foreign, empty or tampered report'
  const {out,report}=await run({});
  assert.ok(verifyWalk(contract,core,report,out).ok);
  assert.equal(verifyWalk(contract,core,undefined,out).ok,false);
- assert.match(verifyWalk(contract,core,{...report,contractVersion:'0.1.0'},out).reason,/expected 0\.2\.0/);
+ assert.match(verifyWalk(contract,core,{...report,contractVersion:'0.0.1'},out).reason,new RegExp(`expected ${contract.version.replaceAll('.','\\.')}$`));
  assert.match(verifyWalk(contract,core,{...report,settings:{}},out).reason,/disableIdLocatorAutocompletion/);
  assert.match(verifyWalk(contract,core,{...report,assertions:0},out).reason,/zero assertions/);
  assert.match(verifyWalk(contract,core,{...report,ids:report.ids.slice(1)},out).reason,/not resolved/);
